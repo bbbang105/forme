@@ -17,6 +17,7 @@ pnpm 모노레포: `packages/web` (Next.js 16 PWA) + `packages/shared` (DB 스�
 | 스타일링 | Tailwind CSS 4 + shadcn/ui + Radix UI |
 | 푸시알림 | web-push + Service Worker |
 | RSS | feedsmith |
+| DnD | @dnd-kit (core + sortable) |
 | 에디터 | TipTap (메모) |
 | 패키지 관리 | pnpm workspace |
 | 배포 | Vercel |
@@ -58,6 +59,7 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/lib/crawl-feed.ts` | RSS 크롤 (feedsmith, since 필터, SSRF 방어) |
 | `packages/web/src/lib/url-safety.ts` | SSRF 방어 유틸 |
 | `packages/web/src/app/api/curation/crawl/route.ts` | SSE 수동 크롤 API |
+| `packages/web/src/app/api/curation/sources/reorder/route.ts` | 즐겨찾기 소스 순서 배치 업데이트 |
 | `packages/web/src/app/api/cron/curation/route.ts` | Cron 자동 크롤 (7일 기본) |
 | `packages/web/public/sw.js` | Service Worker (PWA + 푸시) |
 | `packages/web/src/app/manifest.ts` | PWA 매니페스트 (MetadataRoute) |
