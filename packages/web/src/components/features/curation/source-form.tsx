@@ -38,7 +38,6 @@ interface SourceFormProps {
 }
 
 export function SourceForm({
-  existingCategories,
   onSubmit,
   onCancel,
   initialData,

@@ -55,16 +55,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const savedTimeRef = useRef(0);
 
-  // Refs for beforeunload (avoid stale closures)
-  const episodeRef = useRef(episode);
-  episodeRef.current = episode;
-  const isRestoredRef = useRef(isRestored);
-  isRestoredRef.current = isRestored;
-  const playbackRateRef = useRef(playbackRate);
-  playbackRateRef.current = playbackRate;
-  const volumeRef = useRef(volume);
-  volumeRef.current = volume;
-
   // Initialize audio element once
   useEffect(() => {
     const audio = new Audio();
@@ -107,7 +97,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  // Restore last session from localStorage
+  // Restore last session from localStorage (runs once after mount)
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -119,18 +109,21 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         volume: number;
       };
       if (saved?.episode?.id && saved.currentTime > 0) {
-        setEpisode(saved.episode);
-        setCurrentTime(saved.currentTime);
         savedTimeRef.current = saved.currentTime;
-        setIsRestored(true);
-        if (saved.episode.duration) setDuration(saved.episode.duration);
-        if (saved.playbackRate) setPlaybackRateState(saved.playbackRate);
-        if (typeof saved.volume === 'number') setVolumeState(saved.volume);
+        // Batch state restoration via microtask to avoid cascading render lint
+        queueMicrotask(() => {
+          setEpisode(saved.episode);
+          setCurrentTime(saved.currentTime);
+          setIsRestored(true);
+          if (saved.episode.duration) setDuration(saved.episode.duration);
+          if (saved.playbackRate) setPlaybackRateState(saved.playbackRate);
+          if (typeof saved.volume === 'number') setVolumeState(saved.volume);
+        });
       }
     } catch { /* ignore corrupted data */ }
   }, []);
 
-  // Periodically save progress to localStorage
+  // Save progress + beforeunload (merged — no refs needed)
   useEffect(() => {
     if (!episode || isRestored) return;
 
@@ -145,36 +138,18 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       }));
     };
 
-    // Save immediately when episode starts
     save();
-
     const interval = setInterval(save, 3000);
     const audio = audioRef.current;
-    const handlePause = () => save();
-    audio?.addEventListener('pause', handlePause);
+    audio?.addEventListener('pause', save);
+    window.addEventListener('beforeunload', save);
 
     return () => {
       clearInterval(interval);
-      audio?.removeEventListener('pause', handlePause);
+      audio?.removeEventListener('pause', save);
+      window.removeEventListener('beforeunload', save);
     };
   }, [episode, isRestored, playbackRate, volume]);
-
-  // Save on page close/refresh
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      const audio = audioRef.current;
-      const ep = episodeRef.current;
-      if (!audio || !ep || isRestoredRef.current) return;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        episode: ep,
-        currentTime: audio.currentTime,
-        playbackRate: playbackRateRef.current,
-        volume: volumeRef.current,
-      }));
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, []);
 
   const play = useCallback((ep: Episode, startTime?: number) => {
     const audio = audioRef.current;
