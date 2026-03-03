@@ -86,6 +86,13 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/components/features/calendar/event-list.tsx` | 이벤트 목록 (선택 날짜별 필터링) |
 | `packages/web/src/components/features/calendar/dashboard-calendar.tsx` | 대시보드 캘린더 위젯 (오늘 할일 + 다가오는 일정) |
 | `packages/web/src/hooks/use-swipe.ts` | 터치 스와이프 훅 (모바일 월 이동) |
+| `packages/shared/src/schema/memos.ts` | 메모 스키마 (JSONB content + contentText) |
+| `packages/web/src/lib/actions/memos.ts` | 메모 Server Actions (CRUD + 검색 + 고정 + TipTap JSON 검증) |
+| `packages/web/src/components/features/memo/memo-editor.tsx` | TipTap 에디터 (자동저장, 고정/삭제) |
+| `packages/web/src/components/features/memo/memo-toolbar.tsx` | 에디터 서식 툴바 (B/I/U/S, H1/H2, 리스트, 체크리스트, 링크) |
+| `packages/web/src/components/features/memo/memo-list.tsx` | 메모 목록 (검색, 고정 섹션, FAB) |
+| `packages/web/src/components/features/memo/memo-card.tsx` | 메모 카드 (제목+날짜+미리보기) |
+| `packages/web/src/components/features/memo/dashboard-memo.tsx` | 대시보드 최근 메모 위젯 |
 
 ## 인증 구조
 
@@ -121,3 +128,4 @@ study-admin 스타일: Sky Blue `#0ea5e9` 포인트, Pretendard 폰트, 다크�
 | `docs/plans/26-03-03-forme-design.md` | 전체 설계 문서 |
 | `docs/26-03-03-schema-summary.md` | DB 스키마 요약 (테이블, FK, enum) |
 | `docs/26-03-03-patterns.md` | 인증/API/ORM 코드 패턴 |
+| `docs/plans/26-03-04-memo-design.md` | 메모 기능 설계 문서 |

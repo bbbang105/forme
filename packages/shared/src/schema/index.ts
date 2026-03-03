@@ -5,3 +5,4 @@ export * from './calendar-events';
 export * from './todos';
 export * from './podcast';
 export * from './push-subscriptions';
+export * from './memos';
