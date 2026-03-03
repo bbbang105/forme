@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { crawlSource, getActiveSourcesForUser, type CrawlSourceResult } from '@/lib/crawl-feed';
+import {NextRequest, NextResponse} from 'next/server';
+import {crawlSource, type CrawlSourceResult, getActiveSourcesForUser} from '@/lib/crawl-feed';
+import {sendPushToUser} from '@/lib/push';
 
 /**
  * GET /api/cron/curation
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
   }
 
   const startedAt = Date.now();
-  const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const since = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000);
   const sources = await getActiveSourcesForUser(userId);
 
   if (sources.length === 0) {
@@ -48,6 +49,28 @@ export async function GET(request: NextRequest) {
   };
 
   console.info('[cron/curation] complete', summary);
+
+  // 새 아이템이 있으면 푸시 알림 발송
+  if (totalNewItems > 0) {
+    const greetings = [
+      '좋은 아침이에요!',
+      '오늘도 좋은 하루 되세요!',
+      '새로운 소식이 도착했어요!',
+      '오늘의 큐레이션이 준비됐어요!',
+    ];
+    const greeting = greetings[Math.floor(Math.random() * greetings.length)]!;
+
+    try {
+      await sendPushToUser(userId, {
+        title: `${greeting} +${totalNewItems}개 새 글`,
+        body: `${summary.totalSources}개 소스에서 새로운 글 ${totalNewItems}개를 찾았어요. 확인해보세요!`,
+        tag: 'curation-crawl',
+        url: '/curation',
+      });
+    } catch (err) {
+      console.error('[cron/curation] push notification failed', err);
+    }
+  }
 
   return NextResponse.json({
     ok: true,

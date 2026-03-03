@@ -1,6 +1,6 @@
-import type { Metadata } from 'next';
-import { ThemeProvider } from 'next-themes';
-import { ServiceWorkerRegister } from '@/components/sw-register';
+import type {Metadata} from 'next';
+import {ThemeProvider} from 'next-themes';
+import {ServiceWorkerRegister} from '@/components/sw-register';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -28,6 +28,7 @@ export default function RootLayout({
     <html lang="ko" suppressHydrationWarning>
       <head>
         <meta name="theme-color" content="#0ea5e9" />
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
         <link rel="preconnect" href="https://cdn.jsdelivr.net" crossOrigin="anonymous" />
         <link

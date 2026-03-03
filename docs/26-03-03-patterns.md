@@ -206,6 +206,44 @@ export const todos = pgTable('todos', {
 })
 ```
 
+## R2 파일 업로드 패턴
+
+```typescript
+// packages/web/src/lib/r2.ts
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
+
+export async function uploadToR2(key: string, body: Buffer, contentType: string)
+  : Promise<{ url: string }> {
+  // S3Client → Cloudflare R2 (S3-compatible)
+  // key: "podcast/{userId}/{uuid}.{ext}"
+  // MIME 기반 확장자만 허용 (파일명 무시)
+  return { url: `${R2_PUBLIC_URL}/${key}` }
+}
+
+// Route: POST /api/podcast/upload (FormData, maxDuration=300)
+// MIME 검증 → 사이즈 검증 → R2 업로드 → URL 반환
+```
+
+## 푸시 알림 패턴
+
+```typescript
+// packages/web/src/lib/push.ts
+import webpush from 'web-push'
+
+// VAPID lazy init, 유저별 활성 구독에 발송
+export async function sendPushToUser(userId: string, payload: NotificationPayload)
+  : Promise<{ sent: number; failed: number }> {
+  // 1. pushSubscriptions에서 userId + isActive 조회
+  // 2. Promise.allSettled로 멀티 디바이스 발송
+  // 3. 404/410 영구 실패 구독 자동 비활성화
+  // URL은 반드시 상대경로 ('/'로 시작)
+}
+
+// API: POST/DELETE/GET /api/push/subscribe
+// 보안: HTTPS endpoint 강제, 소유자 확인, 필드 길이 제한
+// Cron 연동: /api/cron/curation에서 새 글 발견 시 자동 발송
+```
+
 ## 컴포넌트 Import 패턴
 
 ```typescript
@@ -219,4 +257,6 @@ import { TabBar } from '@/components/layout/tab-bar'
 
 // 기능별
 import { CurationCard } from '@/components/features/curation/curation-card'
+import { EpisodeList } from '@/components/features/podcast/episode-list'
+import { NotificationSettings } from '@/components/features/push/notification-settings'
 ```

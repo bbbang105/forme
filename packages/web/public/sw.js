@@ -1,21 +1,86 @@
 /// <reference lib="webworker" />
 
-// forme - Service Worker (Push Notifications)
+// forme - Service Worker (Offline Cache + Push Notifications)
 
-self.addEventListener('install', () => {
+const CACHE_NAME = 'forme-v2';
+const STATIC_ASSETS = [
+  '/icons/icon-192x192.png',
+  '/icons/icon-512x512.png',
+];
+
+// Install: 정적 에셋 프리캐시
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
+  );
   self.skipWaiting();
 });
 
+// Activate: 이전 캐시 정리
 self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(
+        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+      )
+    ).then(() => self.clients.claim())
+  );
 });
 
-// fetch 핸들러 (Chrome PWA installability 필수 조건)
-// same-origin만 핸들링, cross-origin은 네이티브 통과
+// Fetch: 전략별 캐싱
+// - 아이콘: cache-first (변경 드묾)
+// - JS/CSS 번들, 페이지: network-first (항상 최신 우선)
+// - API: network-only
 self.addEventListener('fetch', (event) => {
-  if (!event.request.url.startsWith(self.location.origin)) return;
+  const { request } = event;
+  if (!request.url.startsWith(self.location.origin)) return;
+  if (request.method !== 'GET') return;
+
+  const url = new URL(request.url);
+
+  // 아이콘만 cache-first (거의 안 바뀜)
+  if (url.pathname.startsWith('/icons/')) {
+    event.respondWith(
+      caches.match(request).then((cached) => {
+        if (cached) return cached;
+        return fetch(request).then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+          }
+          return response;
+        });
+      })
+    );
+    return;
+  }
+
+  // API 요청: network-only (캐시 안 함)
+  if (url.pathname.startsWith('/api/')) {
+    event.respondWith(
+      fetch(request).catch(() => new Response(
+        JSON.stringify({ error: 'Offline' }),
+        { status: 503, headers: { 'Content-Type': 'application/json' } }
+      ))
+    );
+    return;
+  }
+
+  // JS/CSS 번들 + 페이지: network-first, 오프라인 시 캐시
   event.respondWith(
-    fetch(event.request).catch(() => new Response('Network error', { status: 503 }))
+    fetch(request)
+      .then((response) => {
+        if (response.ok) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+        }
+        return response;
+      })
+      .catch(() =>
+        caches.match(request).then((cached) =>
+          cached || new Response('Offline', { status: 503 })
+        )
+      )
   );
 });
 
