@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Newspaper, Calendar, StickyNote, Headphones } from 'lucide-react';
+import { DashboardCuration } from '@/components/features/curation/dashboard-curation';
 
 const features = [
   {
@@ -31,7 +32,7 @@ const features = [
 
 export default function DashboardPage() {
   return (
-    <div className="px-4 py-6 max-w-lg mx-auto space-y-6">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto space-y-6">
       <div className="space-y-1">
         <h2 className="text-2xl font-bold tracking-tight">안녕하세요!</h2>
         <p className="text-sm text-muted-foreground">
@@ -39,7 +40,7 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {features.map(({ title, description, icon: Icon, href }) => (
           <Link key={href} href={href}>
             <Card className="h-full hover:border-primary/50 transition-colors cursor-pointer">
@@ -56,6 +57,9 @@ export default function DashboardPage() {
           </Link>
         ))}
       </div>
+
+      {/* Latest curation items */}
+      <DashboardCuration />
     </div>
   );
 }

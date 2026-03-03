@@ -25,7 +25,7 @@ export function TabBar() {
         'pb-[env(safe-area-inset-bottom)]'
       )}
     >
-      <div className="flex h-16 max-w-lg mx-auto">
+      <div className="flex h-16 max-w-7xl mx-auto">
         {tabs.map(({ href, label, icon: Icon }) => {
           const isActive = pathname === href || pathname.startsWith(`${href}/`);
           return (

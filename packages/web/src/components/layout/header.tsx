@@ -30,7 +30,7 @@ export function Header() {
         'pt-[env(safe-area-inset-top)]'
       )}
     >
-      <div className="flex items-center justify-between h-14 px-4 max-w-lg mx-auto">
+      <div className="flex items-center justify-between h-14 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
         <h1
           className={cn(
             'text-lg tracking-tight',
@@ -42,13 +42,13 @@ export function Header() {
         <Button
           variant="ghost"
           size="icon"
-          className="h-11 w-11 active:scale-90 transition-all duration-150"
-          aria-label={resolvedTheme === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환'}
+          className="h-11 w-11 active:scale-90 transition-all duration-150 relative"
+          aria-label="테마 전환"
           onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+          suppressHydrationWarning
         >
           <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
           <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-          <span className="sr-only">테마 전환</span>
         </Button>
       </div>
     </header>
