@@ -33,11 +33,10 @@ export async function POST(request: Request) {
   const sources = await getActiveSourcesForUser(user.id);
 
   const encoder = new TextEncoder();
+  let closed = false;
 
   const stream = new ReadableStream({
     async start(controller) {
-      let closed = false;
-
       function send(event: string, data: unknown) {
         if (closed) return;
         try {
@@ -96,6 +95,10 @@ export async function POST(request: Request) {
       });
 
       close();
+    },
+    cancel() {
+      // Client disconnected — expected for SSE, suppress ECONNRESET
+      closed = true;
     },
   });
 
