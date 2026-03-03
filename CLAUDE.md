@@ -89,6 +89,6 @@ study-admin 스타일: Sky Blue `#0ea5e9` 포인트, Pretendard 폰트, 다크�
 
 | 문서 | 내용 |
 |------|------|
-| `docs/plans/2026-03-03-forme-design.md` | 전체 설계 문서 |
-| `docs/schema-summary.md` | DB 스키마 요약 (테이블, FK, enum) |
-| `docs/patterns.md` | 인증/API/ORM 코드 패턴 |
+| `docs/plans/26-03-03-forme-design.md` | 전체 설계 문서 |
+| `docs/26-03-03-schema-summary.md` | DB 스키마 요약 (테이블, FK, enum) |
+| `docs/26-03-03-patterns.md` | 인증/API/ORM 코드 패턴 |
