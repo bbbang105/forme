@@ -39,7 +39,9 @@ export function CrawlProgress({ since, onComplete, onClose }: CrawlProgressProps
 
   // Ref to avoid re-triggering useEffect when parent re-renders
   const onCompleteRef = useRef(onComplete);
-  onCompleteRef.current = onComplete;
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
 
   const handleEvent = useCallback(
     (event: string, data: Record<string, unknown>) => {
