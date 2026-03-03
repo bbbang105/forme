@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { db, curationSources } from '@forme/shared';
-import { eq, desc } from 'drizzle-orm';
-import { isSafeUrl } from '@/lib/url-safety';
+import {NextRequest, NextResponse} from 'next/server';
+import {createClient} from '@/lib/supabase/server';
+import {curationSources, db} from '@forme/shared';
+import {asc, desc, eq} from 'drizzle-orm';
+import {isSafeUrl} from '@/lib/url-safety';
 
 async function detectRssUrl(url: string): Promise<string | null> {
   if (!isSafeUrl(url)) return null;
@@ -41,7 +41,11 @@ export async function GET() {
       .select()
       .from(curationSources)
       .where(eq(curationSources.userId, user.id))
-      .orderBy(desc(curationSources.createdAt));
+      .orderBy(
+        desc(curationSources.isFavorite),
+        asc(curationSources.favoriteOrder),
+        desc(curationSources.createdAt)
+      );
 
     return NextResponse.json(sources, {
       headers: { 'Cache-Control': 'no-store' },
