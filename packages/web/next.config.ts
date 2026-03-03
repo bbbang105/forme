@@ -38,7 +38,7 @@ const nextConfig: NextConfig = {
               `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''}`,
               "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
               "font-src 'self' https://cdn.jsdelivr.net",
-              "img-src 'self' data: blob: https://dbeegbhgezhnokosrhtk.supabase.co https://cdn.discordapp.com https://api.dicebear.com",
+              "img-src 'self' data: blob: https: http:",
               "connect-src 'self' https://dbeegbhgezhnokosrhtk.supabase.co wss://dbeegbhgezhnokosrhtk.supabase.co",
               "worker-src 'self'",
               "frame-ancestors 'none'",

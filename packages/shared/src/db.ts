@@ -1,23 +1,31 @@
-import { drizzle } from 'drizzle-orm/postgres-js';
+import { drizzle, type PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from './schema';
 
-function createDb() {
-  const connStr = process.env.DATABASE_URL;
-  if (!connStr) {
-    throw new Error('DATABASE_URL environment variable is not set');
-  }
+let _db: PostgresJsDatabase<typeof schema> | undefined;
 
-  const client = postgres(connStr, {
-    max: 10,
-    idle_timeout: 20,
-    connect_timeout: 10,
-    prepare: false,
-    ssl: 'require',
-  });
+/**
+ * Lazy-initialized DB singleton.
+ * Throws only at first actual usage, not at import/build time.
+ */
+export const db = new Proxy({} as PostgresJsDatabase<typeof schema>, {
+  get(_target, prop, receiver) {
+    if (!_db) {
+      const connStr = process.env.DATABASE_URL;
+      if (!connStr) {
+        throw new Error('DATABASE_URL environment variable is not set');
+      }
+      const client = postgres(connStr, {
+        max: 10,
+        idle_timeout: 20,
+        connect_timeout: 10,
+        prepare: false,
+        ssl: 'require',
+      });
+      _db = drizzle(client, { schema });
+    }
+    return Reflect.get(_db, prop, receiver);
+  },
+});
 
-  return drizzle(client, { schema });
-}
-
-export const db = createDb();
 export { schema };

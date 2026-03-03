@@ -32,10 +32,11 @@ auth.users (Supabase 관리)
 |------|------|----------|------|
 | id | UUID | PK | |
 | user_id | UUID | NOT NULL | FK → auth.users, UNIQUE |
-| discord_id | VARCHAR | NOT NULL | |
-| discord_username | VARCHAR | NOT NULL | |
-| display_name | VARCHAR | NULL | |
+| discord_id | VARCHAR(255) | NOT NULL | |
+| discord_username | VARCHAR(255) | NOT NULL | |
+| display_name | VARCHAR(255) | NULL | |
 | avatar_url | TEXT | NULL | |
+| interests | TEXT[] | NOT NULL | DEFAULT '{}', 추천 정렬용 |
 | created_at | TIMESTAMPTZ | NOT NULL | DEFAULT NOW() |
 | updated_at | TIMESTAMPTZ | NOT NULL | DEFAULT NOW() |
 
@@ -45,10 +46,11 @@ auth.users (Supabase 관리)
 |------|------|----------|------|
 | id | UUID | PK | |
 | user_id | UUID | NOT NULL | FK → auth.users |
-| name | VARCHAR | NOT NULL | |
+| name | VARCHAR(200) | NOT NULL | |
 | url | TEXT | NOT NULL | |
 | rss_url | TEXT | NULL | |
-| category | VARCHAR | NOT NULL | ai / uxui / economy |
+| category | VARCHAR(50) | NOT NULL | DEFAULT 'ai' |
+| tags | TEXT[] | NULL | 소스 기본 태그 |
 | is_active | BOOLEAN | NOT NULL | DEFAULT true |
 | created_at | TIMESTAMPTZ | NOT NULL | DEFAULT NOW() |
 
@@ -57,15 +59,16 @@ auth.users (Supabase 관리)
 | 컬럼 | 타입 | Nullable | 비고 |
 |------|------|----------|------|
 | id | UUID | PK | |
-| source_id | UUID | NOT NULL | FK → curation_sources |
-| title | VARCHAR | NOT NULL | |
+| source_id | UUID | NOT NULL | FK → curation_sources (CASCADE) |
+| title | VARCHAR(500) | NOT NULL | |
 | url | TEXT | NOT NULL | |
 | description | TEXT | NULL | |
-| thumbnail_url | TEXT | NULL | |
+| thumbnail_url | TEXT | NULL | og:image |
 | published_at | TIMESTAMPTZ | NULL | |
-| category | VARCHAR | NOT NULL | |
-| tags | TEXT[] | NULL | |
+| category | VARCHAR(50) | NOT NULL | |
+| tags | TEXT[] | NULL | 피드 카테고리 + 소스 태그 머지 |
 | is_read | BOOLEAN | NOT NULL | DEFAULT false |
+| is_bookmarked | BOOLEAN | NOT NULL | DEFAULT false |
 | collected_at | TIMESTAMPTZ | NOT NULL | DEFAULT NOW() |
 
 ### calendar_events
@@ -142,8 +145,11 @@ auth.users (Supabase 관리)
 
 | 테이블 | 인덱스 | 컬럼 |
 |--------|--------|------|
-| curation_items | idx_curation_items_published | published_at DESC |
-| curation_items | idx_curation_items_category | category |
+| curation_sources | idx_sources_user | user_id |
+| curation_items | idx_items_source_url | source_id, url (UNIQUE) |
+| curation_items | idx_items_published | published_at |
+| curation_items | idx_items_category | category |
+| curation_items | idx_items_source | source_id |
 | todos | idx_todos_date | user_id, date |
 | todos | idx_todos_reminder | reminder_at (WHERE reminder_sent = false) |
 | calendar_events | idx_calendar_events_dates | start_date, end_date |

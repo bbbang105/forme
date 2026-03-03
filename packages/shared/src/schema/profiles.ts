@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { pgTable, uuid, varchar, text, timestamp } from 'drizzle-orm/pg-core';
 
 export const profiles = pgTable('profiles', {
@@ -7,6 +8,7 @@ export const profiles = pgTable('profiles', {
   discordUsername: varchar('discord_username', { length: 255 }).notNull(),
   displayName: varchar('display_name', { length: 255 }),
   avatarUrl: text('avatar_url'),
+  interests: text('interests').array().notNull().default(sql`'{}'::text[]`),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
