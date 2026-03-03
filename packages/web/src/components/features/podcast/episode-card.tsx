@@ -29,20 +29,14 @@ function formatBytes(bytes: number | null): string {
 
 function formatDate(iso: string): string {
   const date = new Date(iso);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  if (diffDays === 0) return '오늘';
-  if (diffDays === 1) return '어제';
-  if (diffDays < 7) return `${diffDays}일 전`;
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)}주 전`;
-
-  return date.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' });
+  const y = date.getFullYear();
+  const m = date.getMonth() + 1;
+  const d = date.getDate();
+  return `${y}년 ${m}월 ${d}일`;
 }
 
 export function EpisodeCard({ episode, onEdit, onDelete }: EpisodeCardProps) {
-  const { episode: currentEpisode, isPlaying, play, togglePlay } = usePlayer();
+  const { episode: currentEpisode, isPlaying, isRestored, currentTime: playerTime, play, togglePlay } = usePlayer();
   const [menuOpen, setMenuOpen] = useState(false);
 
   const isCurrentEpisode = currentEpisode?.id === episode.id;
@@ -107,6 +101,11 @@ export function EpisodeCard({ episode, onEdit, onDelete }: EpisodeCardProps) {
 
         {/* Metadata */}
         <div className="flex items-center gap-2 mt-2 flex-wrap">
+          {isCurrentEpisode && isRestored && (
+            <span className="text-[11px] font-medium text-primary">
+              이어듣기 · {formatDuration(playerTime)}
+            </span>
+          )}
           <span className="text-[11px] text-muted-foreground">
             {formatDate(episode.publishedAt)}
           </span>

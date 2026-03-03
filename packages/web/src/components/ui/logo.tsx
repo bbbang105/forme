@@ -3,29 +3,23 @@ import {cn} from '@/lib/utils';
 interface LogoProps {
   className?: string;
   size?: 'sm' | 'md' | 'lg';
-  showMark?: boolean;
 }
 
 /**
- * forme 로고
- * - Mark: 둥근 사각형 + 라운드 스트로크 스타일의 'f' (두꺼운 선, 부드러운 곡선)
- * - Wordmark: "for" + "me" (포인트 컬러)
+ * forme 워드마크 로고 — "for" + "me" (포인트 컬러)
  */
-export function Logo({ className, size = 'md', showMark = false }: LogoProps) {
+export function Logo({ className, size = 'md' }: LogoProps) {
   const sizes = {
-    sm: { mark: 20, text: 'text-base', gap: 'gap-1.5' },
-    md: { mark: 24, text: 'text-lg', gap: 'gap-2' },
-    lg: { mark: 32, text: 'text-2xl', gap: 'gap-2.5' },
+    sm: 'text-base',
+    md: 'text-lg',
+    lg: 'text-2xl',
   };
 
-  const s = sizes[size];
-
   return (
-    <span className={cn('inline-flex items-center', s.gap, className)}>
-      {showMark && <LogoMark size={s.mark} />}
+    <span className={cn('inline-flex items-center', className)}>
       <span
         className={cn(
-          s.text,
+          sizes[size],
           'font-black tracking-tighter select-none',
         )}
       >

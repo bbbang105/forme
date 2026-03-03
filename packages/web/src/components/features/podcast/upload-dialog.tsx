@@ -168,7 +168,7 @@ export function UploadDialog({ open, onOpenChange, onSuccess }: UploadDialogProp
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="w-full max-w-md">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <span className="text-xl">🎙️</span>
@@ -187,21 +187,22 @@ export function UploadDialog({ open, onOpenChange, onSuccess }: UploadDialogProp
               onChange={handleFileChange}
               disabled={isSubmitting}
             />
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => !file && fileInputRef.current?.click()}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (!file) fileInputRef.current?.click(); } }}
               onDrop={handleDrop}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
-              disabled={isSubmitting}
               className={cn(
                 'w-full rounded-xl border-2 border-dashed p-6 text-center',
-                'transition-all duration-200 cursor-pointer',
+                'transition-all duration-200',
                 isDragging
                   ? 'border-primary bg-primary/5 scale-[1.02]'
                   : file
                     ? 'border-primary/40 bg-primary/5'
-                    : 'border-border hover:border-primary/40 hover:bg-accent/40',
+                    : 'border-border hover:border-primary/40 hover:bg-accent/40 cursor-pointer',
                 isSubmitting && 'pointer-events-none opacity-60'
               )}
             >
@@ -211,13 +212,13 @@ export function UploadDialog({ open, onOpenChange, onSuccess }: UploadDialogProp
                     <FileAudio className="h-5 w-5 text-primary" />
                   </div>
                   <div className="text-left min-w-0 flex-1">
-                    <p className="text-sm font-medium truncate">{file.name}</p>
-                    <p className="text-xs text-muted-foreground">{formatBytes(file.size)}</p>
+                    <p className="text-sm font-medium break-all line-clamp-2">{file.name}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{formatBytes(file.size)}</p>
                   </div>
                   {!isSubmitting && (
                     <button
                       type="button"
-                      onClick={(e) => { e.stopPropagation(); setFile(null); setTitle(''); }}
+                      onClick={() => { setFile(null); setTitle(''); }}
                       className="p-1 rounded-md text-muted-foreground hover:text-foreground transition-colors shrink-0"
                       aria-label="파일 제거"
                     >
@@ -240,7 +241,7 @@ export function UploadDialog({ open, onOpenChange, onSuccess }: UploadDialogProp
                   </div>
                 </div>
               )}
-            </button>
+            </div>
           </div>
 
           {/* Progress bar */}

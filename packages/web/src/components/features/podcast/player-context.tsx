@@ -16,6 +16,7 @@ export interface Episode {
 interface PlayerState {
   episode: Episode | null;
   isPlaying: boolean;
+  isRestored: boolean;
   currentTime: number;
   duration: number;
   volume: number;
@@ -24,7 +25,7 @@ interface PlayerState {
 }
 
 interface PlayerControls {
-  play: (episode: Episode) => void;
+  play: (episode: Episode, startTime?: number) => void;
   pause: () => void;
   resume: () => void;
   togglePlay: () => void;
@@ -36,6 +37,8 @@ interface PlayerControls {
   close: () => void;
 }
 
+const STORAGE_KEY = 'forme-podcast-progress';
+
 const PlayerContext = createContext<(PlayerState & PlayerControls) | null>(null);
 
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
@@ -43,11 +46,24 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const [episode, setEpisode] = useState<Episode | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isRestored, setIsRestored] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolumeState] = useState(1);
   const [playbackRate, setPlaybackRateState] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
+
+  const savedTimeRef = useRef(0);
+
+  // Refs for beforeunload (avoid stale closures)
+  const episodeRef = useRef(episode);
+  episodeRef.current = episode;
+  const isRestoredRef = useRef(isRestored);
+  isRestoredRef.current = isRestored;
+  const playbackRateRef = useRef(playbackRate);
+  playbackRateRef.current = playbackRate;
+  const volumeRef = useRef(volume);
+  volumeRef.current = volume;
 
   // Initialize audio element once
   useEffect(() => {
@@ -59,7 +75,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const onDurationChange = () => setDuration(audio.duration || 0);
     const onPlay = () => { setIsPlaying(true); setIsLoading(false); };
     const onPause = () => setIsPlaying(false);
-    const onEnded = () => { setIsPlaying(false); setCurrentTime(0); };
+    const onEnded = () => {
+      setIsPlaying(false);
+      setCurrentTime(0);
+      localStorage.removeItem(STORAGE_KEY);
+    };
     const onWaiting = () => setIsLoading(true);
     const onCanPlay = () => setIsLoading(false);
     const onError = () => { setIsLoading(false); setIsPlaying(false); };
@@ -87,17 +107,104 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const play = useCallback((ep: Episode) => {
+  // Restore last session from localStorage
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as {
+        episode: Episode;
+        currentTime: number;
+        playbackRate: number;
+        volume: number;
+      };
+      if (saved?.episode?.id && saved.currentTime > 0) {
+        setEpisode(saved.episode);
+        setCurrentTime(saved.currentTime);
+        savedTimeRef.current = saved.currentTime;
+        setIsRestored(true);
+        if (saved.episode.duration) setDuration(saved.episode.duration);
+        if (saved.playbackRate) setPlaybackRateState(saved.playbackRate);
+        if (typeof saved.volume === 'number') setVolumeState(saved.volume);
+      }
+    } catch { /* ignore corrupted data */ }
+  }, []);
+
+  // Periodically save progress to localStorage
+  useEffect(() => {
+    if (!episode || isRestored) return;
+
+    const save = () => {
+      const audio = audioRef.current;
+      if (!audio || !audio.currentTime) return;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        episode,
+        currentTime: audio.currentTime,
+        playbackRate,
+        volume,
+      }));
+    };
+
+    // Save immediately when episode starts
+    save();
+
+    const interval = setInterval(save, 3000);
+    const audio = audioRef.current;
+    const handlePause = () => save();
+    audio?.addEventListener('pause', handlePause);
+
+    return () => {
+      clearInterval(interval);
+      audio?.removeEventListener('pause', handlePause);
+    };
+  }, [episode, isRestored, playbackRate, volume]);
+
+  // Save on page close/refresh
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      const audio = audioRef.current;
+      const ep = episodeRef.current;
+      if (!audio || !ep || isRestoredRef.current) return;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        episode: ep,
+        currentTime: audio.currentTime,
+        playbackRate: playbackRateRef.current,
+        volume: volumeRef.current,
+      }));
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
+
+  const play = useCallback((ep: Episode, startTime?: number) => {
     const audio = audioRef.current;
     if (!audio) return;
 
     setEpisode(ep);
     setIsLoading(true);
-    setCurrentTime(0);
+    setIsRestored(false);
+    setCurrentTime(startTime ?? 0);
     setDuration(0);
     audio.src = ep.audioUrl;
     audio.playbackRate = playbackRate;
     audio.volume = volume;
+
+    // Save immediately so progress persists even on quick refresh
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      episode: ep,
+      currentTime: startTime ?? 0,
+      playbackRate,
+      volume,
+    }));
+
+    if (startTime && startTime > 0) {
+      const onLoaded = () => {
+        audio.currentTime = startTime;
+        audio.removeEventListener('loadedmetadata', onLoaded);
+      };
+      audio.addEventListener('loadedmetadata', onLoaded);
+    }
+
     audio.play().catch(console.error);
   }, [playbackRate, volume]);
 
@@ -110,12 +217,16 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const togglePlay = useCallback(() => {
+    if (isRestored && episode) {
+      play(episode, savedTimeRef.current);
+      return;
+    }
     if (isPlaying) {
       audioRef.current?.pause();
     } else {
       audioRef.current?.play().catch(console.error);
     }
-  }, [isPlaying]);
+  }, [isPlaying, isRestored, episode, play]);
 
   const seek = useCallback((seconds: number) => {
     const audio = audioRef.current;
@@ -158,8 +269,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }
     setEpisode(null);
     setIsPlaying(false);
+    setIsRestored(false);
     setCurrentTime(0);
     setDuration(0);
+    localStorage.removeItem(STORAGE_KEY);
   }, []);
 
   return (
@@ -167,6 +280,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       value={{
         episode,
         isPlaying,
+        isRestored,
         currentTime,
         duration,
         volume,

@@ -2,7 +2,7 @@
 
 // forme - Service Worker (Offline Cache + Push Notifications)
 
-const CACHE_NAME = 'forme-v1';
+const CACHE_NAME = 'forme-v2';
 const STATIC_ASSETS = [
   '/icons/icon-192x192.png',
   '/icons/icon-512x512.png',
@@ -28,8 +28,9 @@ self.addEventListener('activate', (event) => {
 });
 
 // Fetch: 전략별 캐싱
-// - 정적 에셋 (_next/static, icons): cache-first
-// - 페이지/API: network-first
+// - 아이콘: cache-first (변경 드묾)
+// - JS/CSS 번들, 페이지: network-first (항상 최신 우선)
+// - API: network-only
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (!request.url.startsWith(self.location.origin)) return;
@@ -37,11 +38,8 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
 
-  // 정적 에셋: cache-first
-  if (
-    url.pathname.startsWith('/_next/static/') ||
-    url.pathname.startsWith('/icons/')
-  ) {
+  // 아이콘만 cache-first (거의 안 바뀜)
+  if (url.pathname.startsWith('/icons/')) {
     event.respondWith(
       caches.match(request).then((cached) => {
         if (cached) return cached;
@@ -68,7 +66,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 페이지: network-first, 실패 시 캐시
+  // JS/CSS 번들 + 페이지: network-first, 오프라인 시 캐시
   event.respondWith(
     fetch(request)
       .then((response) => {

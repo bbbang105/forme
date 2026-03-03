@@ -1,6 +1,9 @@
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
+  experimental: {
+    proxyClientMaxBodySize: '200mb',
+  },
   transpilePackages: ['@forme/shared'],
   poweredByHeader: false,
   images: {

@@ -190,8 +190,8 @@ export function AudioPlayer({ onCollapse }: AudioPlayerProps) {
             ))}
           </div>
 
-          {/* Volume */}
-          <div className="flex items-center gap-2 min-w-[100px]">
+          {/* Volume — 모바일에서는 기기 볼륨 사용, 데스크톱만 표시 */}
+          <div className="hidden sm:flex items-center gap-2 min-w-[100px]">
             <button
               onClick={() => setVolume(volume > 0 ? 0 : 1)}
               className="text-muted-foreground hover:text-foreground transition-colors"

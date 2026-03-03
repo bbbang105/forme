@@ -54,7 +54,7 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/lib/supabase/server.ts` | 서버 Supabase 클라이언트 |
 | `packages/web/src/components/layout/tab-bar.tsx` | 하단 탭바 (5탭) |
 | `packages/web/src/components/layout/header.tsx` | 헤더 (forme 로고 + 다크모드 토글) |
-| `packages/web/src/components/ui/logo.tsx` | forme 워드마크 로고 컴포넌트 |
+| `packages/web/src/components/ui/logo.tsx` | forme 워드마크 로고 (showMark 제거, 워드마크 전용) |
 | `packages/shared/src/schema/` | Drizzle DB 스키마 |
 | `packages/shared/src/db.ts` | DB 싱글톤 (SSL 강제) |
 | `packages/web/src/lib/crawl-feed.ts` | RSS 크롤 (feedsmith, since 필터, SSRF 방어) |
@@ -68,7 +68,8 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/app/api/podcast/upload/route.ts` | 팟캐스트 오디오 R2 업로드 |
 | `packages/web/src/app/api/podcast/episodes/route.ts` | 팟캐스트 에피소드 CRUD |
 | `packages/web/src/app/api/push/subscribe/route.ts` | 푸시 구독 등록/해제/조회 |
-| `packages/web/public/sw.js` | Service Worker (PWA + 푸시 + 오프라인 캐시) |
+| `packages/web/src/components/features/podcast/player-context.tsx` | 팟캐스트 플레이어 (localStorage 이어듣기) |
+| `packages/web/public/sw.js` | Service Worker (PWA + 푸시 + network-first 캐시) |
 | `packages/web/src/app/manifest.ts` | PWA 매니페스트 (MetadataRoute) |
 
 ## 인증 구조

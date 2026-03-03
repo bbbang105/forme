@@ -1,13 +1,20 @@
 'use client';
 
 import {useState} from 'react';
-import {Loader2, Pause, Play, X} from 'lucide-react';
+import {Loader2, Pause, Play, RotateCcw, X} from 'lucide-react';
 import {cn} from '@/lib/utils';
 import {usePlayer} from './player-context';
 import {AudioPlayer} from './audio-player';
 
+function formatTime(seconds: number): string {
+  if (!isFinite(seconds) || isNaN(seconds)) return '0:00';
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
 export function MiniPlayer() {
-  const { episode, isPlaying, isLoading, currentTime, duration, togglePlay, close } = usePlayer();
+  const { episode, isPlaying, isRestored, isLoading, currentTime, duration, togglePlay, close } = usePlayer();
   const [isExpanded, setIsExpanded] = useState(false);
 
   if (!episode) return null;
@@ -56,24 +63,34 @@ export function MiniPlayer() {
         >
           <p className="text-sm font-medium truncate">{episode.title}</p>
           <p className="text-xs text-muted-foreground">
-            {isLoading ? '로딩 중...' : isPlaying ? '재생 중' : '일시정지'}
+            {isLoading
+              ? '로딩 중...'
+              : isRestored
+                ? `${formatTime(currentTime)}부터 이어듣기`
+                : isPlaying
+                  ? '재생 중'
+                  : '일시정지'}
           </p>
         </button>
 
-        {/* Play / Pause */}
+        {/* Play / Resume */}
         <button
           onClick={(e) => { e.stopPropagation(); togglePlay(); }}
           className={cn(
             'flex items-center justify-center w-9 h-9 rounded-full',
-            'bg-primary text-primary-foreground',
             'hover:bg-primary/90 active:scale-90 transition-all shrink-0',
-            'disabled:opacity-70'
+            'disabled:opacity-70',
+            isRestored
+              ? 'bg-primary/15 text-primary border border-primary/30'
+              : 'bg-primary text-primary-foreground',
           )}
           disabled={isLoading}
-          aria-label={isPlaying ? '일시정지' : '재생'}
+          aria-label={isRestored ? '이어듣기' : isPlaying ? '일시정지' : '재생'}
         >
           {isLoading ? (
             <Loader2 className="h-4 w-4 animate-spin" />
+          ) : isRestored ? (
+            <RotateCcw className="h-4 w-4" />
           ) : isPlaying ? (
             <Pause className="h-4 w-4" fill="currentColor" />
           ) : (
