@@ -112,43 +112,55 @@ export async function createTodo(formData: { date: string; content: string }) {
 }
 ```
 
-## API Route 패턴 (커서 페이지네이션)
+## API Route 패턴 (Drizzle + 커서 페이지네이션)
 
 ```typescript
 // packages/web/src/app/api/curation/route.ts
-import { createClient } from '@/lib/supabase/server'
-import { NextResponse, type NextRequest } from 'next/server'
+import { db, curationItems, curationSources } from '@forme/shared'
+import { eq, and, desc, sql } from 'drizzle-orm'
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
-  const { searchParams } = request.nextUrl
+  const { data: { user } } = await supabase.auth.getUser()
+  // Supabase Auth로 인증 → Drizzle ORM으로 직접 쿼리
+  const sortDateExpr = sql`COALESCE(${curationItems.publishedAt}, ${curationItems.collectedAt})`
 
-  const cursor = searchParams.get('cursor')
-  const category = searchParams.get('category')
-  const limit = 20
-
-  let query = supabase
-    .from('curation_items')
-    .select('*')
-    .order('published_at', { ascending: false })
+  const rows = await db
+    .select({ /* ... */ sortDate: sortDateExpr.as('sort_date') })
+    .from(curationItems)
+    .innerJoin(curationSources, eq(curationItems.sourceId, curationSources.id))
+    .where(and(...filterConditions))
+    .orderBy(sql`${sortDateExpr} DESC`, desc(curationItems.id))
     .limit(limit + 1)
 
-  if (category && category !== 'all') {
-    query = query.eq('category', category)
-  }
-  if (cursor) {
-    query = query.lt('published_at', cursor)
-  }
-
-  const { data, error } = await query
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-  const hasMore = data.length > limit
-  const items = hasMore ? data.slice(0, limit) : data
-  const nextCursor = hasMore ? items[items.length - 1].published_at : null
-
-  return NextResponse.json({ items, nextCursor })
+  // keyset cursor: "<sortDate ISO>|<uuid>"
+  const nextCursor = hasMore
+    ? `${new Date(lastItem.sortDate as string | Date).toISOString()}|${lastItem.id}`
+    : null
+  return NextResponse.json({ items, nextCursor, hasMore })
 }
+```
+
+## RSS 크롤 패턴
+
+```typescript
+// packages/web/src/lib/crawl-feed.ts
+import { parseFeed } from 'feedsmith'
+
+// since 옵션으로 수집 기간 제한 (publishedAt 기준 필터링)
+export async function crawlSource(source: CrawlSource, options?: { since?: Date })
+  : Promise<CrawlSourceResult> {
+  // 1. SSRF 방어 (isSafeUrl)
+  // 2. fetch → parseFeed → extractFeedItems (RSS/Atom/JSON/RDF 통합)
+  // 3. since 필터: publishedAt < since 제외, 날짜 없으면 통과
+  // 4. OG image 병렬 추출 (5개씩 배치)
+  // 5. 피드 태그 + 소스 태그 머지
+  // 6. db.insert().onConflictDoNothing() — (source_id, url) unique constraint
+  return { sourceId, sourceName, success, itemsFound, newItemsAdded, itemsFilteredOut }
+}
+
+// SSE 스트림: POST /api/curation/crawl (since: ISO string body)
+// Cron: GET /api/cron/curation (기본 7일 필터)
 ```
 
 ## Drizzle ORM 패턴

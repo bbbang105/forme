@@ -1,8 +1,18 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Loader2, Plus, RefreshCw, Settings2, Trash2 } from 'lucide-react';
+import { CalendarDays, Loader2, Plus, RefreshCw, Settings2, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import {
   Dialog,
   DialogContent,
@@ -27,7 +37,23 @@ interface Source {
   createdAt: string;
 }
 
-type View = 'list' | 'add' | 'crawl';
+type View = 'list' | 'add' | 'crawl-settings' | 'crawl';
+
+type CrawlRange = '7d' | '30d' | 'custom';
+
+function computeSince(range: CrawlRange, customDate: string): string | undefined {
+  switch (range) {
+    case '7d':
+      return new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    case '30d':
+      return new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    case 'custom': {
+      if (!customDate) return undefined;
+      const d = new Date(customDate);
+      return isNaN(d.getTime()) ? undefined : d.toISOString();
+    }
+  }
+}
 
 interface SourceManagerProps {
   onCrawlComplete: () => void;
@@ -39,6 +65,10 @@ export function SourceManager({ onCrawlComplete }: SourceManagerProps) {
   const [sources, setSources] = useState<Source[]>([]);
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Source | null>(null);
+  const [crawlRange, setCrawlRange] = useState<CrawlRange>('7d');
+  const [customDate, setCustomDate] = useState('');
+  const [crawlSince, setCrawlSince] = useState<string | undefined>();
 
   const fetchSources = useCallback(async () => {
     setLoading(true);
@@ -126,11 +156,13 @@ export function SourceManager({ onCrawlComplete }: SourceManagerProps) {
           <DialogTitle>
             {view === 'list' && '소스 관리'}
             {view === 'add' && '소스 추가'}
+            {view === 'crawl-settings' && '수집 설정'}
             {view === 'crawl' && '수집 진행'}
           </DialogTitle>
           <DialogDescription>
             {view === 'list' && 'RSS 소스를 관리하고 수집합니다.'}
             {view === 'add' && '새 RSS 소스를 추가합니다.'}
+            {view === 'crawl-settings' && '수집할 기간을 선택하세요.'}
             {view === 'crawl' && 'RSS 피드를 수집하고 있습니다.'}
           </DialogDescription>
         </DialogHeader>
@@ -151,7 +183,11 @@ export function SourceManager({ onCrawlComplete }: SourceManagerProps) {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => setView('crawl')}
+                onClick={() => {
+                  setCrawlRange('7d');
+                  setCustomDate('');
+                  setView('crawl-settings');
+                }}
                 className="gap-1.5"
                 disabled={sources.filter((s) => s.isActive && s.rssUrl).length === 0}
               >
@@ -219,7 +255,7 @@ export function SourceManager({ onCrawlComplete }: SourceManagerProps) {
                           {source.isActive ? '활성' : '비활성'}
                         </button>
                         <button
-                          onClick={() => handleDelete(source.id)}
+                          onClick={() => setDeleteTarget(source)}
                           disabled={deleting === source.id}
                           className="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                           aria-label="소스 삭제"
@@ -248,9 +284,72 @@ export function SourceManager({ onCrawlComplete }: SourceManagerProps) {
           />
         )}
 
+        {/* Crawl settings view */}
+        {view === 'crawl-settings' && (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center gap-1.5">
+                <CalendarDays className="h-4 w-4" />
+                수집 기간
+              </label>
+              <div className="flex gap-2">
+                {([
+                  { value: '7d', label: '최근 7일' },
+                  { value: '30d', label: '최근 30일' },
+                  { value: 'custom', label: '직접 선택' },
+                ] as const).map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setCrawlRange(opt.value)}
+                    className={cn(
+                      'px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
+                      crawlRange === opt.value
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              {crawlRange === 'custom' && (
+                <input
+                  type="date"
+                  value={customDate}
+                  onChange={(e) => setCustomDate(e.target.value)}
+                  max={new Date().toISOString().split('T')[0]}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                />
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                onClick={() => {
+                  setCrawlSince(computeSince(crawlRange, customDate));
+                  setView('crawl');
+                }}
+                disabled={crawlRange === 'custom' && !customDate}
+                className="gap-1.5"
+              >
+                <RefreshCw className="h-4 w-4" />
+                수집 시작
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setView('list')}
+              >
+                취소
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Crawl view */}
         {view === 'crawl' && (
           <CrawlProgress
+            since={crawlSince}
             onComplete={() => {
               onCrawlComplete();
             }}
@@ -258,6 +357,32 @@ export function SourceManager({ onCrawlComplete }: SourceManagerProps) {
           />
         )}
       </DialogContent>
+
+      {/* Delete confirmation */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>소스를 삭제하시겠습니까?</AlertDialogTitle>
+            <AlertDialogDescription>
+              &lsquo;{deleteTarget?.name}&rsquo; 소스와 수집된 아이템이 모두 삭제됩니다. 이 작업은 되돌릴 수 없습니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteTarget) {
+                  handleDelete(deleteTarget.id);
+                  setDeleteTarget(null);
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              삭제
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }

@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
   }
 
   const startedAt = Date.now();
+  const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const sources = await getActiveSourcesForUser(userId);
 
   if (sources.length === 0) {
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest) {
   const results: CrawlSourceResult[] = [];
 
   for (const source of sources) {
-    const result = await crawlSource(source);
+    const result = await crawlSource(source, { since });
     results.push(result);
   }
 

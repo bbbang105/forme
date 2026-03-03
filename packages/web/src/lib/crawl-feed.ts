@@ -12,7 +12,12 @@ export interface CrawlSourceResult {
   success: boolean;
   itemsFound: number;
   newItemsAdded: number;
+  itemsFilteredOut: number;
   error?: string;
+}
+
+interface CrawlOptions {
+  since?: Date;
 }
 
 interface NormalizedFeedItem {
@@ -141,7 +146,7 @@ interface CrawlSource {
  * Crawl a single RSS source: fetch feed, parse items, batch insert new items.
  * Uses INSERT ON CONFLICT DO NOTHING to avoid N+1 queries.
  */
-export async function crawlSource(source: CrawlSource): Promise<CrawlSourceResult> {
+export async function crawlSource(source: CrawlSource, options?: CrawlOptions): Promise<CrawlSourceResult> {
   try {
     if (!isSafeUrl(source.rssUrl)) {
       return {
@@ -150,6 +155,7 @@ export async function crawlSource(source: CrawlSource): Promise<CrawlSourceResul
         success: false,
         itemsFound: 0,
         newItemsAdded: 0,
+        itemsFilteredOut: 0,
         error: 'URL not allowed (private/loopback)',
       };
     }
@@ -166,6 +172,7 @@ export async function crawlSource(source: CrawlSource): Promise<CrawlSourceResul
         success: false,
         itemsFound: 0,
         newItemsAdded: 0,
+        itemsFilteredOut: 0,
         error: `HTTP ${response.status}`,
       };
     }
@@ -175,7 +182,21 @@ export async function crawlSource(source: CrawlSource): Promise<CrawlSourceResul
     const feedItems = extractFeedItems(parsed);
 
     // Prepare items for batch insert
-    const validItems = feedItems.filter((item) => item.link && item.title);
+    let validItems = feedItems.filter((item) => item.link && item.title);
+
+    // Filter by since date if provided
+    let itemsFilteredOut = 0;
+    if (options?.since) {
+      const sinceTime = options.since.getTime();
+      const beforeCount = validItems.length;
+      validItems = validItems.filter((item) => {
+        if (!item.pubDate) return true; // keep items without date
+        const itemDate = new Date(item.pubDate);
+        if (isNaN(itemDate.getTime())) return true; // keep unparseable dates
+        return itemDate.getTime() >= sinceTime;
+      });
+      itemsFilteredOut = beforeCount - validItems.length;
+    }
 
     if (validItems.length === 0) {
       return {
@@ -184,6 +205,7 @@ export async function crawlSource(source: CrawlSource): Promise<CrawlSourceResul
         success: true,
         itemsFound: feedItems.length,
         newItemsAdded: 0,
+        itemsFilteredOut,
       };
     }
 
@@ -241,6 +263,7 @@ export async function crawlSource(source: CrawlSource): Promise<CrawlSourceResul
       success: true,
       itemsFound: feedItems.length,
       newItemsAdded: inserted.length,
+      itemsFilteredOut,
     };
   } catch (error) {
     return {
@@ -249,6 +272,7 @@ export async function crawlSource(source: CrawlSource): Promise<CrawlSourceResul
       success: false,
       itemsFound: 0,
       newItemsAdded: 0,
+      itemsFilteredOut: 0,
       error: error instanceof Error ? error.message : 'Unknown error',
     };
   }

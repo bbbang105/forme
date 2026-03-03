@@ -164,56 +164,50 @@ export async function GET(request: NextRequest) {
     userInterests = profile?.interests ?? [];
   }
 
+  // ── Sort date expression ──
+  // Use COALESCE so items without publishedAt fall back to collectedAt.
+  // collectedAt is NOT NULL, so sortDate is always non-null → no NULLS LAST needed.
+  const sortDateExpr = sql`COALESCE(${curationItems.publishedAt}, ${curationItems.collectedAt})`;
+
   // ── Parse and apply cursor ──
   if (cursor) {
     if (isRecommended) {
-      // Recommended cursor: "<overlap>|<publishedAt ISO>|<uuid>"
+      // Recommended cursor: "<overlap>|<sortDate ISO>|<uuid>"
       const parts = cursor.split('|');
       if (parts.length < 3) {
         return NextResponse.json({ error: 'Invalid cursor format' }, { status: 400 });
       }
       const cursorOverlap = parseInt(parts[0], 10);
-      const cursorDateStr = parts.slice(1, -1).join('|'); // ISO date may contain no extra |, but be safe
+      const cursorDateStr = parts.slice(1, -1).join('|');
       const cursorId = parts[parts.length - 1];
 
-      if (isNaN(cursorOverlap) || !UUID_RE.test(cursorId)) {
+      if (isNaN(cursorOverlap) || !cursorDateStr || !UUID_RE.test(cursorId)) {
         return NextResponse.json({ error: 'Invalid cursor format' }, { status: 400 });
       }
+
+      const cursorDate = new Date(cursorDateStr);
+      if (isNaN(cursorDate.getTime())) {
+        return NextResponse.json({ error: 'Invalid cursor format: date is not parseable' }, { status: 400 });
+      }
+      const cursorIso = cursorDate.toISOString();
 
       const safeInterests = sqlTextArray(userInterests);
       const overlapCursor = sql`COALESCE(array_length(ARRAY(SELECT unnest(${curationItems.tags}) INTERSECT SELECT unnest(${safeInterests})), 1), 0)`;
 
-      if (cursorDateStr) {
-        const cursorDate = new Date(cursorDateStr);
-        if (isNaN(cursorDate.getTime())) {
-          return NextResponse.json({ error: 'Invalid cursor format: date is not parseable' }, { status: 400 });
-        }
-        const cursorIso = cursorDate.toISOString();
-        filterConditions.push(
-          sql`(
-            ${overlapCursor} < ${cursorOverlap}
-            OR (
-              ${overlapCursor} = ${cursorOverlap}
-              AND (${curationItems.publishedAt} < ${cursorIso}::timestamptz OR (${curationItems.publishedAt} = ${cursorIso}::timestamptz AND ${curationItems.id} < ${cursorId}))
-            )
-          )`
-        );
-      } else {
-        filterConditions.push(
-          sql`(
-            ${overlapCursor} < ${cursorOverlap}
-            OR (
-              ${overlapCursor} = ${cursorOverlap}
-              AND ${curationItems.publishedAt} IS NULL AND ${curationItems.id} < ${cursorId}
-            )
-          )`
-        );
-      }
+      filterConditions.push(
+        sql`(
+          ${overlapCursor} < ${cursorOverlap}
+          OR (
+            ${overlapCursor} = ${cursorOverlap}
+            AND (${sortDateExpr} < ${cursorIso}::timestamptz OR (${sortDateExpr} = ${cursorIso}::timestamptz AND ${curationItems.id} < ${cursorId}))
+          )
+        )`
+      );
     } else {
-      // Latest cursor: "<publishedAt ISO>|<uuid>"
+      // Latest cursor: "<sortDate ISO>|<uuid>"
       const separatorIdx = cursor.lastIndexOf('|');
 
-      if (separatorIdx < 0) {
+      if (separatorIdx < 1) {
         return NextResponse.json({ error: 'Invalid cursor format' }, { status: 400 });
       }
 
@@ -224,20 +218,15 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid cursor format: id is not a valid UUID' }, { status: 400 });
       }
 
-      if (cursorDateStr) {
-        const cursorDate = new Date(cursorDateStr);
-        if (isNaN(cursorDate.getTime())) {
-          return NextResponse.json({ error: 'Invalid cursor format: date is not parseable' }, { status: 400 });
-        }
-        const cursorIso = cursorDate.toISOString();
-        filterConditions.push(
-          sql`(${curationItems.publishedAt} < ${cursorIso}::timestamptz OR (${curationItems.publishedAt} = ${cursorIso}::timestamptz AND ${curationItems.id} < ${cursorId}))`
-        );
-      } else {
-        filterConditions.push(
-          sql`(${curationItems.publishedAt} IS NULL AND ${curationItems.id} < ${cursorId})`
-        );
+      const cursorDate = new Date(cursorDateStr);
+      if (isNaN(cursorDate.getTime())) {
+        return NextResponse.json({ error: 'Invalid cursor format: date is not parseable' }, { status: 400 });
       }
+      const cursorIso = cursorDate.toISOString();
+
+      filterConditions.push(
+        sql`(${sortDateExpr} < ${cursorIso}::timestamptz OR (${sortDateExpr} = ${cursorIso}::timestamptz AND ${curationItems.id} < ${cursorId}))`
+      );
     }
   }
 
@@ -268,13 +257,14 @@ export async function GET(request: NextRequest) {
           collectedAt: curationItems.collectedAt,
           sourceName: curationSources.name,
           overlap: overlapExpr.as('overlap'),
+          sortDate: sortDateExpr.as('sort_date'),
         })
         .from(curationItems)
         .innerJoin(curationSources, eq(curationItems.sourceId, curationSources.id))
         .where(whereClause)
         .orderBy(
           sql`${overlapExpr} DESC`,
-          sql`${curationItems.publishedAt} DESC NULLS LAST`,
+          sql`${sortDateExpr} DESC`,
           desc(curationItems.id)
         )
         .limit(limit + 1);
@@ -285,7 +275,7 @@ export async function GET(request: NextRequest) {
       const lastItem = items[items.length - 1];
       const nextCursor =
         hasMore && lastItem
-          ? `${lastItem.overlap}|${lastItem.publishedAt?.toISOString() ?? ''}|${lastItem.id}`
+          ? `${lastItem.overlap}|${new Date(lastItem.sortDate as string | Date).toISOString()}|${lastItem.id}`
           : null;
 
       return NextResponse.json(
@@ -314,12 +304,13 @@ export async function GET(request: NextRequest) {
         isBookmarked: curationItems.isBookmarked,
         collectedAt: curationItems.collectedAt,
         sourceName: curationSources.name,
+        sortDate: sortDateExpr.as('sort_date'),
       })
       .from(curationItems)
       .innerJoin(curationSources, eq(curationItems.sourceId, curationSources.id))
       .where(whereClause)
       .orderBy(
-        sql`${curationItems.publishedAt} DESC NULLS LAST`,
+        sql`${sortDateExpr} DESC`,
         desc(curationItems.id)
       )
       .limit(limit + 1);
@@ -330,7 +321,7 @@ export async function GET(request: NextRequest) {
     const lastItem = items[items.length - 1];
     const nextCursor =
       hasMore && lastItem
-        ? `${lastItem.publishedAt?.toISOString() ?? ''}|${lastItem.id}`
+        ? `${new Date(lastItem.sortDate as string | Date).toISOString()}|${lastItem.id}`
         : null;
 
     return NextResponse.json(

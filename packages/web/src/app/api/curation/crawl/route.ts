@@ -6,7 +6,7 @@ import { crawlSource, getActiveSourcesForUser, type CrawlSourceResult } from '@/
  * Triggers RSS crawl for all active sources belonging to the authenticated user.
  * Streams progress via Server-Sent Events.
  */
-export async function POST() {
+export async function POST(request: Request) {
   const supabase = await createClient();
 
   const {
@@ -16,6 +16,18 @@ export async function POST() {
 
   if (authError || !user) {
     return new Response('Unauthorized', { status: 401 });
+  }
+
+  // Parse optional since date from request body
+  let since: Date | undefined;
+  try {
+    const body = await request.json();
+    if (body.since) {
+      const parsed = new Date(body.since);
+      if (!isNaN(parsed.getTime())) since = parsed;
+    }
+  } catch {
+    // No body or invalid JSON — continue without since filter
   }
 
   const sources = await getActiveSourcesForUser(user.id);
@@ -52,7 +64,7 @@ export async function POST() {
           total: sources.length,
         });
 
-        const result = await crawlSource(source);
+        const result = await crawlSource(source, since ? { since } : undefined);
         results.push(result);
         send('progress', { index: i, result });
       }

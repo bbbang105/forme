@@ -9,6 +9,7 @@ interface CrawlResult {
   success: boolean;
   itemsFound: number;
   newItemsAdded: number;
+  itemsFilteredOut: number;
   error?: string;
 }
 
@@ -20,13 +21,14 @@ interface CrawlSummary {
 }
 
 interface CrawlProgressProps {
+  since?: string;
   onComplete: () => void;
   onClose: () => void;
 }
 
 type CrawlState = 'connecting' | 'crawling' | 'complete' | 'error';
 
-export function CrawlProgress({ onComplete, onClose }: CrawlProgressProps) {
+export function CrawlProgress({ since, onComplete, onClose }: CrawlProgressProps) {
   const [state, setState] = useState<CrawlState>('connecting');
   const [totalSources, setTotalSources] = useState(0);
   const [currentIndex, setCurrentIndex] = useState(-1);
@@ -66,6 +68,8 @@ export function CrawlProgress({ onComplete, onClose }: CrawlProgressProps) {
       try {
         const response = await fetch('/api/curation/crawl', {
           method: 'POST',
+          headers: since ? { 'Content-Type': 'application/json' } : undefined,
+          body: since ? JSON.stringify({ since }) : undefined,
           signal: abortController.signal,
         });
 
@@ -120,7 +124,7 @@ export function CrawlProgress({ onComplete, onClose }: CrawlProgressProps) {
     return () => {
       abortController.abort();
     };
-  }, [handleEvent]);
+  }, [since, handleEvent]);
 
   return (
     <div className="space-y-4">
@@ -190,6 +194,9 @@ export function CrawlProgress({ onComplete, onClose }: CrawlProgressProps) {
               {r.success ? (
                 <span className="text-muted-foreground ml-auto shrink-0">
                   +{r.newItemsAdded}건
+                  {r.itemsFilteredOut > 0 && (
+                    <span className="text-muted-foreground/60"> ({r.itemsFilteredOut}건 제외)</span>
+                  )}
                 </span>
               ) : (
                 <span className="text-destructive ml-auto shrink-0 truncate max-w-[120px]">

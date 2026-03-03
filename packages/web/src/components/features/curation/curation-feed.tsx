@@ -134,9 +134,11 @@ export function CurationFeed() {
   }, [category, status, search, tagsParam, sort, fetchItems]);
 
   // Infinite scroll
+  // `loading` is a dependency so the observer re-attaches to the NEW sentinel
+  // DOM node after a loading cycle unmounts/remounts the sentinel.
   useEffect(() => {
     const sentinel = sentinelRef.current;
-    if (!sentinel) return;
+    if (!sentinel || loading) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -158,7 +160,7 @@ export function CurationFeed() {
 
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [fetchItems]);
+  }, [fetchItems, loading]);
 
   // Optimistic updates
   const handleToggleBookmark = useCallback(
