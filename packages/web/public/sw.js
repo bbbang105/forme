@@ -2,7 +2,7 @@
 
 // forme - Service Worker (Push Notifications)
 
-self.addEventListener('install', (event) => {
+self.addEventListener('install', () => {
   self.skipWaiting();
 });
 
