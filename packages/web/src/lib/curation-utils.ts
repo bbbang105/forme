@@ -25,17 +25,10 @@ export function formatRelativeDate(dateStr: string | null): string | null {
   const date = new Date(dateStr);
   if (isNaN(date.getTime())) return null;
 
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  if (diffDays < 0) return date.toLocaleDateString('ko-KR', { year: 'numeric', month: 'short', day: 'numeric' });
-  if (diffDays === 0) return '오늘';
-  if (diffDays === 1) return '어제';
-  if (diffDays < 7) return `${diffDays}일 전`;
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)}주 전`;
-  if (diffDays < 365) return `${Math.floor(diffDays / 30)}개월 전`;
-  return date.toLocaleDateString('ko-KR', { year: 'numeric', month: 'short', day: 'numeric' });
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}.${m}.${d}`;
 }
 
 export const DEFAULT_CATEGORY_STYLES: Record<string, { label: string; bg: string; text: string; ring: string }> = {
@@ -45,6 +38,12 @@ export const DEFAULT_CATEGORY_STYLES: Record<string, { label: string; bg: string
     text: 'text-violet-700 dark:text-violet-300',
     ring: 'ring-violet-200 dark:ring-violet-500/30',
   },
+  dev: {
+    label: 'DEV',
+    bg: 'bg-blue-100 dark:bg-blue-500/20',
+    text: 'text-blue-700 dark:text-blue-300',
+    ring: 'ring-blue-200 dark:ring-blue-500/30',
+  },
   uxui: {
     label: 'UXUI',
     bg: 'bg-sky-100 dark:bg-sky-500/20',
@@ -52,16 +51,30 @@ export const DEFAULT_CATEGORY_STYLES: Record<string, { label: string; bg: string
     ring: 'ring-sky-200 dark:ring-sky-500/30',
   },
   economy: {
-    label: '경제',
+    label: 'ECONOMY',
     bg: 'bg-amber-100 dark:bg-amber-500/20',
     text: 'text-amber-700 dark:text-amber-300',
     ring: 'ring-amber-200 dark:ring-amber-500/30',
   },
 };
 
+/**
+ * Legacy category → canonical mapping.
+ * Old categories like 'career', 'frontend', 'backend' map to 'dev'.
+ */
+const CATEGORY_ALIASES: Record<string, string> = {
+  career: 'dev',
+  frontend: 'dev',
+  backend: 'dev',
+  devops: 'dev',
+  security: 'dev',
+  data: 'dev',
+};
+
 export function getCategoryStyle(category: string) {
-  return DEFAULT_CATEGORY_STYLES[category] ?? {
-    label: category,
+  const key = CATEGORY_ALIASES[category.toLowerCase()] ?? category.toLowerCase();
+  return DEFAULT_CATEGORY_STYLES[key] ?? {
+    label: category.toUpperCase(),
     bg: 'bg-gray-100 dark:bg-gray-500/20',
     text: 'text-gray-700 dark:text-gray-300',
     ring: 'ring-gray-200 dark:ring-gray-500/30',
