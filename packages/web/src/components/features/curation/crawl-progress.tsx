@@ -67,6 +67,7 @@ export function CrawlProgress({ since, onComplete, onClose }: CrawlProgressProps
 
   useEffect(() => {
     const abortController = new AbortController();
+    let done = false;
 
     (async () => {
       try {
@@ -94,8 +95,8 @@ export function CrawlProgress({ since, onComplete, onClose }: CrawlProgressProps
         let buffer = '';
 
         while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+          const { value, done: streamDone } = await reader.read();
+          if (streamDone) break;
 
           buffer += decoder.decode(value, { stream: true });
 
@@ -117,6 +118,7 @@ export function CrawlProgress({ since, onComplete, onClose }: CrawlProgressProps
             }
           }
         }
+        done = true;
       } catch {
         if (!abortController.signal.aborted) {
           setErrorMessage('수집 중 오류가 발생했습니다.');
@@ -126,7 +128,7 @@ export function CrawlProgress({ since, onComplete, onClose }: CrawlProgressProps
     })();
 
     return () => {
-      abortController.abort();
+      if (!done) abortController.abort();
     };
   }, [since, handleEvent]);
 
