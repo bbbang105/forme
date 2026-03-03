@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { CheckCircle2, Loader2, XCircle } from 'lucide-react';
 
 interface CrawlResult {
@@ -37,6 +37,10 @@ export function CrawlProgress({ since, onComplete, onClose }: CrawlProgressProps
   const [summary, setSummary] = useState<CrawlSummary | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
 
+  // Ref to avoid re-triggering useEffect when parent re-renders
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
+
   const handleEvent = useCallback(
     (event: string, data: Record<string, unknown>) => {
       switch (event) {
@@ -54,11 +58,11 @@ export function CrawlProgress({ since, onComplete, onClose }: CrawlProgressProps
         case 'complete':
           setSummary(data.summary as CrawlSummary);
           setState('complete');
-          onComplete();
+          onCompleteRef.current();
           break;
       }
     },
-    [onComplete]
+    []
   );
 
   useEffect(() => {
