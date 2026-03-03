@@ -11,7 +11,7 @@ interface LogoProps {
  * - Mark: 둥근 사각형 + 라운드 스트로크 스타일의 'f' (두꺼운 선, 부드러운 곡선)
  * - Wordmark: "for" + "me" (포인트 컬러)
  */
-export function Logo({ className, size = 'md', showMark = true }: LogoProps) {
+export function Logo({ className, size = 'md', showMark = false }: LogoProps) {
   const sizes = {
     sm: { mark: 20, text: 'text-base', gap: 'gap-1.5' },
     md: { mark: 24, text: 'text-lg', gap: 'gap-2' },
