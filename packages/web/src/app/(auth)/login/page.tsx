@@ -15,7 +15,10 @@ function LoginForm() {
     setIsLoading(true);
     try {
       const supabase = createClient();
-      const redirectPath = searchParams.get('redirect') ?? '/dashboard';
+      const rawRedirect = searchParams.get('redirect') ?? '/dashboard';
+      const redirectPath = rawRedirect.startsWith('/') && !rawRedirect.startsWith('//')
+        ? rawRedirect
+        : '/dashboard';
 
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: 'discord',

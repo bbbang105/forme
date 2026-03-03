@@ -1,3 +1,3 @@
 export * from './schema';
 export * from './types';
-export { getDb, closeDb } from './db';
+export { db } from './db';

@@ -1,19 +1,20 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
+const ALLOWED_PATHS = ['/dashboard', '/curation', '/calendar', '/memo', '/podcast'];
+
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get('code');
   const rawNext = searchParams.get('next') ?? '/dashboard';
-  let next = '/dashboard';
-  try {
-    const redirectUrl = new URL(rawNext, origin);
-    if (redirectUrl.origin === origin) {
-      next = redirectUrl.pathname + redirectUrl.search;
-    }
-  } catch {
-    // invalid URL, use default
-  }
+
+  // open redirect 방어: 상대경로 + 허용된 경로만 허용
+  const safePath = rawNext.startsWith('/') && !rawNext.startsWith('//')
+    ? rawNext
+    : '/dashboard';
+  const next = ALLOWED_PATHS.some((p) => safePath.startsWith(p))
+    ? safePath
+    : '/dashboard';
 
   if (!code) {
     return NextResponse.redirect(`${origin}/login?error=auth`);
@@ -23,6 +24,7 @@ export async function GET(request: Request) {
   const { error } = await supabase.auth.exchangeCodeForSession(code);
 
   if (error) {
+    console.error('[auth/callback] exchangeCodeForSession 실패:', error.message);
     return NextResponse.redirect(`${origin}/login?error=auth`);
   }
 

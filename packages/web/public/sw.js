@@ -11,9 +11,12 @@ self.addEventListener('activate', (event) => {
 });
 
 // fetch 핸들러 (Chrome PWA installability 필수 조건)
-// 네트워크 우선 — 동적 앱이므로 캐싱 없이 패스스루
+// same-origin만 핸들링, cross-origin은 네이티브 통과
 self.addEventListener('fetch', (event) => {
-  event.respondWith(fetch(event.request));
+  if (!event.request.url.startsWith(self.location.origin)) return;
+  event.respondWith(
+    fetch(event.request).catch(() => new Response('Network error', { status: 503 }))
+  );
 });
 
 // 푸시 수신
@@ -45,11 +48,14 @@ self.addEventListener('push', (event) => {
   );
 });
 
-// 알림 클릭
+// 알림 클릭 — same-origin URL만 허용
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
-  const urlToOpen = event.notification.data?.url || '/';
+  const rawUrl = event.notification.data?.url || '/';
+  const fullUrl = new URL(rawUrl, self.location.origin);
+  if (fullUrl.origin !== self.location.origin) return;
+  const urlToOpen = fullUrl.href;
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {

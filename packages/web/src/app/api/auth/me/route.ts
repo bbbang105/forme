@@ -17,11 +17,18 @@ export async function GET() {
     (identity) => identity.provider === 'discord'
   );
 
-  return NextResponse.json({
-    id: user.id,
-    email: user.email,
-    discordId: discordIdentity?.id,
-    discordUsername: discordIdentity?.identity_data?.full_name || discordIdentity?.identity_data?.name,
-    avatarUrl: discordIdentity?.identity_data?.avatar_url,
-  });
+  return NextResponse.json(
+    {
+      id: user.id,
+      email: user.email ?? null,
+      discordId: discordIdentity?.identity_data?.provider_id ?? discordIdentity?.identity_data?.sub,
+      discordUsername: discordIdentity?.identity_data?.full_name || discordIdentity?.identity_data?.name,
+      avatarUrl: discordIdentity?.identity_data?.avatar_url,
+    },
+    {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+      },
+    }
+  );
 }

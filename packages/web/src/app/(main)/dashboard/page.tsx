@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Newspaper, Calendar, StickyNote, Headphones } from 'lucide-react';
 
@@ -40,7 +41,7 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-2 gap-3">
         {features.map(({ title, description, icon: Icon, href }) => (
-          <a key={href} href={href}>
+          <Link key={href} href={href}>
             <Card className="h-full hover:border-primary/50 transition-colors cursor-pointer">
               <CardHeader className="pb-2 p-4">
                 <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center mb-2">
@@ -52,7 +53,7 @@ export default function DashboardPage() {
                 <p className="text-xs text-muted-foreground">{description}</p>
               </CardContent>
             </Card>
-          </a>
+          </Link>
         ))}
       </div>
     </div>

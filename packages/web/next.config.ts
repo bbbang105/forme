@@ -5,10 +5,15 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   images: {
     remotePatterns: [
-      { protocol: 'https', hostname: '**.supabase.co' },
+      { protocol: 'https', hostname: 'dbeegbhgezhnokosrhtk.supabase.co' },
       { protocol: 'https', hostname: 'cdn.discordapp.com' },
       { protocol: 'https', hostname: 'api.dicebear.com' },
     ],
+  },
+  async redirects() {
+    return [
+      { source: '/', destination: '/dashboard', permanent: false },
+    ];
   },
   async headers() {
     return [
@@ -18,6 +23,29 @@ const nextConfig: NextConfig = {
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'X-Frame-Options', value: 'DENY' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          {
+            key: 'Strict-Transport-Security',
+            value: 'max-age=31536000; includeSubDomains; preload',
+          },
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(), geolocation=(), payment=()',
+          },
+          {
+            key: 'Content-Security-Policy',
+            value: [
+              "default-src 'self'",
+              `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''}`,
+              "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+              "font-src 'self' https://cdn.jsdelivr.net",
+              "img-src 'self' data: blob: https://dbeegbhgezhnokosrhtk.supabase.co https://cdn.discordapp.com https://api.dicebear.com",
+              "connect-src 'self' https://dbeegbhgezhnokosrhtk.supabase.co wss://dbeegbhgezhnokosrhtk.supabase.co",
+              "worker-src 'self'",
+              "frame-ancestors 'none'",
+              "base-uri 'self'",
+              "form-action 'self'",
+            ].join('; '),
+          },
         ],
       },
       {
