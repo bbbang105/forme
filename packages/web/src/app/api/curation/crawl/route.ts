@@ -36,10 +36,23 @@ export async function POST(request: Request) {
 
   const stream = new ReadableStream({
     async start(controller) {
+      let closed = false;
+
       function send(event: string, data: unknown) {
-        controller.enqueue(
-          encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
-        );
+        if (closed) return;
+        try {
+          controller.enqueue(
+            encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
+          );
+        } catch {
+          closed = true;
+        }
+      }
+
+      function close() {
+        if (closed) return;
+        closed = true;
+        try { controller.close(); } catch { /* already closed */ }
       }
 
       send('start', { totalSources: sources.length });
@@ -49,13 +62,14 @@ export async function POST(request: Request) {
           results: [],
           summary: { totalSources: 0, totalNewItems: 0, successCount: 0, failCount: 0 },
         });
-        controller.close();
+        close();
         return;
       }
 
       const results: CrawlSourceResult[] = [];
 
       for (let i = 0; i < sources.length; i++) {
+        if (closed) break;
         const source = sources[i]!;
 
         send('processing', {
@@ -81,7 +95,7 @@ export async function POST(request: Request) {
         },
       });
 
-      controller.close();
+      close();
     },
   });
 
