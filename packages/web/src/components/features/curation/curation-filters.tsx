@@ -1,12 +1,33 @@
 'use client';
 
-import { useState } from 'react';
-import { BookmarkIcon, ChevronDown, ChevronUp, Eye, EyeOff, Tag } from 'lucide-react';
-import { INTEREST_OPTIONS, getTagColor } from '@forme/shared/config';
-import { cn } from '@/lib/utils';
-import { getCategoryStyle } from '@/lib/curation-utils';
+import {useState} from 'react';
+import {
+    BookmarkIcon,
+    Bot,
+    ChevronDown,
+    ChevronUp,
+    Code2,
+    LayoutGrid,
+    Mail,
+    MailOpen,
+    Palette,
+    RotateCcw,
+    Tag,
+    TrendingUp,
+} from 'lucide-react';
+import {INTEREST_OPTIONS} from '@forme/shared/config';
+import {cn} from '@/lib/utils';
 
-export type StatusFilter = '' | 'unread' | 'bookmarked';
+export type StatusFilter = 'unread' | 'read' | 'bookmarked';
+
+/** Fixed 4 categories + all */
+const CATEGORY_TABS = [
+  { value: '', label: '전체', icon: LayoutGrid },
+  { value: 'ai', label: 'AI', icon: Bot },
+  { value: 'dev', label: 'DEV', icon: Code2 },
+  { value: 'uxui', label: 'UXUI', icon: Palette },
+  { value: 'economy', label: 'ECONOMY', icon: TrendingUp },
+] as const;
 
 interface CurationFiltersProps {
   categories: string[];
@@ -19,7 +40,6 @@ interface CurationFiltersProps {
 }
 
 export function CurationFilters({
-  categories,
   selectedCategory,
   onCategoryChange,
   status,
@@ -27,7 +47,6 @@ export function CurationFilters({
   selectedTags,
   onTagsChange,
 }: CurationFiltersProps) {
-  const allCategories = ['all', ...new Set(categories)];
   const [tagsExpanded, setTagsExpanded] = useState(false);
 
   const toggleTag = (tag: string) => {
@@ -40,25 +59,24 @@ export function CurationFilters({
 
   return (
     <div className="space-y-3">
-      {/* Category pills */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
-        {allCategories.map((cat) => {
-          const isActive = cat === selectedCategory || (cat === 'all' && !selectedCategory);
-          const style = cat === 'all' ? null : getCategoryStyle(cat);
-
+      {/* Category segment tabs */}
+      <div className="flex rounded-xl bg-muted/50 p-1 gap-0.5">
+        {CATEGORY_TABS.map(({ value, label, icon: Icon }) => {
+          const isActive = value === selectedCategory;
           return (
             <button
-              key={cat}
-              onClick={() => onCategoryChange(cat === 'all' ? '' : cat)}
+              key={value}
+              onClick={() => onCategoryChange(value)}
               className={cn(
-                'inline-flex items-center rounded-full px-3 py-1.5 text-xs font-medium',
-                'transition-colors shrink-0 cursor-pointer',
+                'flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg px-2 py-2.5 text-xs font-semibold',
+                'transition-all cursor-pointer',
                 isActive
-                  ? 'bg-primary text-primary-foreground'
-                  : 'border border-border text-foreground hover:bg-accent hover:text-accent-foreground'
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
               )}
             >
-              {cat === 'all' ? '전체' : style?.label ?? cat}
+              <Icon className="h-4 w-4" />
+              <span className="hidden xs:inline sm:inline">{label}</span>
             </button>
           );
         })}
@@ -67,16 +85,16 @@ export function CurationFilters({
       {/* Status filter chips */}
       <div className="flex items-center gap-1.5">
         <StatusChip
-          active={status === ''}
-          onClick={() => onStatusChange('')}
-          icon={<Eye className="h-3.5 w-3.5" />}
-          label="모든 글"
-        />
-        <StatusChip
           active={status === 'unread'}
           onClick={() => onStatusChange('unread')}
-          icon={<EyeOff className="h-3.5 w-3.5" />}
+          icon={<Mail className="h-3.5 w-3.5" />}
           label="안읽은 글"
+        />
+        <StatusChip
+          active={status === 'read'}
+          onClick={() => onStatusChange('read')}
+          icon={<MailOpen className="h-3.5 w-3.5" />}
+          label="읽은 글"
         />
         <StatusChip
           active={status === 'bookmarked'}
@@ -116,9 +134,10 @@ export function CurationFilters({
                   onClick={() => toggleTag(tag)}
                   className={cn(
                     'inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium',
-                    'transition-all cursor-pointer',
-                    getTagColor(tag, isSelected),
-                    !isSelected && 'hover:opacity-80'
+                    'transition-all cursor-pointer ring-1 ring-inset',
+                    isSelected
+                      ? 'bg-primary/15 text-primary ring-primary/30'
+                      : 'text-muted-foreground ring-border hover:bg-accent hover:text-accent-foreground'
                   )}
                 >
                   {tag}
@@ -128,9 +147,10 @@ export function CurationFilters({
             {selectedTags.length > 0 && (
               <button
                 onClick={() => onTagsChange([])}
-                className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium border border-border text-muted-foreground hover:bg-accent transition-colors cursor-pointer"
+                className="inline-flex items-center justify-center h-6 w-6 rounded-full text-muted-foreground hover:bg-destructive/15 hover:text-destructive transition-colors cursor-pointer"
+                aria-label="태그 초기화"
               >
-                초기화
+                <RotateCcw className="h-3.5 w-3.5" />
               </button>
             )}
           </div>

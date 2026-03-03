@@ -1,5 +1,6 @@
-import { TabBar } from '@/components/layout/tab-bar';
-import { Header } from '@/components/layout/header';
+import {TabBar} from '@/components/layout/tab-bar';
+import {Header} from '@/components/layout/header';
+import {ScrollToTop} from '@/components/layout/scroll-to-top';
 
 export default function MainLayout({
   children,
@@ -13,6 +14,7 @@ export default function MainLayout({
         {children}
       </main>
       <TabBar />
+      <ScrollToTop />
     </div>
   );
 }

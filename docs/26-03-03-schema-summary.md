@@ -52,6 +52,8 @@ auth.users (Supabase 관리)
 | category | VARCHAR(50) | NOT NULL | DEFAULT 'ai' |
 | tags | TEXT[] | NULL | 소스 기본 태그 |
 | is_active | BOOLEAN | NOT NULL | DEFAULT true |
+| is_favorite | BOOLEAN | NOT NULL | DEFAULT false |
+| favorite_order | INTEGER | NOT NULL | DEFAULT 0, 즐겨찾기 정렬 순서 |
 | created_at | TIMESTAMPTZ | NOT NULL | DEFAULT NOW() |
 
 ### curation_items
@@ -146,6 +148,7 @@ auth.users (Supabase 관리)
 | 테이블 | 인덱스 | 컬럼 |
 |--------|--------|------|
 | curation_sources | idx_sources_user | user_id |
+| curation_sources | idx_sources_user_fav_order | user_id, is_favorite, favorite_order |
 | curation_items | idx_items_source_url | source_id, url (UNIQUE) |
 | curation_items | idx_items_published | published_at |
 | curation_items | idx_items_category | category |

@@ -1,14 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { Clock, Newspaper, Sparkles } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { Skeleton } from '@/components/ui/skeleton';
-import { CurationCard, CurationListRow, type CurationItemData } from './curation-card';
-import { CurationFilters, type StatusFilter } from './curation-filters';
-import { CurationSearch } from './curation-search';
-import { SourceManager } from './source-manager';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {useRouter, useSearchParams} from 'next/navigation';
+import {Clock, Newspaper, Sparkles, Star} from 'lucide-react';
+import {cn} from '@/lib/utils';
+import {Skeleton} from '@/components/ui/skeleton';
+import {CurationCard, type CurationItemData, CurationListRow} from './curation-card';
+import {CurationFilters, type StatusFilter} from './curation-filters';
+import {CurationSearch} from './curation-search';
+import {SourceManager} from './source-manager';
 
 const PAGE_SIZE = 12;
 
@@ -20,7 +20,7 @@ export function CurationFeed() {
 
   // Filter state from URL
   const category = searchParams.get('category') ?? '';
-  const status = (searchParams.get('status') ?? '') as StatusFilter;
+  const status = (searchParams.get('status') ?? 'unread') as StatusFilter;
   const search = searchParams.get('search') ?? '';
   const tagsParam = searchParams.get('tags') ?? '';
   const selectedTags = useMemo(
@@ -28,6 +28,7 @@ export function CurationFeed() {
     [tagsParam]
   );
   const sort = (searchParams.get('sort') ?? 'latest') as SortMode;
+  const sourceId = searchParams.get('sourceId') ?? '';
 
   // Data state
   const [items, setItems] = useState<CurationItemData[]>([]);
@@ -37,6 +38,7 @@ export function CurationFeed() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [categories, setCategories] = useState<string[]>([]);
   const [hasSources, setHasSources] = useState(true);
+  const [favoriteSources, setFavoriteSources] = useState<{ id: string; name: string }[]>([]);
 
   // Refs for infinite scroll
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -60,6 +62,7 @@ export function CurationFeed() {
       search?: string;
       tags?: string[];
       sort?: SortMode;
+      sourceId?: string;
     }) => {
       const params = new URLSearchParams();
       const newCategory = updates.category ?? category;
@@ -67,16 +70,18 @@ export function CurationFeed() {
       const newSearch = updates.search ?? search;
       const newTags = updates.tags ?? selectedTags;
       const newSort = updates.sort ?? sort;
+      const newSourceId = updates.sourceId ?? sourceId;
 
       if (newCategory) params.set('category', newCategory);
-      if (newStatus) params.set('status', newStatus);
+      if (newStatus && newStatus !== 'unread') params.set('status', newStatus);
       if (newSearch) params.set('search', newSearch);
       if (newTags.length > 0) params.set('tags', newTags.join(','));
       if (newSort !== 'latest') params.set('sort', newSort);
+      if (newSourceId) params.set('sourceId', newSourceId);
       const qs = params.toString();
       router.push(`/curation${qs ? `?${qs}` : ''}`, { scroll: false });
     },
-    [router, category, status, search, selectedTags, sort]
+    [router, category, status, search, selectedTags, sort, sourceId]
   );
 
   // Fetch items
@@ -90,6 +95,7 @@ export function CurationFeed() {
       if (search) params.set('search', search);
       if (tagsParam) params.set('tags', tagsParam);
       if (sort !== 'latest') params.set('sort', sort);
+      if (sourceId) params.set('sourceId', sourceId);
       if (cursorArg) params.set('cursor', cursorArg);
       params.set('limit', String(PAGE_SIZE));
 
@@ -110,17 +116,20 @@ export function CurationFeed() {
         if (!append) setLoading(false);
       }
     },
-    [category, status, search, tagsParam, sort]
+    [category, status, search, tagsParam, sort, sourceId]
   );
 
-  // Fetch sources for categories
+  // Fetch sources for categories + favorites
   const fetchCategories = useCallback(async () => {
     const res = await fetch('/api/curation/sources');
     if (!res.ok) return;
-    const sources = await res.json();
+    const sources: { id: string; name: string; category: string; isFavorite: boolean }[] = await res.json();
     setHasSources(sources.length > 0);
-    const cats = [...new Set(sources.map((s: { category: string }) => s.category))] as string[];
+    const cats = [...new Set(sources.map((s) => s.category))] as string[];
     setCategories(cats);
+    setFavoriteSources(
+      sources.filter((s) => s.isFavorite).map((s) => ({ id: s.id, name: s.name }))
+    );
   }, []);
 
   // Load categories once on mount
@@ -131,7 +140,7 @@ export function CurationFeed() {
   // Fetch items on filter changes
   useEffect(() => {
     fetchItems(null, false);
-  }, [category, status, search, tagsParam, sort, fetchItems]);
+  }, [category, status, search, tagsParam, sort, sourceId, fetchItems]);
 
   // Infinite scroll
   // `loading` is a dependency so the observer re-attaches to the NEW sentinel
@@ -190,11 +199,16 @@ export function CurationFeed() {
   );
 
   const handleMarkRead = useCallback(async (id: string) => {
-    setItems((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, isRead: true } : item
-      )
-    );
+    // On the unread tab, remove the item immediately; otherwise just toggle
+    if (status === 'unread') {
+      setItems((prev) => prev.filter((item) => item.id !== id));
+    } else {
+      setItems((prev) =>
+        prev.map((item) =>
+          item.id === id ? { ...item, isRead: true } : item
+        )
+      );
+    }
 
     const res = await fetch(`/api/curation/${id}`, {
       method: 'PATCH',
@@ -203,18 +217,19 @@ export function CurationFeed() {
     });
 
     if (!res.ok) {
-      setItems((prev) =>
-        prev.map((item) =>
-          item.id === id ? { ...item, isRead: false } : item
-        )
-      );
+      // Revert: re-fetch to restore correct state
+      fetchItems(null, false);
     }
-  }, []);
+  }, [status, fetchItems]);
 
   const handleCrawlComplete = useCallback(() => {
     fetchCategories();
     fetchItems(null, false);
   }, [fetchItems, fetchCategories]);
+
+  const handleFavoritesChange = useCallback(() => {
+    fetchCategories();
+  }, [fetchCategories]);
 
   // Empty state: no sources
   if (!loading && !hasSources) {
@@ -222,7 +237,7 @@ export function CurationFeed() {
       <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-lg font-semibold">큐레이션</h2>
-          <SourceManager onCrawlComplete={handleCrawlComplete} />
+          <SourceManager onCrawlComplete={handleCrawlComplete} onFavoritesChange={handleFavoritesChange} />
         </div>
         <div className="flex flex-col items-center justify-center min-h-[40vh] text-center">
           <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
@@ -242,7 +257,7 @@ export function CurationFeed() {
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold">큐레이션</h2>
-        <SourceManager onCrawlComplete={handleCrawlComplete} />
+        <SourceManager onCrawlComplete={handleCrawlComplete} onFavoritesChange={handleFavoritesChange} />
       </div>
 
       {/* Search */}
@@ -252,6 +267,29 @@ export function CurationFeed() {
           onChange={(v) => updateFilters({ search: v })}
         />
       </div>
+
+      {/* Favorite sources bar */}
+      {favoriteSources.length > 0 && (
+        <div className="mb-3 flex gap-2 overflow-x-auto scrollbar-hide">
+          {favoriteSources.map((src) => (
+            <button
+              key={src.id}
+              onClick={() =>
+                updateFilters({ sourceId: sourceId === src.id ? '' : src.id })
+              }
+              className={cn(
+                'inline-flex items-center gap-1 shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer border',
+                sourceId === src.id
+                  ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30'
+                  : 'bg-background text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground'
+              )}
+            >
+              <Star className="h-3 w-3 text-amber-500" fill="currentColor" />
+              {src.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Filters */}
       <div className="mb-4">
@@ -283,6 +321,7 @@ export function CurationFeed() {
       </div>
 
       {/* Feed */}
+      <div className="min-h-[30vh]">
       {loading ? (
         <FeedSkeleton />
       ) : items.length === 0 ? (
@@ -293,10 +332,12 @@ export function CurationFeed() {
               : selectedTags.length > 0
                 ? '선택한 태그에 맞는 글이 없습니다.'
                 : status === 'unread'
-                  ? '안읽은 글이 없습니다.'
-                  : status === 'bookmarked'
-                    ? '북마크한 글이 없습니다.'
-                    : '수집된 글이 없습니다. 소스를 추가하고 수집해보세요.'}
+                  ? '안읽은 글이 없습니다. 모두 읽었어요!'
+                  : status === 'read'
+                    ? '읽은 글이 없습니다.'
+                    : status === 'bookmarked'
+                      ? '북마크한 글이 없습니다.'
+                      : '수집된 글이 없습니다. 소스를 추가하고 수집해보세요.'}
           </p>
         </div>
       ) : (
@@ -336,6 +377,7 @@ export function CurationFeed() {
           )}
         </>
       )}
+      </div>
     </div>
   );
 }

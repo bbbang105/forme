@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { db, curationItems, curationSources, profiles } from '@forme/shared';
-import { eq, and, desc, sql } from 'drizzle-orm';
-import { escapeIlike } from '@/lib/curation-utils';
+import {NextRequest, NextResponse} from 'next/server';
+import {createClient} from '@/lib/supabase/server';
+import {curationItems, curationSources, db, profiles} from '@forme/shared';
+import {and, desc, eq, inArray, sql, type SQL} from 'drizzle-orm';
+import {escapeIlike} from '@/lib/curation-utils';
 
 // ── Helpers ──
 
@@ -98,6 +98,7 @@ export async function GET(request: NextRequest) {
   const search = searchRaw.slice(0, MAX_SEARCH_LENGTH);
   const tagsParam = searchParams.get('tags')?.trim() || '';
   const sort = searchParams.get('sort')?.trim() || 'latest';
+  const sourceId = searchParams.get('sourceId')?.trim() || '';
 
   const rawLimit = parseInt(searchParams.get('limit') || String(DEFAULT_LIMIT), 10);
   const limit = isNaN(rawLimit)
@@ -105,9 +106,9 @@ export async function GET(request: NextRequest) {
     : Math.min(MAX_LIMIT, Math.max(1, rawLimit));
 
   // ── Validate params ──
-  if (status && status !== 'unread' && status !== 'bookmarked') {
+  if (status && status !== 'unread' && status !== 'read' && status !== 'bookmarked') {
     return NextResponse.json(
-      { error: "status must be 'unread' or 'bookmarked'" },
+      { error: "status must be 'unread', 'read', or 'bookmarked'" },
       { status: 400 }
     );
   }
@@ -115,6 +116,13 @@ export async function GET(request: NextRequest) {
   if (sort !== 'latest' && sort !== 'recommended') {
     return NextResponse.json(
       { error: "sort must be 'latest' or 'recommended'" },
+      { status: 400 }
+    );
+  }
+
+  if (sourceId && !UUID_RE.test(sourceId)) {
+    return NextResponse.json(
+      { error: 'sourceId must be a valid UUID' },
       { status: 400 }
     );
   }
@@ -127,20 +135,32 @@ export async function GET(request: NextRequest) {
   const filterConditions = [eq(curationSources.userId, user.id)];
 
   if (category && category !== 'all') {
-    filterConditions.push(eq(curationItems.category, category));
+    // 'dev' includes legacy categories that map to dev
+    const DEV_ALIASES = ['dev', 'career', 'frontend', 'backend', 'devops', 'security', 'data'];
+    if (category === 'dev') {
+      filterConditions.push(inArray(curationItems.category, DEV_ALIASES));
+    } else {
+      filterConditions.push(eq(curationItems.category, category));
+    }
+  }
+
+  if (sourceId) {
+    filterConditions.push(eq(curationItems.sourceId, sourceId));
   }
 
   if (status === 'unread') {
     filterConditions.push(eq(curationItems.isRead, false));
+  } else if (status === 'read') {
+    filterConditions.push(eq(curationItems.isRead, true));
   } else if (status === 'bookmarked') {
     filterConditions.push(eq(curationItems.isBookmarked, true));
   }
 
   if (search) {
-    const escaped = escapeIlike(search);
+    const escaped = escapeIlike(search.replace(/\s+/g, ''));
     const pattern = `%${escaped}%`;
     filterConditions.push(
-      sql`(${curationItems.title} ILIKE ${pattern} ESCAPE '\\' OR ${curationItems.description} ILIKE ${pattern} ESCAPE '\\')`
+      sql`(REPLACE(${curationItems.title}, ' ', '') ILIKE ${pattern} ESCAPE '\\' OR REPLACE(COALESCE(${curationItems.description}, ''), ' ', '') ILIKE ${pattern} ESCAPE '\\' OR REPLACE(COALESCE(${curationSources.name}, ''), ' ', '') ILIKE ${pattern} ESCAPE '\\')`
     );
   }
 
@@ -151,9 +171,10 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // ── Recommended sort: fetch user interests ──
+  // ── Recommended sort: fetch user interests & build score expression ──
   let userInterests: string[] = [];
   const isRecommended = sort === 'recommended';
+  let scoreExpr: SQL | null = null;
 
   if (isRecommended) {
     const [profile] = await db
@@ -162,6 +183,37 @@ export async function GET(request: NextRequest) {
       .where(eq(profiles.userId, user.id))
       .limit(1);
     userInterests = profile?.interests ?? [];
+
+    // Composite score: profile interests + read tag frequency + read category frequency
+    const interestOverlapExpr = userInterests.length > 0
+      ? sql`COALESCE(array_length(ARRAY(SELECT unnest(${curationItems.tags}) INTERSECT SELECT unnest(${sqlTextArray(userInterests)})), 1), 0)`
+      : sql`0`;
+
+    const readTagScoreExpr = sql`COALESCE((
+      SELECT SUM(LEAST(rtf.freq, 5))::int
+      FROM (
+        SELECT unnest(ri.tags) AS tag, COUNT(*)::int AS freq
+        FROM curation_items ri
+        JOIN curation_sources rs ON ri.source_id = rs.id
+        WHERE rs.user_id = ${user.id} AND ri.is_read = true
+        GROUP BY 1
+      ) rtf
+      WHERE rtf.tag = ANY(${curationItems.tags})
+    ), 0)`;
+
+    const readCatScoreExpr = sql`COALESCE((
+      SELECT LEAST(rcf.freq, 10)
+      FROM (
+        SELECT ri.category, COUNT(*)::int AS freq
+        FROM curation_items ri
+        JOIN curation_sources rs ON ri.source_id = rs.id
+        WHERE rs.user_id = ${user.id} AND ri.is_read = true
+        GROUP BY 1
+      ) rcf
+      WHERE rcf.category = ${curationItems.category}
+    ), 0)`;
+
+    scoreExpr = sql`(3 * ${interestOverlapExpr} + ${readTagScoreExpr} + ${readCatScoreExpr})`;
   }
 
   // ── Sort date expression ──
@@ -172,16 +224,16 @@ export async function GET(request: NextRequest) {
   // ── Parse and apply cursor ──
   if (cursor) {
     if (isRecommended) {
-      // Recommended cursor: "<overlap>|<sortDate ISO>|<uuid>"
+      // Recommended cursor: "<score>|<sortDate ISO>|<uuid>"
       const parts = cursor.split('|');
       if (parts.length < 3) {
         return NextResponse.json({ error: 'Invalid cursor format' }, { status: 400 });
       }
-      const cursorOverlap = parseInt(parts[0], 10);
+      const cursorScore = parseInt(parts[0], 10);
       const cursorDateStr = parts.slice(1, -1).join('|');
       const cursorId = parts[parts.length - 1];
 
-      if (isNaN(cursorOverlap) || !cursorDateStr || !UUID_RE.test(cursorId)) {
+      if (isNaN(cursorScore) || !cursorDateStr || !UUID_RE.test(cursorId)) {
         return NextResponse.json({ error: 'Invalid cursor format' }, { status: 400 });
       }
 
@@ -191,14 +243,11 @@ export async function GET(request: NextRequest) {
       }
       const cursorIso = cursorDate.toISOString();
 
-      const safeInterests = sqlTextArray(userInterests);
-      const overlapCursor = sql`COALESCE(array_length(ARRAY(SELECT unnest(${curationItems.tags}) INTERSECT SELECT unnest(${safeInterests})), 1), 0)`;
-
       filterConditions.push(
         sql`(
-          ${overlapCursor} < ${cursorOverlap}
+          ${scoreExpr} < ${cursorScore}
           OR (
-            ${overlapCursor} = ${cursorOverlap}
+            ${scoreExpr} = ${cursorScore}
             AND (${sortDateExpr} < ${cursorIso}::timestamptz OR (${sortDateExpr} = ${cursorIso}::timestamptz AND ${curationItems.id} < ${cursorId}))
           )
         )`
@@ -237,10 +286,7 @@ export async function GET(request: NextRequest) {
         ? filterConditions[0]
         : and(...filterConditions);
 
-    if (isRecommended && userInterests.length > 0) {
-      const safeInterestsQuery = sqlTextArray(userInterests);
-      const overlapExpr = sql`COALESCE(array_length(ARRAY(SELECT unnest(${curationItems.tags}) INTERSECT SELECT unnest(${safeInterestsQuery})), 1), 0)`;
-
+    if (isRecommended) {
       const rows = await db
         .select({
           id: curationItems.id,
@@ -256,14 +302,14 @@ export async function GET(request: NextRequest) {
           isBookmarked: curationItems.isBookmarked,
           collectedAt: curationItems.collectedAt,
           sourceName: curationSources.name,
-          overlap: overlapExpr.as('overlap'),
+          score: scoreExpr!.as('score'),
           sortDate: sortDateExpr.as('sort_date'),
         })
         .from(curationItems)
         .innerJoin(curationSources, eq(curationItems.sourceId, curationSources.id))
         .where(whereClause)
         .orderBy(
-          sql`${overlapExpr} DESC`,
+          sql`${scoreExpr} DESC`,
           sql`${sortDateExpr} DESC`,
           desc(curationItems.id)
         )
@@ -275,7 +321,7 @@ export async function GET(request: NextRequest) {
       const lastItem = items[items.length - 1];
       const nextCursor =
         hasMore && lastItem
-          ? `${lastItem.overlap}|${new Date(lastItem.sortDate as string | Date).toISOString()}|${lastItem.id}`
+          ? `${lastItem.score}|${new Date(lastItem.sortDate as string | Date).toISOString()}|${lastItem.id}`
           : null;
 
       return NextResponse.json(

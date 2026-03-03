@@ -1,14 +1,16 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import {useMemo, useState} from 'react';
 import Image from 'next/image';
-import { Bookmark, ExternalLink } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import {
-  getArticleGradient,
-  formatRelativeDate,
-  getCategoryStyle,
-} from '@/lib/curation-utils';
+import {Bookmark} from 'lucide-react';
+import {cn} from '@/lib/utils';
+import {formatRelativeDate, getArticleGradient, getCategoryStyle,} from '@/lib/curation-utils';
+
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+function isNew(collectedAt: string): boolean {
+  return Date.now() - new Date(collectedAt).getTime() < ONE_DAY_MS;
+}
 
 export interface CurationItemData {
   id: string;
@@ -77,7 +79,7 @@ export function CurationCard({
   onMarkRead,
 }: CurationCardProps) {
   const catStyle = getCategoryStyle(item.category);
-  const relativeDate = formatRelativeDate(item.publishedAt);
+  const dateLabel = formatRelativeDate(item.publishedAt ?? item.collectedAt);
 
   const handleClick = () => {
     if (!item.isRead) {
@@ -100,17 +102,21 @@ export function CurationCard({
       className={cn(
         'group flex flex-col rounded-xl border border-border/60 bg-card',
         'hover:border-primary/30 hover:shadow-md transition-all duration-200',
-        'focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
-        item.isRead && 'opacity-60'
+        'focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2'
       )}
     >
       {/* Thumbnail */}
-      <div className="aspect-video w-full overflow-hidden rounded-t-xl bg-muted">
+      <div className="relative aspect-video w-full overflow-hidden rounded-t-xl bg-muted">
         <Thumbnail
           src={item.thumbnailUrl}
           title={item.title}
           className="w-full h-full"
         />
+        {isNew(item.collectedAt) && (
+          <span className="absolute top-2 left-2 inline-flex items-center rounded-md bg-primary px-1.5 py-0.5 text-[10px] font-bold text-primary-foreground shadow-sm">
+            NEW
+          </span>
+        )}
       </div>
 
       {/* Body */}
@@ -127,12 +133,12 @@ export function CurationCard({
           >
             {catStyle.label}
           </span>
-          {item.tags?.slice(0, 2).map((tag) => (
+          {item.tags?.slice(0, 3).map((tag) => (
             <span
               key={tag}
-              className="text-xs text-muted-foreground"
+              className="inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-medium text-primary bg-primary/10 ring-1 ring-inset ring-primary/20"
             >
-              #{tag}
+              {tag}
             </span>
           ))}
         </div>
@@ -155,27 +161,24 @@ export function CurationCard({
             {item.sourceName && (
               <span className="truncate max-w-[120px]">{item.sourceName}</span>
             )}
-            {item.sourceName && relativeDate && <span>·</span>}
-            {relativeDate && <span className="shrink-0">{relativeDate}</span>}
+            {item.sourceName && dateLabel && <span>·</span>}
+            {dateLabel && <span className="shrink-0">{dateLabel}</span>}
           </div>
-          <div className="flex items-center gap-1 shrink-0">
-            <button
-              onClick={handleBookmark}
-              className={cn(
-                'p-1 rounded-md transition-colors',
-                item.isBookmarked
-                  ? 'text-amber-500'
-                  : 'text-muted-foreground/40 hover:text-amber-500'
-              )}
-              aria-label={item.isBookmarked ? '북마크 해제' : '북마크'}
-            >
-              <Bookmark
-                className="h-3.5 w-3.5"
-                fill={item.isBookmarked ? 'currentColor' : 'none'}
-              />
-            </button>
-            <ExternalLink className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-primary transition-colors" />
-          </div>
+          <button
+            onClick={handleBookmark}
+            className={cn(
+              'p-1.5 rounded-md transition-colors shrink-0',
+              item.isBookmarked
+                ? 'text-amber-500'
+                : 'text-muted-foreground/40 hover:text-amber-500'
+            )}
+            aria-label={item.isBookmarked ? '북마크 해제' : '북마크'}
+          >
+            <Bookmark
+              className="h-5 w-5"
+              fill={item.isBookmarked ? 'currentColor' : 'none'}
+            />
+          </button>
         </div>
       </div>
     </a>
@@ -189,7 +192,7 @@ export function CurationListRow({
   onMarkRead,
 }: CurationCardProps) {
   const catStyle = getCategoryStyle(item.category);
-  const relativeDate = formatRelativeDate(item.publishedAt);
+  const dateLabel = formatRelativeDate(item.publishedAt ?? item.collectedAt);
 
   const handleClick = () => {
     if (!item.isRead) {
@@ -212,8 +215,7 @@ export function CurationListRow({
       className={cn(
         'group flex items-start gap-4 py-4 px-3 -mx-3 rounded-lg',
         'hover:bg-muted/40 transition-colors',
-        'focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
-        item.isRead && 'opacity-60'
+        'focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2'
       )}
     >
       {/* Small thumbnail */}
@@ -227,15 +229,22 @@ export function CurationListRow({
 
       {/* Content */}
       <div className="flex flex-col flex-1 min-w-0 gap-1.5">
-        <h3 className="text-sm font-medium text-foreground line-clamp-2 group-hover:text-primary transition-colors">
-          {item.title}
-        </h3>
+        <div className="flex items-center gap-1.5">
+          {isNew(item.collectedAt) && (
+            <span className="inline-flex items-center rounded-md bg-primary px-1.5 py-0.5 text-[10px] font-bold text-primary-foreground shrink-0">
+              NEW
+            </span>
+          )}
+          <h3 className="text-sm font-medium text-foreground line-clamp-2 group-hover:text-primary transition-colors">
+            {item.title}
+          </h3>
+        </div>
         {item.description && (
           <p className="text-xs text-muted-foreground line-clamp-2">
             {item.description}
           </p>
         )}
-        <div className="flex items-center gap-2 flex-wrap mt-0.5">
+        <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
           <span
             className={cn(
               'inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset',
@@ -246,25 +255,33 @@ export function CurationListRow({
           >
             {catStyle.label}
           </span>
+          {item.tags?.slice(0, 3).map((tag) => (
+            <span
+              key={tag}
+              className="inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-medium text-primary bg-primary/10 ring-1 ring-inset ring-primary/20"
+            >
+              {tag}
+            </span>
+          ))}
           {item.sourceName && (
             <span className="text-xs text-muted-foreground truncate">
               {item.sourceName}
             </span>
           )}
-          {relativeDate && (
+          {dateLabel && (
             <span className="text-xs text-muted-foreground">
-              {relativeDate}
+              {dateLabel}
             </span>
           )}
         </div>
       </div>
 
       {/* Actions */}
-      <div className="flex items-center gap-1 shrink-0 pt-1">
+      <div className="flex items-center shrink-0 pt-1">
         <button
           onClick={handleBookmark}
           className={cn(
-            'p-1 rounded-md transition-colors',
+            'p-1.5 rounded-md transition-colors',
             item.isBookmarked
               ? 'text-amber-500'
               : 'text-muted-foreground/40 hover:text-amber-500'
@@ -272,11 +289,10 @@ export function CurationListRow({
           aria-label={item.isBookmarked ? '북마크 해제' : '북마크'}
         >
           <Bookmark
-            className="h-4 w-4"
+            className="h-4.5 w-4.5"
             fill={item.isBookmarked ? 'currentColor' : 'none'}
           />
         </button>
-        <ExternalLink className="h-4 w-4 text-muted-foreground/40 group-hover:text-primary transition-colors" />
       </div>
     </a>
   );

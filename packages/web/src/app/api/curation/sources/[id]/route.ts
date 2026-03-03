@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { db, curationSources } from '@forme/shared';
-import { eq, and } from 'drizzle-orm';
+import {NextRequest, NextResponse} from 'next/server';
+import {createClient} from '@/lib/supabase/server';
+import {curationSources, db} from '@forme/shared';
+import {and, eq} from 'drizzle-orm';
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -26,7 +26,7 @@ export async function PATCH(
     return NextResponse.json({ error: 'Invalid source id' }, { status: 400 });
   }
 
-  let body: { name?: string; category?: string; isActive?: boolean };
+  let body: { name?: string; category?: string; isActive?: boolean; isFavorite?: boolean; tags?: string[]; rssUrl?: string | null };
   try {
     body = await request.json();
   } catch {
@@ -37,6 +37,9 @@ export async function PATCH(
     name: string;
     category: string;
     isActive: boolean;
+    isFavorite: boolean;
+    tags: string[];
+    rssUrl: string | null;
   }> = {};
 
   if (body.name !== undefined) {
@@ -79,6 +82,36 @@ export async function PATCH(
       );
     }
     updates.isActive = body.isActive;
+  }
+
+  if (body.isFavorite !== undefined) {
+    if (typeof body.isFavorite !== 'boolean') {
+      return NextResponse.json(
+        { error: 'isFavorite must be a boolean' },
+        { status: 400 }
+      );
+    }
+    updates.isFavorite = body.isFavorite;
+  }
+
+  if (body.tags !== undefined) {
+    if (!Array.isArray(body.tags) || body.tags.some((t) => typeof t !== 'string')) {
+      return NextResponse.json(
+        { error: 'tags must be an array of strings' },
+        { status: 400 }
+      );
+    }
+    updates.tags = body.tags;
+  }
+
+  if (body.rssUrl !== undefined) {
+    if (body.rssUrl !== null && typeof body.rssUrl !== 'string') {
+      return NextResponse.json(
+        { error: 'rssUrl must be a string or null' },
+        { status: 400 }
+      );
+    }
+    updates.rssUrl = body.rssUrl ? body.rssUrl.trim() : null;
   }
 
   if (Object.keys(updates).length === 0) {

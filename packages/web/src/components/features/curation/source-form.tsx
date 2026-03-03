@@ -1,42 +1,58 @@
 'use client';
 
-import { useState } from 'react';
-import { ChevronDown, ChevronUp, Loader2, Plus } from 'lucide-react';
-import { INTEREST_OPTIONS, getTagColor } from '@forme/shared/config';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import {useState} from 'react';
+import {Bot, ChevronDown, ChevronUp, Code2, Loader2, Palette, Plus, Save, TrendingUp} from 'lucide-react';
+import {INTEREST_OPTIONS} from '@forme/shared/config';
+import {cn} from '@/lib/utils';
+import {Button} from '@/components/ui/button';
+import {Input} from '@/components/ui/input';
+import {Label} from '@/components/ui/label';
+
+const FIXED_CATEGORIES = [
+  { value: 'ai', label: 'AI', icon: Bot },
+  { value: 'dev', label: 'DEV', icon: Code2 },
+  { value: 'uxui', label: 'UXUI', icon: Palette },
+  { value: 'economy', label: 'ECONOMY', icon: TrendingUp },
+] as const;
+
+interface SourceFormData {
+  name: string;
+  url: string;
+  category: string;
+  rssUrl?: string;
+  tags?: string[];
+}
 
 interface SourceFormProps {
   existingCategories: string[];
-  onSubmit: (data: {
+  onSubmit: (data: SourceFormData) => Promise<void>;
+  onCancel: () => void;
+  /** Pre-fill for edit mode */
+  initialData?: {
     name: string;
     url: string;
     category: string;
-    rssUrl?: string;
-    tags?: string[];
-  }) => Promise<void>;
-  onCancel: () => void;
+    rssUrl: string | null;
+    tags: string[] | null;
+  };
 }
 
 export function SourceForm({
   existingCategories,
   onSubmit,
   onCancel,
+  initialData,
 }: SourceFormProps) {
-  const [name, setName] = useState('');
-  const [url, setUrl] = useState('');
-  const [category, setCategory] = useState('ai');
-  const [customCategory, setCustomCategory] = useState('');
-  const [rssUrl, setRssUrl] = useState('');
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [tagsExpanded, setTagsExpanded] = useState(false);
-  const [isCustom, setIsCustom] = useState(false);
+  const isEdit = !!initialData;
+
+  const [name, setName] = useState(initialData?.name ?? '');
+  const [url, setUrl] = useState(initialData?.url ?? '');
+  const [category, setCategory] = useState(initialData?.category ?? 'ai');
+  const [rssUrl, setRssUrl] = useState(initialData?.rssUrl ?? '');
+  const [selectedTags, setSelectedTags] = useState<string[]>(initialData?.tags ?? []);
+  const [tagsExpanded, setTagsExpanded] = useState(isEdit && (initialData?.tags?.length ?? 0) > 0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  const categories = [...new Set(['ai', 'uxui', 'economy', ...existingCategories])];
 
   const toggleTag = (tag: string) => {
     setSelectedTags((prev) =>
@@ -48,8 +64,7 @@ export function SourceForm({
     e.preventDefault();
     setError('');
 
-    const finalCategory = isCustom ? customCategory.trim() : category;
-    if (!name.trim() || !url.trim() || !finalCategory) {
+    if (!name.trim() || !url.trim() || !category) {
       setError('이름, URL, 카테고리를 모두 입력해주세요.');
       return;
     }
@@ -66,12 +81,12 @@ export function SourceForm({
       await onSubmit({
         name: name.trim(),
         url: url.trim(),
-        category: finalCategory,
+        category,
         rssUrl: rssUrl.trim() || undefined,
         tags: selectedTags.length > 0 ? selectedTags : undefined,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : '소스 추가에 실패했습니다.');
+      setError(err instanceof Error ? err.message : `소스 ${isEdit ? '수정' : '추가'}에 실패했습니다.`);
     } finally {
       setLoading(false);
     }
@@ -103,50 +118,25 @@ export function SourceForm({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="source-category">카테고리</Label>
-        {!isCustom ? (
-          <div className="flex gap-2">
-            <select
-              id="source-category"
-              value={category}
-              onChange={(e) => {
-                if (e.target.value === '__custom__') {
-                  setIsCustom(true);
-                } else {
-                  setCategory(e.target.value);
-                }
-              }}
-              className="flex-1 h-10 rounded-md border border-input bg-background px-3 text-sm"
-            >
-              {categories.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
-              ))}
-              <option value="__custom__">+ 새 카테고리</option>
-            </select>
-          </div>
-        ) : (
-          <div className="flex gap-2">
-            <Input
-              value={customCategory}
-              onChange={(e) => setCustomCategory(e.target.value)}
-              placeholder="새 카테고리 이름"
-              autoFocus
-            />
-            <Button
+        <Label>카테고리</Label>
+        <div className="grid grid-cols-4 gap-1.5">
+          {FIXED_CATEGORIES.map(({ value, label, icon: Icon }) => (
+            <button
+              key={value}
               type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setIsCustom(false);
-                setCustomCategory('');
-              }}
+              onClick={() => setCategory(value)}
+              className={cn(
+                'flex flex-col items-center gap-1 rounded-lg px-2 py-2.5 text-xs font-semibold transition-all cursor-pointer',
+                category === value
+                  ? 'bg-primary/15 text-primary ring-1 ring-inset ring-primary/30'
+                  : 'bg-muted text-muted-foreground hover:text-foreground'
+              )}
             >
-              취소
-            </Button>
-          </div>
-        )}
+              <Icon className="h-4 w-4" />
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="space-y-2">
@@ -193,9 +183,10 @@ export function SourceForm({
                   onClick={() => toggleTag(tag)}
                   className={cn(
                     'inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium',
-                    'transition-all cursor-pointer',
-                    getTagColor(tag, isSelected),
-                    !isSelected && 'hover:opacity-80'
+                    'transition-all cursor-pointer ring-1 ring-inset',
+                    isSelected
+                      ? 'bg-primary/15 text-primary ring-primary/30'
+                      : 'text-muted-foreground ring-border hover:bg-accent hover:text-accent-foreground'
                   )}
                 >
                   {tag}
@@ -217,6 +208,11 @@ export function SourceForm({
         <Button type="submit" disabled={loading} className="flex-1">
           {loading ? (
             <Loader2 className="h-4 w-4 animate-spin" />
+          ) : isEdit ? (
+            <>
+              <Save className="h-4 w-4 mr-1" />
+              저장
+            </>
           ) : (
             <>
               <Plus className="h-4 w-4 mr-1" />

@@ -1,17 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import {useEffect, useState} from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowRight, ExternalLink } from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton';
-import { cn } from '@/lib/utils';
-import {
-  formatRelativeDate,
-  getCategoryStyle,
-  getArticleGradient,
-} from '@/lib/curation-utils';
-import type { CurationItemData } from './curation-card';
+import {ArrowRight, ExternalLink} from 'lucide-react';
+import {Skeleton} from '@/components/ui/skeleton';
+import {cn} from '@/lib/utils';
+import {formatRelativeDate, getArticleGradient, getCategoryStyle,} from '@/lib/curation-utils';
+import type {CurationItemData} from './curation-card';
 
 export function DashboardCuration() {
   const [items, setItems] = useState<CurationItemData[]>([]);
@@ -20,7 +16,7 @@ export function DashboardCuration() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch('/api/curation?limit=3');
+        const res = await fetch('/api/curation?status=unread&limit=3');
         if (res.ok) {
           const data = await res.json();
           setItems(data.items);
@@ -86,7 +82,6 @@ function MiniCard({ item }: { item: CurationItemData }) {
       className={cn(
         'group flex items-center gap-3 p-3 rounded-lg border border-border/60',
         'hover:border-primary/30 hover:shadow-sm transition-all',
-        item.isRead && 'opacity-60'
       )}
     >
       {/* Mini thumbnail */}

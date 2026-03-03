@@ -163,6 +163,29 @@ export async function crawlSource(source: CrawlSource, options?: { since?: Date 
 // Cron: GET /api/cron/curation (기본 7일 필터)
 ```
 
+## 배치 업데이트 패턴 (트랜잭션)
+
+```typescript
+// packages/web/src/app/api/curation/sources/reorder/route.ts
+// Body: { items: [{ id: string, favoriteOrder: number }] }
+// 검증: UUID 포맷, 중복 ID 차단, 정수 범위 (0~10000), 배열 최대 50
+const items = body.items;
+
+await db.transaction(async (tx) => {
+  for (const item of items) {
+    await tx
+      .update(curationSources)
+      .set({ favoriteOrder: item.favoriteOrder })
+      .where(
+        and(
+          eq(curationSources.id, item.id),
+          eq(curationSources.userId, user.id)  // 소유권 보장
+        )
+      );
+  }
+});
+```
+
 ## Drizzle ORM 패턴
 
 ```typescript

@@ -1,15 +1,16 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import { ArrowLeft, Check, Loader2, User } from 'lucide-react';
+import {useCallback, useEffect, useState} from 'react';
+import {ArrowLeft, Check, Loader2, User} from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { INTEREST_OPTIONS, getTagColor } from '@forme/shared/config';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Skeleton } from '@/components/ui/skeleton';
+import {INTEREST_OPTIONS} from '@forme/shared/config';
+import {cn} from '@/lib/utils';
+import {Card, CardContent, CardHeader} from '@/components/ui/card';
+import {Button} from '@/components/ui/button';
+import {Input} from '@/components/ui/input';
+import {Label} from '@/components/ui/label';
+import {Skeleton} from '@/components/ui/skeleton';
 
 interface ProfileData {
   id: string;
@@ -170,7 +171,7 @@ export default function ProfilePage() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="display-name">디스플레이 이름</Label>
+            <Label htmlFor="display-name">닉네임</Label>
             <Input
               id="display-name"
               value={displayName}
@@ -204,7 +205,7 @@ export default function ProfilePage() {
           <p className="text-xs text-muted-foreground mb-3">
             관심사를 선택하면 맞춤 큐레이션 추천을 받을 수 있어요.
           </p>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5">
             {INTEREST_OPTIONS.map((tag) => {
               const isSelected = selectedInterests.includes(tag);
               const isDisabled =
@@ -216,7 +217,14 @@ export default function ProfilePage() {
                   type="button"
                   onClick={() => toggleInterest(tag)}
                   disabled={isDisabled}
-                  className={`inline-flex items-center rounded-full px-3 py-1.5 text-xs font-medium transition-all cursor-pointer ${getTagColor(tag, isSelected)} ${isDisabled ? 'opacity-40 cursor-not-allowed' : 'hover:opacity-80'}`}
+                  className={cn(
+                    'inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium',
+                    'transition-all cursor-pointer ring-1 ring-inset',
+                    isSelected
+                      ? 'bg-primary/15 text-primary ring-primary/30'
+                      : 'text-muted-foreground ring-border hover:bg-accent hover:text-accent-foreground',
+                    isDisabled && 'opacity-40 cursor-not-allowed'
+                  )}
                 >
                   {tag}
                 </button>
