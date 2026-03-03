@@ -244,6 +244,41 @@ export async function sendPushToUser(userId: string, payload: NotificationPayloa
 // Cron 연동: /api/cron/curation에서 새 글 발견 시 자동 발송
 ```
 
+## Server Action 입력 검증 패턴
+
+```typescript
+// packages/web/src/lib/actions/calendar.ts
+const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const HEX_COLOR_REGEX = /^#[0-9a-fA-F]{6}$/;
+
+export async function createCalendarEvent(data: { title: string; startDate: string; ... }) {
+  const user = await requireAuth();
+
+  // 입력 검증
+  if (!data.title.trim()) throw new Error('제목을 입력해주세요');
+  if (data.title.trim().length > 200) throw new Error('제목은 200자 이내여야 합니다');
+  if (!DATE_REGEX.test(data.startDate)) throw new Error('Invalid date format');
+  if (data.color && !HEX_COLOR_REGEX.test(data.color)) throw new Error('Invalid color');
+  if (data.startDate > data.endDate) throw new Error('종료일은 시작일 이후여야 합니다');
+
+  // Drizzle ORM 사용
+  const [row] = await db.insert(calendarEvents).values({ ... }).returning();
+  revalidatePath('/calendar');
+  revalidatePath('/dashboard');
+  return row;
+}
+```
+
+## 캘린더 클라이언트 패턴
+
+```typescript
+// 모바일 터치 스와이프: useSwipe 훅 사용 (packages/web/src/hooks/use-swipe.ts)
+// 키보드 내비게이션: 화살표(←→↑↓) 날짜 이동, T 오늘
+// 월 전환 애니메이션: CSS animate-slide-left/right
+// 투두 진행률: 완료/전체 프로그레스 바
+// 이벤트 삭제: AlertDialog 확인 다이얼로그
+```
+
 ## 컴포넌트 Import 패턴
 
 ```typescript
@@ -257,6 +292,8 @@ import { TabBar } from '@/components/layout/tab-bar'
 
 // 기능별
 import { CurationCard } from '@/components/features/curation/curation-card'
+import { CalendarClient } from '@/components/features/calendar/calendar-client'
+import { DashboardCalendar } from '@/components/features/calendar/dashboard-calendar'
 import { EpisodeList } from '@/components/features/podcast/episode-list'
 import { NotificationSettings } from '@/components/features/push/notification-settings'
 ```
