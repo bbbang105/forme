@@ -236,7 +236,10 @@ export function CurationFeed() {
     return (
       <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-semibold">큐레이션</h2>
+          <div>
+            <h2 className="text-lg font-semibold">큐레이션</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">관심 있는 RSS 피드를 구독하고 한곳에서 읽어보세요</p>
+          </div>
           <SourceManager onCrawlComplete={handleCrawlComplete} onFavoritesChange={handleFavoritesChange} />
         </div>
         <div className="flex flex-col items-center justify-center min-h-[40vh] text-center">
@@ -256,7 +259,10 @@ export function CurationFeed() {
     <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold">큐레이션</h2>
+        <div>
+          <h2 className="text-lg font-semibold">큐레이션</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">관심 있는 RSS 피드를 구독하고 한곳에서 읽어보세요</p>
+        </div>
         <SourceManager onCrawlComplete={handleCrawlComplete} onFavoritesChange={handleFavoritesChange} />
       </div>
 

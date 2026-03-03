@@ -1,29 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import {useEffect, useState} from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { useTheme } from 'next-themes';
-import { Moon, Sun, User } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
-
-const pageTitles: Record<string, string> = {
-  '/dashboard': 'forme',
-  '/curation': '큐레이션',
-  '/calendar': '캘린더',
-  '/memo': '메모',
-  '/podcast': '팟캐스트',
-};
+import {useTheme} from 'next-themes';
+import {Moon, Sun, User} from 'lucide-react';
+import {Button} from '@/components/ui/button';
+import {Logo} from '@/components/ui/logo';
+import {cn} from '@/lib/utils';
 
 export function Header() {
-  const pathname = usePathname();
   const { resolvedTheme, setTheme } = useTheme();
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-
-  const title = pageTitles[pathname] || 'forme';
-  const isHome = pathname === '/dashboard';
 
   useEffect(() => {
     fetch('/api/profile')
@@ -44,14 +32,9 @@ export function Header() {
       )}
     >
       <div className="flex items-center justify-between h-14 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-        <h1
-          className={cn(
-            'text-lg tracking-tight',
-            isHome ? 'font-black' : 'font-semibold'
-          )}
-        >
-          {title}
-        </h1>
+        <Link href="/dashboard" aria-label="홈">
+          <Logo size="md" showMark={false} />
+        </Link>
         <div className="flex items-center gap-1">
           <Button
             variant="ghost"

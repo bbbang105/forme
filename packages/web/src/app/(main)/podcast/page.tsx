@@ -1,15 +1,50 @@
-import { Headphones } from 'lucide-react';
+'use client';
+
+import {useCallback, useState} from 'react';
+import {Plus} from 'lucide-react';
+import {Button} from '@/components/ui/button';
+import {EpisodeList} from '@/components/features/podcast/episode-list';
+import {UploadDialog} from '@/components/features/podcast/upload-dialog';
+import type {Episode} from '@/components/features/podcast/player-context';
 
 export default function PodcastPage() {
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [lastEpisode, setLastEpisode] = useState<Episode | null>(null);
+
+  const handleUploadSuccess = useCallback((episode: Episode) => {
+    setLastEpisode(episode);
+    setUploadOpen(false);
+  }, []);
+
   return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 text-center">
-      <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
-        <Headphones className="h-6 w-6 text-primary" />
+    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-2xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="text-lg font-semibold">팟캐스트</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            AI 팟캐스트 에피소드를 업로드하고 들어보세요
+          </p>
+        </div>
+        <Button
+          onClick={() => setUploadOpen(true)}
+          size="sm"
+          className="rounded-full h-9 px-4 gap-1.5 shadow-sm active:scale-95 transition-transform"
+        >
+          <Plus className="h-4 w-4" />
+          업로드
+        </Button>
       </div>
-      <h2 className="text-lg font-semibold mb-1">팟캐스트</h2>
-      <p className="text-sm text-muted-foreground">
-        AI 팟캐스트 플레이어 기능이 곧 추가됩니다
-      </p>
+
+      {/* Episode List */}
+      <EpisodeList newEpisode={lastEpisode} />
+
+      {/* Upload Dialog */}
+      <UploadDialog
+        open={uploadOpen}
+        onOpenChange={setUploadOpen}
+        onSuccess={handleUploadSuccess}
+      />
     </div>
   );
 }

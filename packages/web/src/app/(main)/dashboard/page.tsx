@@ -1,7 +1,11 @@
 import Link from 'next/link';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Newspaper, Calendar, StickyNote, Headphones } from 'lucide-react';
-import { DashboardCuration } from '@/components/features/curation/dashboard-curation';
+import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
+import {Calendar, Headphones, Newspaper, StickyNote} from 'lucide-react';
+import {DashboardCuration} from '@/components/features/curation/dashboard-curation';
+import {createClient} from '@/lib/supabase/server';
+import {db, profiles} from '@forme/shared';
+import {eq} from 'drizzle-orm';
+import {getFormattedDate, getGreeting} from '@/lib/greetings';
 
 const features = [
   {
@@ -30,13 +34,32 @@ const features = [
   },
 ];
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  let displayName = '유저';
+  if (user) {
+    const [profile] = await db
+      .select({ displayName: profiles.displayName })
+      .from(profiles)
+      .where(eq(profiles.userId, user.id))
+      .limit(1);
+    if (profile?.displayName) {
+      displayName = profile.displayName;
+    }
+  }
+
+  const greeting = getGreeting();
+  const dateStr = getFormattedDate();
+
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto space-y-6">
       <div className="space-y-1">
-        <h2 className="text-2xl font-bold tracking-tight">안녕하세요!</h2>
+        <p className="text-xs text-muted-foreground">{dateStr}</p>
+        <h2 className="text-2xl font-bold tracking-tight">안녕하세요, {displayName}님!</h2>
         <p className="text-sm text-muted-foreground">
-          오늘도 좋은 하루 되세요
+          {greeting}
         </p>
       </div>
 

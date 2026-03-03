@@ -121,12 +121,11 @@ auth.users (Supabase 관리)
 |------|------|----------|------|
 | id | UUID | PK | |
 | user_id | UUID | NOT NULL | FK → auth.users |
-| title | VARCHAR | NOT NULL | |
+| title | TEXT | NOT NULL | |
 | description | TEXT | NULL | |
-| audio_url | TEXT | NOT NULL | R2 URL |
+| audio_url | TEXT | NOT NULL | Cloudflare R2 URL |
 | duration | INTEGER | NULL | seconds |
-| source_urls | TEXT[] | NULL | |
-| source_type | VARCHAR | NULL | article/paper/youtube/mixed |
+| file_size | BIGINT | NULL | bytes |
 | published_at | TIMESTAMPTZ | NOT NULL | DEFAULT NOW() |
 | created_at | TIMESTAMPTZ | NOT NULL | DEFAULT NOW() |
 
@@ -157,4 +156,7 @@ auth.users (Supabase 관리)
 | todos | idx_todos_reminder | reminder_at (WHERE reminder_sent = false) |
 | calendar_events | idx_calendar_events_dates | start_date, end_date |
 | memos | idx_memos_updated | user_id, updated_at DESC |
-| podcast_episodes | idx_podcast_published | user_id, published_at DESC |
+| podcast_episodes | idx_podcast_episodes_user_published | user_id, published_at |
+| push_subscriptions | idx_push_subs_endpoint | endpoint (UNIQUE) |
+| push_subscriptions | idx_push_subs_user | user_id |
+| curation_items | idx_items_bookmarked | is_bookmarked (WHERE true) |

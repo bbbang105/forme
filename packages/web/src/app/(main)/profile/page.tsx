@@ -11,6 +11,7 @@ import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {Label} from '@/components/ui/label';
 import {Skeleton} from '@/components/ui/skeleton';
+import {NotificationSettings} from '@/components/features/push/notification-settings';
 
 interface ProfileData {
   id: string;
@@ -233,6 +234,9 @@ export default function ProfilePage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Push Notifications */}
+      <NotificationSettings />
 
       {/* Error / Success */}
       {error && (

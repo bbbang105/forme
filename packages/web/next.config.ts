@@ -1,4 +1,4 @@
-import type { NextConfig } from 'next';
+import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
   transpilePackages: ['@forme/shared'],
@@ -39,7 +39,8 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
               "font-src 'self' https://cdn.jsdelivr.net",
               "img-src 'self' data: blob: https: http:",
-              "connect-src 'self' https://dbeegbhgezhnokosrhtk.supabase.co wss://dbeegbhgezhnokosrhtk.supabase.co",
+              `connect-src 'self' https://dbeegbhgezhnokosrhtk.supabase.co wss://dbeegbhgezhnokosrhtk.supabase.co${process.env.R2_PUBLIC_URL ? ' ' + process.env.R2_PUBLIC_URL : ''}`,
+              `media-src 'self' blob:${process.env.R2_PUBLIC_URL ? ' ' + process.env.R2_PUBLIC_URL : ''}`,
               "worker-src 'self'",
               "frame-ancestors 'none'",
               "base-uri 'self'",
