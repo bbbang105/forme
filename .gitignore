@@ -1,0 +1,46 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build
+.next/
+dist/
+out/
+
+# env
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# turbo
+.turbo/
+
+# drizzle
+drizzle/meta/
+
+# worktrees
+.worktrees/
+
+# debug
+npm-debug.log*
+pnpm-debug.log*
+
+# coverage
+coverage/
+
+# auto-generated
+*.tsbuildinfo
+next-env.d.ts
+
+# serena
+.serena/
