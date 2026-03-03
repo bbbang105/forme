@@ -17,8 +17,15 @@ export function TabBar() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-      <div className="flex items-center justify-around h-16 max-w-lg mx-auto" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+    <nav
+      className={cn(
+        'fixed bottom-0 left-0 right-0 z-50',
+        'border-t border-border/60 dark:border-border',
+        'bg-background/95 backdrop-blur-md supports-[backdrop-filter]:bg-background/75',
+        'pb-[env(safe-area-inset-bottom)]'
+      )}
+    >
+      <div className="flex h-16 max-w-lg mx-auto">
         {tabs.map(({ href, label, icon: Icon }) => {
           const isActive = pathname === href || pathname.startsWith(`${href}/`);
           return (
@@ -26,14 +33,36 @@ export function TabBar() {
               key={href}
               href={href}
               className={cn(
-                'flex flex-col items-center justify-center gap-1 min-w-[64px] py-1.5 transition-colors',
+                'flex flex-col items-center justify-center gap-1 flex-1 h-full',
+                'transition-all duration-150',
+                'active:scale-[0.92] active:opacity-70',
                 isActive
                   ? 'text-primary'
                   : 'text-muted-foreground hover:text-foreground'
               )}
             >
-              <Icon className="h-5 w-5" strokeWidth={isActive ? 2.5 : 2} />
-              <span className="text-[10px] font-medium leading-none">{label}</span>
+              <span className="relative flex items-center justify-center w-8 h-8">
+                <span
+                  className={cn(
+                    'absolute inset-0 rounded-full transition-all duration-200',
+                    isActive
+                      ? 'bg-primary/10 scale-100 opacity-100'
+                      : 'bg-primary/10 scale-50 opacity-0'
+                  )}
+                />
+                <Icon
+                  className="relative z-10 h-5 w-5"
+                  strokeWidth={isActive ? 2.5 : 2}
+                />
+              </span>
+              <span
+                className={cn(
+                  'text-[11px] leading-none tracking-tight',
+                  isActive ? 'font-semibold' : 'font-medium'
+                )}
+              >
+                {label}
+              </span>
             </Link>
           );
         })}

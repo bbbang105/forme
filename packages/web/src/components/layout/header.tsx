@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { Moon, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 const pageTitles: Record<string, string> = {
   '/dashboard': 'forme',
@@ -18,15 +19,30 @@ export function Header() {
   const { resolvedTheme, setTheme } = useTheme();
 
   const title = pageTitles[pathname] || 'forme';
+  const isHome = pathname === '/dashboard';
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+    <header
+      className={cn(
+        'fixed top-0 left-0 right-0 z-50',
+        'border-b border-border/60 dark:border-border',
+        'bg-background/95 backdrop-blur-md supports-[backdrop-filter]:bg-background/75',
+        'pt-[env(safe-area-inset-top)]'
+      )}
+    >
       <div className="flex items-center justify-between h-14 px-4 max-w-lg mx-auto">
-        <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
+        <h1
+          className={cn(
+            'text-lg tracking-tight',
+            isHome ? 'font-black' : 'font-semibold'
+          )}
+        >
+          {title}
+        </h1>
         <Button
           variant="ghost"
           size="icon"
-          className="h-9 w-9"
+          className="h-11 w-11 active:scale-90 transition-all duration-150"
           aria-label={resolvedTheme === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환'}
           onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
         >
