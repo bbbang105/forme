@@ -200,9 +200,6 @@ export function CrawlProgress({ since, onComplete, onClose }: CrawlProgressProps
               {r.success ? (
                 <span className="text-muted-foreground ml-auto shrink-0">
                   +{r.newItemsAdded}건
-                  {r.itemsFilteredOut > 0 && (
-                    <span className="text-muted-foreground/60"> ({r.itemsFilteredOut}건 제외)</span>
-                  )}
                 </span>
               ) : (
                 <span className="text-destructive ml-auto shrink-0 truncate max-w-[120px]">
