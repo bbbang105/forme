@@ -67,14 +67,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  let body: { name?: string; url?: string; category?: string; rssUrl?: string };
+  let body: { name?: string; url?: string; category?: string; rssUrl?: string; tags?: string[] };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const { name, url, category, rssUrl } = body;
+  const { name, url, category, rssUrl, tags } = body;
 
   if (!name || typeof name !== 'string' || name.trim() === '') {
     return NextResponse.json({ error: 'name is required' }, { status: 400 });
@@ -99,6 +99,19 @@ export async function POST(request: NextRequest) {
 
   if (category && typeof category === 'string' && category.trim().length > 50) {
     return NextResponse.json({ error: 'category must be 50 characters or fewer' }, { status: 400 });
+  }
+
+  // Validate tags if provided
+  if (tags !== undefined) {
+    if (!Array.isArray(tags)) {
+      return NextResponse.json({ error: 'tags must be an array' }, { status: 400 });
+    }
+    if (tags.length > 20) {
+      return NextResponse.json({ error: 'tags must have at most 20 items' }, { status: 400 });
+    }
+    if (tags.some((t) => typeof t !== 'string' || t.length > 50)) {
+      return NextResponse.json({ error: 'Each tag must be a string of 50 characters or fewer' }, { status: 400 });
+    }
   }
 
   // Validate rssUrl if provided
@@ -126,6 +139,7 @@ export async function POST(request: NextRequest) {
         url: url.trim(),
         rssUrl: resolvedRssUrl,
         category: category?.trim() ?? 'ai',
+        tags: tags && tags.length > 0 ? tags : null,
       })
       .returning();
 

@@ -7,6 +7,7 @@ export const curationSources = pgTable('curation_sources', {
   url: text('url').notNull(),
   rssUrl: text('rss_url'),
   category: varchar('category', { length: 50 }).notNull().default('ai'),
+  tags: text('tags').array(),
   isActive: boolean('is_active').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({

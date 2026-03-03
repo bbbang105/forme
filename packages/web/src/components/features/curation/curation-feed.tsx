@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Newspaper } from 'lucide-react';
+import { Clock, Newspaper, Sparkles } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CurationCard, CurationListRow, type CurationItemData } from './curation-card';
 import { CurationFilters, type StatusFilter } from './curation-filters';
@@ -10,6 +11,8 @@ import { CurationSearch } from './curation-search';
 import { SourceManager } from './source-manager';
 
 const PAGE_SIZE = 12;
+
+type SortMode = 'latest' | 'recommended';
 
 export function CurationFeed() {
   const router = useRouter();
@@ -19,6 +22,12 @@ export function CurationFeed() {
   const category = searchParams.get('category') ?? '';
   const status = (searchParams.get('status') ?? '') as StatusFilter;
   const search = searchParams.get('search') ?? '';
+  const tagsParam = searchParams.get('tags') ?? '';
+  const selectedTags = useMemo(
+    () => (tagsParam ? tagsParam.split(',').filter(Boolean) : []),
+    [tagsParam]
+  );
+  const sort = (searchParams.get('sort') ?? 'latest') as SortMode;
 
   // Data state
   const [items, setItems] = useState<CurationItemData[]>([]);
@@ -45,15 +54,29 @@ export function CurationFeed() {
 
   // URL sync helper
   const updateFilters = useCallback(
-    (newCategory: string, newStatus: StatusFilter, newSearch: string) => {
+    (updates: {
+      category?: string;
+      status?: StatusFilter;
+      search?: string;
+      tags?: string[];
+      sort?: SortMode;
+    }) => {
       const params = new URLSearchParams();
+      const newCategory = updates.category ?? category;
+      const newStatus = updates.status ?? status;
+      const newSearch = updates.search ?? search;
+      const newTags = updates.tags ?? selectedTags;
+      const newSort = updates.sort ?? sort;
+
       if (newCategory) params.set('category', newCategory);
       if (newStatus) params.set('status', newStatus);
       if (newSearch) params.set('search', newSearch);
+      if (newTags.length > 0) params.set('tags', newTags.join(','));
+      if (newSort !== 'latest') params.set('sort', newSort);
       const qs = params.toString();
       router.push(`/curation${qs ? `?${qs}` : ''}`, { scroll: false });
     },
-    [router]
+    [router, category, status, search, selectedTags, sort]
   );
 
   // Fetch items
@@ -65,6 +88,8 @@ export function CurationFeed() {
       if (category) params.set('category', category);
       if (status) params.set('status', status);
       if (search) params.set('search', search);
+      if (tagsParam) params.set('tags', tagsParam);
+      if (sort !== 'latest') params.set('sort', sort);
       if (cursorArg) params.set('cursor', cursorArg);
       params.set('limit', String(PAGE_SIZE));
 
@@ -85,7 +110,7 @@ export function CurationFeed() {
         if (!append) setLoading(false);
       }
     },
-    [category, status, search]
+    [category, status, search, tagsParam, sort]
   );
 
   // Fetch sources for categories
@@ -106,7 +131,7 @@ export function CurationFeed() {
   // Fetch items on filter changes
   useEffect(() => {
     fetchItems(null, false);
-  }, [category, status, search, fetchItems]);
+  }, [category, status, search, tagsParam, sort, fetchItems]);
 
   // Infinite scroll
   useEffect(() => {
@@ -169,11 +194,19 @@ export function CurationFeed() {
       )
     );
 
-    await fetch(`/api/curation/${id}`, {
+    const res = await fetch(`/api/curation/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ isRead: true }),
     });
+
+    if (!res.ok) {
+      setItems((prev) =>
+        prev.map((item) =>
+          item.id === id ? { ...item, isRead: false } : item
+        )
+      );
+    }
   }, []);
 
   const handleCrawlComplete = useCallback(() => {
@@ -214,18 +247,36 @@ export function CurationFeed() {
       <div className="mb-4">
         <CurationSearch
           value={search}
-          onChange={(v) => updateFilters(category, status, v)}
+          onChange={(v) => updateFilters({ search: v })}
         />
       </div>
 
       {/* Filters */}
-      <div className="mb-6">
+      <div className="mb-4">
         <CurationFilters
           categories={categories}
           selectedCategory={category}
-          onCategoryChange={(c) => updateFilters(c, status, search)}
+          onCategoryChange={(c) => updateFilters({ category: c })}
           status={status}
-          onStatusChange={(s) => updateFilters(category, s, search)}
+          onStatusChange={(s) => updateFilters({ status: s })}
+          selectedTags={selectedTags}
+          onTagsChange={(tags) => updateFilters({ tags })}
+        />
+      </div>
+
+      {/* Sort toggle */}
+      <div className="flex items-center gap-1.5 mb-6">
+        <SortButton
+          active={sort === 'latest'}
+          onClick={() => updateFilters({ sort: 'latest' })}
+          icon={<Clock className="h-3.5 w-3.5" />}
+          label="최신순"
+        />
+        <SortButton
+          active={sort === 'recommended'}
+          onClick={() => updateFilters({ sort: 'recommended' })}
+          icon={<Sparkles className="h-3.5 w-3.5" />}
+          label="추천순"
         />
       </div>
 
@@ -237,11 +288,13 @@ export function CurationFeed() {
           <p className="text-sm text-muted-foreground">
             {search
               ? `"${search}" 검색 결과가 없습니다.`
-              : status === 'unread'
-                ? '안읽은 글이 없습니다.'
-                : status === 'bookmarked'
-                  ? '북마크한 글이 없습니다.'
-                  : '수집된 글이 없습니다. 소스를 추가하고 수집해보세요.'}
+              : selectedTags.length > 0
+                ? '선택한 태그에 맞는 글이 없습니다.'
+                : status === 'unread'
+                  ? '안읽은 글이 없습니다.'
+                  : status === 'bookmarked'
+                    ? '북마크한 글이 없습니다.'
+                    : '수집된 글이 없습니다. 소스를 추가하고 수집해보세요.'}
           </p>
         </div>
       ) : (
@@ -282,6 +335,34 @@ export function CurationFeed() {
         </>
       )}
     </div>
+  );
+}
+
+function SortButton({
+  active,
+  onClick,
+  icon,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium',
+        'transition-colors cursor-pointer',
+        active
+          ? 'bg-foreground text-background'
+          : 'border border-border text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+      )}
+    >
+      {icon}
+      {label}
+    </button>
   );
 }
 

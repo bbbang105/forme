@@ -1,8 +1,11 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTheme } from 'next-themes';
-import { Moon, Sun } from 'lucide-react';
+import { Moon, Sun, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -17,9 +20,19 @@ const pageTitles: Record<string, string> = {
 export function Header() {
   const pathname = usePathname();
   const { resolvedTheme, setTheme } = useTheme();
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   const title = pageTitles[pathname] || 'forme';
   const isHome = pathname === '/dashboard';
+
+  useEffect(() => {
+    fetch('/api/profile')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.avatarUrl) setAvatarUrl(data.avatarUrl);
+      })
+      .catch(() => {});
+  }, []);
 
   return (
     <header
@@ -39,17 +52,32 @@ export function Header() {
         >
           {title}
         </h1>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-11 w-11 active:scale-90 transition-all duration-150 relative"
-          aria-label="테마 전환"
-          onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
-          suppressHydrationWarning
-        >
-          <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-          <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-11 w-11 active:scale-90 transition-all duration-150 relative"
+            aria-label="테마 전환"
+            onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+            suppressHydrationWarning
+          >
+            <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+            <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+          </Button>
+          <Link
+            href="/profile"
+            className="h-9 w-9 rounded-full overflow-hidden flex items-center justify-center hover:opacity-80 transition-opacity"
+            aria-label="프로필"
+          >
+            {avatarUrl ? (
+              <Image src={avatarUrl} alt="" width={36} height={36} className="h-full w-full object-cover" />
+            ) : (
+              <div className="h-full w-full bg-primary/10 flex items-center justify-center">
+                <User className="h-4 w-4 text-primary" />
+              </div>
+            )}
+          </Link>
+        </div>
       </div>
     </header>
   );

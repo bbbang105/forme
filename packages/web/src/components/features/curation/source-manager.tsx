@@ -22,6 +22,7 @@ interface Source {
   url: string;
   rssUrl: string | null;
   category: string;
+  tags: string[] | null;
   isActive: boolean;
   createdAt: string;
 }
@@ -63,6 +64,7 @@ export function SourceManager({ onCrawlComplete }: SourceManagerProps) {
     url: string;
     category: string;
     rssUrl?: string;
+    tags?: string[];
   }) => {
     const res = await fetch('/api/curation/sources', {
       method: 'POST',

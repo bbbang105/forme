@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Loader2, Plus } from 'lucide-react';
+import { ChevronDown, ChevronUp, Loader2, Plus } from 'lucide-react';
+import { INTEREST_OPTIONS, getTagColor } from '@forme/shared/config';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,6 +15,7 @@ interface SourceFormProps {
     url: string;
     category: string;
     rssUrl?: string;
+    tags?: string[];
   }) => Promise<void>;
   onCancel: () => void;
 }
@@ -27,11 +30,19 @@ export function SourceForm({
   const [category, setCategory] = useState('ai');
   const [customCategory, setCustomCategory] = useState('');
   const [rssUrl, setRssUrl] = useState('');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [tagsExpanded, setTagsExpanded] = useState(false);
   const [isCustom, setIsCustom] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const categories = [...new Set(['ai', 'uxui', 'economy', ...existingCategories])];
+
+  const toggleTag = (tag: string) => {
+    setSelectedTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+    );
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,6 +68,7 @@ export function SourceForm({
         url: url.trim(),
         category: finalCategory,
         rssUrl: rssUrl.trim() || undefined,
+        tags: selectedTags.length > 0 ? selectedTags : undefined,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : '소스 추가에 실패했습니다.');
@@ -148,6 +160,50 @@ export function SourceForm({
           onChange={(e) => setRssUrl(e.target.value)}
           placeholder="비워두면 자동 감지를 시도합니다"
         />
+      </div>
+
+      {/* Tags */}
+      <div className="space-y-2">
+        <button
+          type="button"
+          onClick={() => setTagsExpanded((prev) => !prev)}
+          className="inline-flex items-center gap-1.5 text-sm font-medium hover:text-primary transition-colors cursor-pointer"
+        >
+          태그
+          {selectedTags.length > 0 && (
+            <span className="text-xs text-muted-foreground">
+              ({selectedTags.length}개)
+            </span>
+          )}
+          {tagsExpanded ? (
+            <ChevronUp className="h-3.5 w-3.5" />
+          ) : (
+            <ChevronDown className="h-3.5 w-3.5" />
+          )}
+        </button>
+
+        {tagsExpanded && (
+          <div className="flex flex-wrap gap-1.5">
+            {INTEREST_OPTIONS.map((tag) => {
+              const isSelected = selectedTags.includes(tag);
+              return (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => toggleTag(tag)}
+                  className={cn(
+                    'inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium',
+                    'transition-all cursor-pointer',
+                    getTagColor(tag, isSelected),
+                    !isSelected && 'hover:opacity-80'
+                  )}
+                >
+                  {tag}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {error && (

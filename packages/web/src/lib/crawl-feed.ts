@@ -134,6 +134,7 @@ interface CrawlSource {
   name: string;
   rssUrl: string;
   category: string;
+  tags?: string[];
 }
 
 /**
@@ -204,9 +205,16 @@ export async function crawlSource(source: CrawlSource): Promise<CrawlSourceResul
     const insertValues = validItems.map((item, idx) => {
       let publishedAt: Date | null = null;
       if (item.pubDate) {
-        const parsed = new Date(item.pubDate);
-        if (!isNaN(parsed.getTime())) publishedAt = parsed;
+        const parsedDate = new Date(item.pubDate);
+        if (!isNaN(parsedDate.getTime())) publishedAt = parsedDate;
       }
+
+      // Merge feed categories + source tags (deduplicated, sanitized)
+      const MAX_TAG_LENGTH = 100;
+      const normalizeTag = (t: string) => t.trim().slice(0, MAX_TAG_LENGTH);
+      const feedCats = (item.categories ?? []).map(normalizeTag).filter(Boolean);
+      const sourceTags = (source.tags ?? []).map(normalizeTag).filter(Boolean);
+      const mergedTags = [...new Set([...feedCats, ...sourceTags])];
 
       return {
         sourceId: source.id,
@@ -216,7 +224,7 @@ export async function crawlSource(source: CrawlSource): Promise<CrawlSourceResul
         thumbnailUrl: ogImages[idx] ?? null,
         publishedAt,
         category: source.category,
-        tags: item.categories && item.categories.length > 0 ? item.categories : null,
+        tags: mergedTags.length > 0 ? mergedTags : null,
       };
     });
 
@@ -262,5 +270,6 @@ export async function getActiveSourcesForUser(userId: string) {
       name: s.name,
       rssUrl: s.rssUrl!,
       category: s.category,
+      tags: s.tags ?? undefined,
     }));
 }

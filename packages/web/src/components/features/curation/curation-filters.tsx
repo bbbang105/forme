@@ -1,6 +1,8 @@
 'use client';
 
-import { BookmarkIcon, Eye, EyeOff } from 'lucide-react';
+import { useState } from 'react';
+import { BookmarkIcon, ChevronDown, ChevronUp, Eye, EyeOff, Tag } from 'lucide-react';
+import { INTEREST_OPTIONS, getTagColor } from '@forme/shared/config';
 import { cn } from '@/lib/utils';
 import { getCategoryStyle } from '@/lib/curation-utils';
 
@@ -12,6 +14,8 @@ interface CurationFiltersProps {
   onCategoryChange: (category: string) => void;
   status: StatusFilter;
   onStatusChange: (status: StatusFilter) => void;
+  selectedTags: string[];
+  onTagsChange: (tags: string[]) => void;
 }
 
 export function CurationFilters({
@@ -20,8 +24,19 @@ export function CurationFilters({
   onCategoryChange,
   status,
   onStatusChange,
+  selectedTags,
+  onTagsChange,
 }: CurationFiltersProps) {
   const allCategories = ['all', ...new Set(categories)];
+  const [tagsExpanded, setTagsExpanded] = useState(false);
+
+  const toggleTag = (tag: string) => {
+    if (selectedTags.includes(tag)) {
+      onTagsChange(selectedTags.filter((t) => t !== tag));
+    } else {
+      onTagsChange([...selectedTags, tag]);
+    }
+  };
 
   return (
     <div className="space-y-3">
@@ -69,6 +84,57 @@ export function CurationFilters({
           icon={<BookmarkIcon className="h-3.5 w-3.5" />}
           label="북마크"
         />
+      </div>
+
+      {/* Tag filter */}
+      <div>
+        <button
+          onClick={() => setTagsExpanded((prev) => !prev)}
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+        >
+          <Tag className="h-3.5 w-3.5" />
+          태그 필터
+          {selectedTags.length > 0 && (
+            <span className="inline-flex items-center justify-center h-4 min-w-[16px] rounded-full bg-primary text-primary-foreground text-[10px] px-1">
+              {selectedTags.length}
+            </span>
+          )}
+          {tagsExpanded ? (
+            <ChevronUp className="h-3.5 w-3.5" />
+          ) : (
+            <ChevronDown className="h-3.5 w-3.5" />
+          )}
+        </button>
+
+        {tagsExpanded && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {INTEREST_OPTIONS.map((tag) => {
+              const isSelected = selectedTags.includes(tag);
+              return (
+                <button
+                  key={tag}
+                  onClick={() => toggleTag(tag)}
+                  className={cn(
+                    'inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium',
+                    'transition-all cursor-pointer',
+                    getTagColor(tag, isSelected),
+                    !isSelected && 'hover:opacity-80'
+                  )}
+                >
+                  {tag}
+                </button>
+              );
+            })}
+            {selectedTags.length > 0 && (
+              <button
+                onClick={() => onTagsChange([])}
+                className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium border border-border text-muted-foreground hover:bg-accent transition-colors cursor-pointer"
+              >
+                초기화
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
