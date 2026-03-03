@@ -181,3 +181,19 @@
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* Calendar month slide animations */
+.animate-slide-left {
+  animation: slide-left 0.2s ease-out;
+}
+.animate-slide-right {
+  animation: slide-right 0.2s ease-out;
+}
+@keyframes slide-left {
+  from { opacity: 0.6; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes slide-right {
+  from { opacity: 0.6; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}

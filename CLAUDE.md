@@ -30,6 +30,7 @@ pnpm dev              # 개발 서버 (port 3200)
 pnpm build            # 프로덕션 빌드
 pnpm lint             # ESLint
 pnpm typecheck        # TypeScript 타입 체크
+pnpm test             # Vitest 테스트 (packages/web)
 pnpm db:generate      # Drizzle 마이그레이션 생성
 pnpm db:push          # 스키마 직접 push (dev용)
 ```
@@ -41,6 +42,9 @@ pnpm db:push          # 스키마 직접 push (dev용)
 - DB 접근 시 RLS 의존 (`auth.uid() = user_id`), 추가 권한 체크 불필요
 - 스타일: Tailwind 유틸리티 클래스, 하드코딩 색상 금지 (CSS 변수 사용)
 - 컴포넌트: shadcn/ui 기반, `components/ui/`에 위치
+- Server Actions 입력 검증: 날짜(YYYY-MM-DD), 색상(#hex), 길이 제한 등 서버측 검증 필수
+- KST 시간대: `Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' })` 사용
+- 테스트: Vitest + `vi.hoisted()` Proxy 기반 DB 목 패턴 (`packages/web/src/__tests__/`)
 
 ## 핵심 파일
 
@@ -55,7 +59,9 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/components/layout/tab-bar.tsx` | 하단 탭바 (5탭) |
 | `packages/web/src/components/layout/header.tsx` | 헤더 (forme 로고 + 다크모드 토글) |
 | `packages/web/src/components/ui/logo.tsx` | forme 워드마크 로고 (showMark 제거, 워드마크 전용) |
-| `packages/shared/src/schema/` | Drizzle DB 스키마 |
+| `packages/shared/src/schema/calendar-events.ts` | 캘린더 이벤트 스키마 |
+| `packages/shared/src/schema/todos.ts` | 투두 스키마 |
+| `packages/shared/src/schema/` | Drizzle DB 스키마 (전체) |
 | `packages/shared/src/db.ts` | DB 싱글톤 (SSL 강제) |
 | `packages/web/src/lib/crawl-feed.ts` | RSS 크롤 (feedsmith, since 필터, SSRF 방어) |
 | `packages/web/src/lib/url-safety.ts` | SSRF 방어 유틸 |
@@ -71,6 +77,15 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/components/features/podcast/player-context.tsx` | 팟캐스트 플레이어 (localStorage 이어듣기) |
 | `packages/web/public/sw.js` | Service Worker (PWA + 푸시 + network-first 캐시) |
 | `packages/web/src/app/manifest.ts` | PWA 매니페스트 (MetadataRoute) |
+| `packages/web/src/lib/actions/calendar.ts` | 캘린더 이벤트 Server Actions (CRUD + 입력 검증) |
+| `packages/web/src/lib/actions/todos.ts` | 투두 Server Actions (CRUD + 토글 + 입력 검증) |
+| `packages/web/src/components/features/calendar/calendar-client.tsx` | 캘린더 메인 클라이언트 (월간뷰, 스와이프, 키보드 내비) |
+| `packages/web/src/components/features/calendar/calendar-grid.tsx` | 캘린더 그리드 (날짜 셀, 이벤트/투두 도트) |
+| `packages/web/src/components/features/calendar/todo-list.tsx` | 투두 리스트 (추가/토글/삭제, IME 처리) |
+| `packages/web/src/components/features/calendar/event-form.tsx` | 이벤트 폼 (생성/수정/삭제 확인 다이얼로그) |
+| `packages/web/src/components/features/calendar/event-list.tsx` | 이벤트 목록 (선택 날짜별 필터링) |
+| `packages/web/src/components/features/calendar/dashboard-calendar.tsx` | 대시보드 캘린더 위젯 (오늘 할일 + 다가오는 일정) |
+| `packages/web/src/hooks/use-swipe.ts` | 터치 스와이프 훅 (모바일 월 이동) |
 
 ## 인증 구조
 
