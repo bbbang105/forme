@@ -25,8 +25,14 @@ Thumbs.db
 # turbo
 .turbo/
 
-# drizzle
-drizzle/meta/
+# drizzle / DB
+drizzle/
+**/drizzle.config.*
+**/migrations/*.sql
+
+# seed scripts
+scripts/seed-*
+scripts/run-seed.*
 
 # worktrees
 .worktrees/
