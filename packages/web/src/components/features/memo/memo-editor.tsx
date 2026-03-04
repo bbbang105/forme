@@ -200,17 +200,24 @@ export function MemoEditor({ memo }: MemoEditorProps) {
     };
   }, [tags, scheduleSave]);
 
-  // Save on blur – store handler in ref so handleBack can remove it
+  // Flush pending save on blur / page hide / beforeunload
   const blurHandlerRef = useRef<(() => void) | null>(null);
   useEffect(() => {
-    const handleBlur = () => {
+    const flushSave = () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       save();
     };
-    blurHandlerRef.current = handleBlur;
-    window.addEventListener('blur', handleBlur);
+    blurHandlerRef.current = flushSave;
+    const handleVisibilityChange = () => {
+      if (document.hidden) flushSave();
+    };
+    window.addEventListener('blur', flushSave);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', flushSave);
     return () => {
-      window.removeEventListener('blur', handleBlur);
+      window.removeEventListener('blur', flushSave);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('beforeunload', flushSave);
       blurHandlerRef.current = null;
     };
   }, [save]);
