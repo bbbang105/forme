@@ -279,6 +279,29 @@ export async function createCalendarEvent(data: { title: string; startDate: stri
 // 이벤트 삭제: AlertDialog 확인 다이얼로그
 ```
 
+## 메모 에디터 패턴 (TipTap)
+
+```typescript
+// packages/web/src/lib/actions/memos.ts
+// JSONB content 저장 시 서버사이드 검증
+function sanitizeTipTapContent(content: Record<string, unknown>) {
+  if (content.type !== 'doc') throw new Error('Invalid content format');
+  if (JSON.stringify(content).length > 500000) throw new Error('메모 내용이 너무 큽니다');
+  // 재귀적으로 link marks의 href 프로토콜 검증 (http/https/mailto만 허용)
+  return sanitizeNode(content);
+}
+
+// UUID 검증 + contentText 길이 제한 + LIKE 메타문자 이스케이프
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function escapeLikePattern(input: string) {
+  return input.replace(/[%_\\]/g, '\\$&');
+}
+
+// 자동저장: 클라이언트에서 1초 debounce + blur 시 즉시 저장
+// 빈 메모: getMemos()에서 title/contentText 모두 빈 레코드 필터링
+// 에디터 뒤로가기 시 빈 메모 자동 삭제
+```
+
 ## 컴포넌트 Import 패턴
 
 ```typescript
@@ -296,4 +319,7 @@ import { CalendarClient } from '@/components/features/calendar/calendar-client'
 import { DashboardCalendar } from '@/components/features/calendar/dashboard-calendar'
 import { EpisodeList } from '@/components/features/podcast/episode-list'
 import { NotificationSettings } from '@/components/features/push/notification-settings'
+import { MemoEditor } from '@/components/features/memo/memo-editor'
+import { MemoList } from '@/components/features/memo/memo-list'
+import { DashboardMemo } from '@/components/features/memo/dashboard-memo'
 ```
