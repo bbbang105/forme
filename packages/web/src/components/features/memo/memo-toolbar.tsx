@@ -1,6 +1,5 @@
 'use client';
 
-import '@tiptap/extension-image'; // type augmentation for setImage command
 import type {Editor} from '@tiptap/react';
 import {
     Bold,

@@ -1,10 +1,20 @@
 'use client';
 
 import {Node, mergeAttributes} from '@tiptap/core';
+import type {RawCommands} from '@tiptap/core';
 import {ReactNodeViewRenderer, NodeViewWrapper} from '@tiptap/react';
 import type {ReactNodeViewProps} from '@tiptap/react';
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {X} from 'lucide-react';
+
+/* ── Type augmentation for setImage command ── */
+declare module '@tiptap/core' {
+  interface Commands<ReturnType> {
+    imageBlock: {
+      setImage: (attrs: {src: string; alt?: string; title?: string}) => ReturnType;
+    };
+  }
+}
 
 /* ── React NodeView Component ── */
 
@@ -202,9 +212,10 @@ export const ImageBlock = Node.create({
   addCommands() {
     return {
       setImage:
-        (attrs) =>
-        ({commands}) =>
-          commands.insertContent({type: this.name, attrs}),
-    };
+        (attrs: {src: string; alt?: string; title?: string}) =>
+        ({commands}) => {
+          return commands.insertContent({type: this.name, attrs});
+        },
+    } satisfies Partial<RawCommands> as never;
   },
 });
