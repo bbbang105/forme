@@ -18,7 +18,7 @@ pnpm 모노레포: `packages/web` (Next.js 16 PWA) + `packages/shared` (DB 스�
 | 푸시알림 | web-push + Service Worker |
 | RSS | feedsmith |
 | DnD | @dnd-kit (core + sortable) |
-| 에디터 | TipTap (메모) |
+| 에디터 | TipTap + CodeBlockLowlight (lowlight/highlight.js 구문 하이라이팅) |
 | 패키지 관리 | pnpm workspace |
 | 배포 | Vercel |
 
@@ -88,8 +88,11 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/hooks/use-swipe.ts` | 터치 스와이프 훅 (모바일 월 이동) |
 | `packages/shared/src/schema/memos.ts` | 메모 스키마 (JSONB content + contentText + tags) |
 | `packages/web/src/lib/actions/memos.ts` | 메모 Server Actions (CRUD + 검색 + 고정 + 페이지네이션 + 태그 + TipTap JSON 검증) |
-| `packages/web/src/components/features/memo/memo-editor.tsx` | TipTap 에디터 (자동저장, 고정/삭제, 태그, 이미지, 에러 재시도) |
-| `packages/web/src/components/features/memo/memo-toolbar.tsx` | 에디터 서식 툴바 (B/I/U/S, H1-H3, 리스트, 체크리스트, 링크, 이미지) |
+| `packages/web/src/components/features/memo/memo-editor.tsx` | TipTap 에디터 (자동저장, 고정/삭제, 태그, 전체화면 fixed 레이아웃) |
+| `packages/web/src/components/features/memo/memo-toolbar.tsx` | 에디터 서식 툴바 (B/I/U/S, H1-H3, 리스트, 체크리스트, 링크, 이미지, 인라인코드, 코드블록) |
+| `packages/web/src/components/features/memo/image-block.tsx` | 커스텀 이미지 확장 (React NodeView: 리사이즈, 삭제 버튼, 캡션) |
+| `packages/web/src/components/features/memo/image-drop-plugin.ts` | 이미지 드래그앤드롭/붙여넣기 업로드 ProseMirror 플러그인 |
+| `packages/web/src/components/features/memo/code-block-view.tsx` | 코드블록 React NodeView (언어 셀렉터 드롭다운, 30개 언어) |
 | `packages/web/src/components/features/memo/memo-list.tsx` | 메모 목록 (서버 검색, 하이라이트, 정렬, 태그 필터, 페이지네이션) |
 | `packages/web/src/components/features/memo/memo-card.tsx` | 메모 카드 (제목+날짜+미리보기, React.memo) |
 | `packages/web/src/components/features/memo/dashboard-memo.tsx` | 대시보드 최근 메모 위젯 (에러 폴백) |

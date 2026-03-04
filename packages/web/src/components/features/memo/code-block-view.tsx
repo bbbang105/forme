@@ -39,7 +39,7 @@ const LANGUAGES = [
   {value: 'plaintext', label: 'Plain Text'},
 ] as const;
 
-export function CodeBlockView({node, updateAttributes, extension}: ReactNodeViewProps) {
+export function CodeBlockView({node, updateAttributes}: ReactNodeViewProps) {
   const language = (node.attrs.language as string) || '';
 
   const onLanguageChange = useCallback(

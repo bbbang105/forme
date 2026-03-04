@@ -283,7 +283,7 @@
 /* Code block wrapper */
 .code-block-wrapper {
   position: relative;
-  margin: 0.5rem 0;
+  margin: 0.5rem 0 2.5rem;
 }
 
 .code-block-header {

@@ -315,6 +315,36 @@ function validateTags(tags: string[]): string[] {
 // 검색: searchMemos() 서버 액션 + 300ms debounce + 하이라이트
 ```
 
+## 메모 이미지 블록 패턴 (커스텀 TipTap 확장)
+
+```typescript
+// packages/web/src/components/features/memo/image-block.tsx
+// @tiptap/extension-image 대신 커스텀 ImageBlock 확장 (React NodeView)
+// 기능: 리사이즈 (마우스/터치 드래그), 삭제 버튼 (X), 캡션 편집
+// figure/figcaption 구조 HTML 직렬화, 기존 <img> 태그 하위호환 parseHTML
+// setImage 커맨드: declare module '@tiptap/core' 타입 augmentation
+
+// packages/web/src/components/features/memo/image-drop-plugin.ts
+// ProseMirror 플러그인: handleDrop + handlePaste
+// 이미지 파일 → /api/memo/image 업로드 → imageBlock 노드 삽입
+// Decoration 기반 업로드 placeholder (스피너)
+// MIME 검증 + 5MB 제한 (클라이언트 + 서버 이중)
+```
+
+## 코드블록 패턴 (CodeBlockLowlight + 커스텀 NodeView)
+
+```typescript
+// packages/web/src/components/features/memo/code-block-view.tsx
+// React NodeView: 우측 상단 언어 셀렉터 (30개 언어 + "자동")
+// lowlight common 번들: TS, JS, Python, Java, C/C++, Go, Rust, SQL 등
+
+// 키보드 단축키 (memo-editor.tsx에서 extend):
+// Cmd/Ctrl+A: 코드블록 내 커서일 때 해당 블록만 전체 선택
+// 트리플 Enter (빈 줄 2개): 코드블록 탈출
+// Cmd/Ctrl+Enter: 즉시 코드블록 탈출
+// ArrowDown (마지막 줄, 문서 끝): 코드블록 아래로 이동
+```
+
 ## 컴포넌트 Import 패턴
 
 ```typescript
