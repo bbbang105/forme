@@ -108,10 +108,11 @@ auth.users (Supabase 관리)
 |------|------|----------|------|
 | id | UUID | PK | |
 | user_id | UUID | NOT NULL | FK → auth.users |
-| title | VARCHAR | NOT NULL | DEFAULT '' |
-| content | JSONB | NULL | TipTap 포맷 |
-| content_text | TEXT | NULL | 검색용 plain text |
+| title | VARCHAR(200) | NULL | |
+| content | JSONB | NOT NULL | DEFAULT '{}', TipTap JSON 포맷 |
+| content_text | TEXT | NOT NULL | DEFAULT '', 검색/미리보기용 plain text |
 | is_pinned | BOOLEAN | NOT NULL | DEFAULT false |
+| tags | TEXT[] | NULL | 최대 5개, 각 20자 이내 |
 | created_at | TIMESTAMPTZ | NOT NULL | DEFAULT NOW() |
 | updated_at | TIMESTAMPTZ | NOT NULL | DEFAULT NOW() |
 
@@ -155,7 +156,8 @@ auth.users (Supabase 관리)
 | todos | idx_todos_date | user_id, date |
 | todos | idx_todos_reminder | reminder_at (WHERE reminder_sent = false) |
 | calendar_events | idx_calendar_events_dates | start_date, end_date |
-| memos | idx_memos_updated | user_id, updated_at DESC |
+| memos | idx_memos_list | user_id, is_pinned, updated_at |
+| memos | idx_memos_search | user_id, content_text |
 | podcast_episodes | idx_podcast_episodes_user_published | user_id, published_at |
 | push_subscriptions | idx_push_subs_endpoint | endpoint (UNIQUE) |
 | push_subscriptions | idx_push_subs_user | user_id |

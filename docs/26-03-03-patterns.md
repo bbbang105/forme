@@ -215,12 +215,13 @@ import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client
 export async function uploadToR2(key: string, body: Buffer, contentType: string)
   : Promise<{ url: string }> {
   // S3Client → Cloudflare R2 (S3-compatible)
-  // key: "podcast/{userId}/{uuid}.{ext}"
+  // key: "podcast/{userId}/{uuid}.{ext}" 또는 "memo-images/{userId}/{uuid}.{ext}"
   // MIME 기반 확장자만 허용 (파일명 무시)
   return { url: `${R2_PUBLIC_URL}/${key}` }
 }
 
-// Route: POST /api/podcast/upload (FormData, maxDuration=300)
+// Route: POST /api/podcast/upload (FormData, 오디오, 200MB)
+// Route: POST /api/memo/image (FormData, 이미지, 5MB, JPEG/PNG/GIF/WebP)
 // MIME 검증 → 사이즈 검증 → R2 업로드 → URL 반환
 ```
 
@@ -279,6 +280,71 @@ export async function createCalendarEvent(data: { title: string; startDate: stri
 // 이벤트 삭제: AlertDialog 확인 다이얼로그
 ```
 
+## 메모 에디터 패턴 (TipTap)
+
+```typescript
+// packages/web/src/lib/actions/memos.ts
+// JSONB content 저장 시 서버사이드 검증
+function sanitizeTipTapContent(content: Record<string, unknown>) {
+  if (content.type !== 'doc') throw new Error('Invalid content format');
+  if (JSON.stringify(content).length > 500000) throw new Error('메모 내용이 너무 큽니다');
+  // 재귀적으로 link marks의 href 프로토콜 검증 (http/https/mailto만 허용)
+  return sanitizeNode(content);
+}
+
+// UUID 검증 + contentText 길이 제한 + LIKE 메타문자 이스케이프
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function escapeLikePattern(input: string) {
+  return input.replace(/[%_\\]/g, '\\$&');
+}
+
+// 태그 검증: 최대 5개, 각 20자 이내, 공백 트리밍
+function validateTags(tags: string[]): string[] {
+  if (tags.length > 5) throw new Error('태그는 최대 5개');
+  return tags.map(t => t.trim()).filter(Boolean);
+}
+
+// 자동저장: 클라이언트에서 1초 debounce + blur 시 즉시 저장
+// 저장 실패: 에러 UI + 재시도 버튼 (saveError 상태)
+// IME 처리: compositionstart/end 이벤트로 한글 입력 중 저장 방지
+// 빈 메모: getMemos()에서 title/contentText 모두 빈 레코드 필터링
+// 에디터 뒤로가기 시 빈 메모 자동 삭제
+// 체크리스트: TaskListSort 플러그인으로 체크된 항목 자동 하단 정렬 (stable sort)
+// 이미지: POST /api/memo/image (R2 업로드, 5MB, JPEG/PNG/GIF/WebP)
+// 페이지네이션: getMemosPage(offset, limit) — offset 기반, "더 보기" UI
+// 검색: searchMemos() 서버 액션 + 300ms debounce + 하이라이트
+```
+
+## 메모 이미지 블록 패턴 (커스텀 TipTap 확장)
+
+```typescript
+// packages/web/src/components/features/memo/image-block.tsx
+// @tiptap/extension-image 대신 커스텀 ImageBlock 확장 (React NodeView)
+// 기능: 리사이즈 (마우스/터치 드래그), 삭제 버튼 (X), 캡션 편집
+// figure/figcaption 구조 HTML 직렬화, 기존 <img> 태그 하위호환 parseHTML
+// setImage 커맨드: declare module '@tiptap/core' 타입 augmentation
+
+// packages/web/src/components/features/memo/image-drop-plugin.ts
+// ProseMirror 플러그인: handleDrop + handlePaste
+// 이미지 파일 → /api/memo/image 업로드 → imageBlock 노드 삽입
+// Decoration 기반 업로드 placeholder (스피너)
+// MIME 검증 + 5MB 제한 (클라이언트 + 서버 이중)
+```
+
+## 코드블록 패턴 (CodeBlockLowlight + 커스텀 NodeView)
+
+```typescript
+// packages/web/src/components/features/memo/code-block-view.tsx
+// React NodeView: 우측 상단 언어 셀렉터 (30개 언어 + "자동")
+// lowlight common 번들: TS, JS, Python, Java, C/C++, Go, Rust, SQL 등
+
+// 키보드 단축키 (memo-editor.tsx에서 extend):
+// Cmd/Ctrl+A: 코드블록 내 커서일 때 해당 블록만 전체 선택
+// 트리플 Enter (빈 줄 2개): 코드블록 탈출
+// Cmd/Ctrl+Enter: 즉시 코드블록 탈출
+// ArrowDown (마지막 줄, 문서 끝): 코드블록 아래로 이동
+```
+
 ## 컴포넌트 Import 패턴
 
 ```typescript
@@ -296,4 +362,7 @@ import { CalendarClient } from '@/components/features/calendar/calendar-client'
 import { DashboardCalendar } from '@/components/features/calendar/dashboard-calendar'
 import { EpisodeList } from '@/components/features/podcast/episode-list'
 import { NotificationSettings } from '@/components/features/push/notification-settings'
+import { MemoEditor } from '@/components/features/memo/memo-editor'
+import { MemoList } from '@/components/features/memo/memo-list'
+import { DashboardMemo } from '@/components/features/memo/dashboard-memo'
 ```

@@ -16,6 +16,7 @@
     "db:studio": "pnpm --filter @forme/shared db:studio"
   },
   "devDependencies": {
+    "playwright": "^1.58.2",
     "prettier": "^3.8.1",
     "typescript": "^5.9.3"
   },

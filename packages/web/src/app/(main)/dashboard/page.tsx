@@ -3,6 +3,7 @@ import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
 import {Calendar, Headphones, Newspaper, StickyNote} from 'lucide-react';
 import {DashboardCuration} from '@/components/features/curation/dashboard-curation';
 import {DashboardCalendar} from '@/components/features/calendar/dashboard-calendar';
+import {DashboardMemo} from '@/components/features/memo/dashboard-memo';
 import {createClient} from '@/lib/supabase/server';
 import {db, profiles} from '@forme/shared';
 import {eq} from 'drizzle-orm';
@@ -84,6 +85,9 @@ export default async function DashboardPage() {
 
       {/* Today's calendar & todos */}
       <DashboardCalendar />
+
+      {/* Recent memos */}
+      <DashboardMemo />
 
       {/* Latest curation items */}
       <DashboardCuration />
