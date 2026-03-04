@@ -1,8 +1,9 @@
-import {NextRequest, NextResponse} from 'next/server';
+import {NextResponse} from 'next/server';
 import {createClient} from '@/lib/supabase/server';
 import {db, podcastEpisodes} from '@forme/shared';
 import {and, desc, eq, lt, or, sql} from 'drizzle-orm';
 import {extractR2Key} from '@/lib/r2';
+import {withTracing} from '@/lib/logger';
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 50;
@@ -26,7 +27,7 @@ function serializeEpisode(ep: typeof podcastEpisodes.$inferSelect) {
  * Cursor-based pagination sorted by publishedAt DESC.
  * Query params: cursor, limit
  */
-export async function GET(request: NextRequest) {
+export const GET = withTracing('GET /api/podcast/episodes', async (request) => {
   const supabase = await createClient();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) {
@@ -86,20 +87,20 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(
       { episodes: episodes.map(serializeEpisode), nextCursor, hasMore },
-      { headers: { 'Cache-Control': 'no-store' } }
+      { headers: { 'Cache-Control': 'private, max-age=60' } }
     );
   } catch (err) {
     console.error('[GET /api/podcast/episodes]', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+});
 
 /**
  * POST /api/podcast/episodes
  * Create a new episode record after file upload.
  * Body: { title, description?, audioUrl, duration?, fileSize? }
  */
-export async function POST(request: NextRequest) {
+export const POST = withTracing('POST /api/podcast/episodes', async (request) => {
   const supabase = await createClient();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) {
@@ -154,4 +155,4 @@ export async function POST(request: NextRequest) {
     console.error('[POST /api/podcast/episodes]', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+});

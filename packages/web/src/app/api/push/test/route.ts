@@ -1,11 +1,12 @@
 import {NextResponse} from 'next/server';
 import {createClient} from '@/lib/supabase/server';
 import {sendPushToUser} from '@/lib/push';
+import {withTracing} from '@/lib/logger';
 
 /**
  * POST /api/push/test — 테스트 푸시 알림 발송
  */
-export async function POST() {
+export const POST = withTracing('POST /api/push/test', async () => {
   const supabase = await createClient();
   const {
     data: { user },
@@ -29,4 +30,4 @@ export async function POST() {
     console.error('[POST /api/push/test]', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+});

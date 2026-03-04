@@ -1,7 +1,8 @@
-import {NextRequest, NextResponse} from 'next/server';
+import {NextResponse} from 'next/server';
 import {createClient} from '@/lib/supabase/server';
 import {uploadToR2} from '@/lib/r2';
 import {randomUUID} from 'crypto';
+import {withTracing} from '@/lib/logger';
 
 /** Allowed image MIME types */
 const ALLOWED_IMAGE_TYPES = [
@@ -29,7 +30,7 @@ const MIME_TO_EXT: Record<string, string> = {
  *
  * Returns: { url: string }
  */
-export async function POST(request: NextRequest) {
+export const POST = withTracing('POST /api/memo/image', async (request) => {
   // Auth
   const supabase = await createClient();
   const {
@@ -88,4 +89,4 @@ export async function POST(request: NextRequest) {
     console.error('[POST /api/memo/image]', err);
     return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
   }
-}
+});

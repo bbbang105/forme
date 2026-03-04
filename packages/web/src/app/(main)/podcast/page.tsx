@@ -3,9 +3,14 @@
 import {useCallback, useState} from 'react';
 import {Plus} from 'lucide-react';
 import {Button} from '@/components/ui/button';
+import dynamic from 'next/dynamic';
 import {EpisodeList} from '@/components/features/podcast/episode-list';
-import {UploadDialog} from '@/components/features/podcast/upload-dialog';
 import type {Episode} from '@/components/features/podcast/player-context';
+
+const UploadDialog = dynamic(
+  () => import('@/components/features/podcast/upload-dialog').then((m) => m.UploadDialog),
+  { ssr: false }
+);
 
 export default function PodcastPage() {
   const [uploadOpen, setUploadOpen] = useState(false);

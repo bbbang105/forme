@@ -1,8 +1,9 @@
 'use server';
 
-import {createClient} from '@/lib/supabase/server';
+import {getAuthUser} from '@/lib/auth';
+import {traceAction, traceQuery} from '@/lib/logger';
 import {db, memos} from '@forme/shared';
-import {and, desc, eq, ilike, or, sql} from 'drizzle-orm';
+import {and, desc, eq, ilike, ne, or, sql} from 'drizzle-orm';
 import {revalidatePath} from 'next/cache';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -11,13 +12,6 @@ const MAX_CONTENT_JSON_SIZE = 500000;
 const MAX_SEARCH_QUERY_LENGTH = 200;
 const ALLOWED_LINK_PROTOCOLS = ['http:', 'https:', 'mailto:'];
 const ALLOWED_IMAGE_PROTOCOLS = ['http:', 'https:'];
-
-async function requireAuth() {
-  const supabase = await createClient();
-  const { data: { user }, error } = await supabase.auth.getUser();
-  if (error || !user) throw new Error('Unauthorized');
-  return user;
-}
 
 function validateUUID(id: string) {
   if (!UUID_REGEX.test(id)) throw new Error('Invalid ID');
@@ -90,50 +84,65 @@ function escapeLikePattern(input: string): string {
   return input.replace(/[%_\\]/g, '\\$&');
 }
 
+/** SQL expression: trim(coalesce(col, '')) != '' */
+const nonEmptyTitle = ne(sql`trim(coalesce(${memos.title}, ''))`, '');
+const nonEmptyContent = ne(sql`trim(${memos.contentText})`, '');
+/** Exclude ghost memos that were created but never edited */
+const notEmpty = or(nonEmptyTitle, nonEmptyContent)!;
+
 export async function getMemos() {
-  const user = await requireAuth();
+  return traceAction('getMemos', async () => {
+    const user = await getAuthUser();
 
-  const rows = await db
-    .select()
-    .from(memos)
-    .where(eq(memos.userId, user.id))
-    .orderBy(desc(memos.isPinned), desc(memos.updatedAt));
-
-  // Filter out empty ghost memos (created but never edited)
-  return rows.filter((m) => m.title?.trim() || m.contentText.trim());
+    return traceQuery('memos.list', () =>
+      db
+        .select()
+        .from(memos)
+        .where(and(eq(memos.userId, user.id), notEmpty))
+        .orderBy(desc(memos.isPinned), desc(memos.updatedAt))
+    );
+  });
 }
 
 export async function getMemo(id: string) {
-  const user = await requireAuth();
-  validateUUID(id);
+  return traceAction('getMemo', async () => {
+    const user = await getAuthUser();
+    validateUUID(id);
 
-  const [row] = await db
-    .select()
-    .from(memos)
-    .where(
-      and(
-        eq(memos.id, id),
-        eq(memos.userId, user.id),
-      )
+    const [row] = await traceQuery('memos.get', () =>
+      db
+        .select()
+        .from(memos)
+        .where(
+          and(
+            eq(memos.id, id),
+            eq(memos.userId, user.id),
+          )
+        )
     );
 
-  return row ?? null;
+    return row ?? null;
+  }, { id });
 }
 
 export async function createMemo() {
-  const user = await requireAuth();
+  return traceAction('createMemo', async () => {
+    const user = await getAuthUser();
 
-  const [row] = await db
-    .insert(memos)
-    .values({
-      userId: user.id,
-      title: '',
-      content: {},
-      contentText: '',
-    })
-    .returning();
+    const [row] = await traceQuery('memos.create', () =>
+      db
+        .insert(memos)
+        .values({
+          userId: user.id,
+          title: '',
+          content: {},
+          contentText: '',
+        })
+        .returning()
+    );
 
-  return row;
+    return row;
+  });
 }
 
 const MAX_TAGS = 5;
@@ -162,162 +171,187 @@ export async function updateMemo(
     tags?: string[];
   }
 ) {
-  const user = await requireAuth();
-  validateUUID(id);
+  return traceAction('updateMemo', async () => {
+    const user = await getAuthUser();
+    validateUUID(id);
 
-  if (data.title !== undefined && data.title.length > 200) {
-    throw new Error('제목은 200자 이내여야 합니다');
-  }
-  if (data.contentText !== undefined && data.contentText.length > MAX_CONTENT_TEXT_LENGTH) {
-    throw new Error(`메모 내용은 ${MAX_CONTENT_TEXT_LENGTH.toLocaleString()}자 이내여야 합니다`);
-  }
-
-  const updates: Record<string, unknown> = { updatedAt: new Date() };
-  if (data.title !== undefined) updates.title = data.title;
-  if (data.content !== undefined) {
-    // Empty content (new memo) passes through, otherwise validate
-    if (Object.keys(data.content).length > 0) {
-      updates.content = sanitizeTipTapContent(data.content);
-    } else {
-      updates.content = data.content;
+    if (data.title !== undefined && data.title.length > 200) {
+      throw new Error('제목은 200자 이내여야 합니다');
     }
-  }
-  if (data.contentText !== undefined) updates.contentText = data.contentText;
-  if (data.tags !== undefined) updates.tags = validateTags(data.tags);
+    if (data.contentText !== undefined && data.contentText.length > MAX_CONTENT_TEXT_LENGTH) {
+      throw new Error(`메모 내용은 ${MAX_CONTENT_TEXT_LENGTH.toLocaleString()}자 이내여야 합니다`);
+    }
 
-  const [row] = await db
-    .update(memos)
-    .set(updates)
-    .where(
-      and(
-        eq(memos.id, id),
-        eq(memos.userId, user.id),
-      )
-    )
-    .returning();
+    const updates: Record<string, unknown> = { updatedAt: new Date() };
+    if (data.title !== undefined) updates.title = data.title;
+    if (data.content !== undefined) {
+      // Empty content (new memo) passes through, otherwise validate
+      if (Object.keys(data.content).length > 0) {
+        updates.content = sanitizeTipTapContent(data.content);
+      } else {
+        updates.content = data.content;
+      }
+    }
+    if (data.contentText !== undefined) updates.contentText = data.contentText;
+    if (data.tags !== undefined) updates.tags = validateTags(data.tags);
 
-  revalidatePath('/memo');
-  revalidatePath('/dashboard');
-  return row;
+    const [row] = await traceQuery('memos.update', () =>
+      db
+        .update(memos)
+        .set(updates)
+        .where(
+          and(
+            eq(memos.id, id),
+            eq(memos.userId, user.id),
+          )
+        )
+        .returning()
+    );
+
+    // Content-only update — only the memo list needs refreshing, not the dashboard widget
+    revalidatePath('/memo');
+    return row;
+  }, { id });
 }
 
 export async function getMemoTags() {
-  const user = await requireAuth();
-  const rows = await db
-    .selectDistinct({ tag: sql<string>`unnest(${memos.tags})` })
-    .from(memos)
-    .where(eq(memos.userId, user.id));
-  return rows.map((r) => r.tag).filter(Boolean);
+  return traceAction('getMemoTags', async () => {
+    const user = await getAuthUser();
+    const rows = await traceQuery('memos.tags', () =>
+      db
+        .selectDistinct({ tag: sql<string>`unnest(${memos.tags})` })
+        .from(memos)
+        .where(eq(memos.userId, user.id))
+    );
+    return rows.map((r) => r.tag).filter(Boolean);
+  });
 }
 
 export async function deleteMemo(id: string) {
-  const user = await requireAuth();
-  validateUUID(id);
+  return traceAction('deleteMemo', async () => {
+    const user = await getAuthUser();
+    validateUUID(id);
 
-  await db
-    .delete(memos)
-    .where(
-      and(
-        eq(memos.id, id),
-        eq(memos.userId, user.id),
-      )
+    await traceQuery('memos.delete', () =>
+      db
+        .delete(memos)
+        .where(
+          and(
+            eq(memos.id, id),
+            eq(memos.userId, user.id),
+          )
+        )
     );
 
-  revalidatePath('/memo');
-  revalidatePath('/dashboard');
+    // Deletion changes the dashboard recent-memos widget count
+    revalidatePath('/memo');
+    revalidatePath('/dashboard');
+  }, { id });
 }
 
 export async function toggleMemoPin(id: string) {
-  const user = await requireAuth();
-  validateUUID(id);
+  return traceAction('toggleMemoPin', async () => {
+    const user = await getAuthUser();
+    validateUUID(id);
 
-  const [row] = await db
-    .update(memos)
-    .set({
-      isPinned: sql`NOT ${memos.isPinned}`,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(memos.id, id),
-        eq(memos.userId, user.id),
-      )
-    )
-    .returning();
+    const [row] = await traceQuery('memos.toggle-pin', () =>
+      db
+        .update(memos)
+        .set({
+          isPinned: sql`NOT ${memos.isPinned}`,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(memos.id, id),
+            eq(memos.userId, user.id),
+          )
+        )
+        .returning()
+    );
 
-  if (!row) throw new Error('Memo not found');
+    if (!row) throw new Error('Memo not found');
 
-  revalidatePath('/memo');
-  revalidatePath('/dashboard');
-  return row;
+    // Pin toggling only reorders the memo list — dashboard widget is unaffected
+    revalidatePath('/memo');
+    return row;
+  }, { id });
 }
 
 export async function searchMemos(query: string) {
-  const user = await requireAuth();
+  return traceAction('searchMemos', async () => {
+    const user = await getAuthUser();
 
-  if (!query.trim()) return getMemos();
-  if (query.trim().length > MAX_SEARCH_QUERY_LENGTH) {
-    throw new Error(`검색어는 ${MAX_SEARCH_QUERY_LENGTH}자 이내여야 합니다`);
-  }
+    if (!query.trim()) return getMemos();
+    if (query.trim().length > MAX_SEARCH_QUERY_LENGTH) {
+      throw new Error(`검색어는 ${MAX_SEARCH_QUERY_LENGTH}자 이내여야 합니다`);
+    }
 
-  const escaped = escapeLikePattern(query.trim());
-  const pattern = `%${escaped}%`;
+    const escaped = escapeLikePattern(query.trim());
+    const pattern = `%${escaped}%`;
 
-  const rows = await db
-    .select()
-    .from(memos)
-    .where(
-      and(
-        eq(memos.userId, user.id),
-        or(
-          ilike(memos.contentText, pattern),
-          ilike(memos.title, pattern),
-        ),
-      )
-    )
-    .orderBy(desc(memos.isPinned), desc(memos.updatedAt));
+    const rows = await traceQuery('memos.search', () =>
+      db
+        .select()
+        .from(memos)
+        .where(
+          and(
+            eq(memos.userId, user.id),
+            or(
+              ilike(memos.contentText, pattern),
+              ilike(memos.title, pattern),
+            ),
+          )
+        )
+        .orderBy(desc(memos.isPinned), desc(memos.updatedAt))
+    );
 
-  return rows;
+    return rows;
+  }, { query });
 }
 
 const DEFAULT_PAGE_SIZE = 20;
 
 export async function getMemosPage(offset = 0, limit = DEFAULT_PAGE_SIZE) {
-  const user = await requireAuth();
+  return traceAction('getMemosPage', async () => {
+    const user = await getAuthUser();
 
-  const safeLimit = Math.min(Math.max(1, limit), 50);
-  const safeOffset = Math.max(0, offset);
+    const safeLimit = Math.min(Math.max(1, limit), 50);
+    const safeOffset = Math.max(0, offset);
 
-  const rows = await db
-    .select()
-    .from(memos)
-    .where(eq(memos.userId, user.id))
-    .orderBy(desc(memos.isPinned), desc(memos.updatedAt))
-    .limit(safeLimit + 1) // fetch one extra to check if more exist
-    .offset(safeOffset);
+    const rows = await traceQuery('memos.page', () =>
+      db
+        .select()
+        .from(memos)
+        .where(and(eq(memos.userId, user.id), notEmpty))
+        .orderBy(desc(memos.isPinned), desc(memos.updatedAt))
+        .limit(safeLimit + 1) // fetch one extra to check if more exist
+        .offset(safeOffset)
+    );
 
-  const filtered = rows.filter((m) => m.title?.trim() || m.contentText.trim());
-  const hasMore = filtered.length > safeLimit;
+    const hasMore = rows.length > safeLimit;
 
-  return {
-    memos: filtered.slice(0, safeLimit),
-    hasMore,
-    nextOffset: safeOffset + safeLimit,
-  };
+    return {
+      memos: rows.slice(0, safeLimit),
+      hasMore,
+      nextOffset: safeOffset + safeLimit,
+    };
+  }, { offset, limit });
 }
 
 export async function getRecentMemos(limit = 3) {
-  const user = await requireAuth();
+  return traceAction('getRecentMemos', async () => {
+    const user = await getAuthUser();
 
-  const safeLimit = Math.min(Math.max(1, limit), 20);
+    const safeLimit = Math.min(Math.max(1, limit), 20);
 
-  const rows = await db
-    .select()
-    .from(memos)
-    .where(eq(memos.userId, user.id))
-    .orderBy(desc(memos.updatedAt))
-    .limit(safeLimit);
-
-  // Filter out empty ghost memos (created but never edited)
-  return rows.filter((m) => m.title?.trim() || m.contentText.trim());
+    return traceQuery('memos.recent', () =>
+      db
+        .select()
+        .from(memos)
+        .where(and(eq(memos.userId, user.id), notEmpty))
+        .orderBy(desc(memos.updatedAt))
+        .limit(safeLimit)
+    );
+  }, { limit });
 }

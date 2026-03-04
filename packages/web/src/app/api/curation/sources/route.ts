@@ -1,8 +1,9 @@
-import {NextRequest, NextResponse} from 'next/server';
+import {NextResponse} from 'next/server';
 import {createClient} from '@/lib/supabase/server';
 import {curationSources, db} from '@forme/shared';
 import {asc, desc, eq} from 'drizzle-orm';
 import {isSafeUrl} from '@/lib/url-safety';
+import {withTracing} from '@/lib/logger';
 
 async function detectRssUrl(url: string): Promise<string | null> {
   if (!isSafeUrl(url)) return null;
@@ -24,7 +25,7 @@ async function detectRssUrl(url: string): Promise<string | null> {
   }
 }
 
-export async function GET() {
+export const GET = withTracing('GET /api/curation/sources', async () => {
   const supabase = await createClient();
 
   const {
@@ -57,9 +58,9 @@ export async function GET() {
       { status: 500 }
     );
   }
-}
+});
 
-export async function POST(request: NextRequest) {
+export const POST = withTracing('POST /api/curation/sources', async (request) => {
   const supabase = await createClient();
 
   const {
@@ -155,4 +156,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+});

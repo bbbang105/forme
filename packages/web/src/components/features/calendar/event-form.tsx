@@ -23,7 +23,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import {createCalendarEvent, deleteCalendarEvent, updateCalendarEvent,} from '@/lib/actions/calendar';
+import {createCalendarEvent, deleteCalendarEvent, updateCalendarEvent} from '@/lib/actions/calendar';
 import {Trash2} from 'lucide-react';
 
 const EVENT_COLORS = [
@@ -49,7 +49,12 @@ interface EventFormProps {
   onOpenChange: (open: boolean) => void;
   event?: CalendarEventData | null;
   defaultDate?: string;
-  onSuccess: () => void;
+  /** Called with the newly created event returned from the server. */
+  onEventCreate: (event: CalendarEventData) => void;
+  /** Called with the full updated event returned from the server. */
+  onEventUpdate: (event: CalendarEventData) => void;
+  /** Called with the id of the deleted event so the parent can remove it. */
+  onEventDelete: (eventId: string) => void;
 }
 
 export function EventForm({
@@ -57,7 +62,9 @@ export function EventForm({
   onOpenChange,
   event,
   defaultDate,
-  onSuccess,
+  onEventCreate,
+  onEventUpdate,
+  onEventDelete,
 }: EventFormProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -66,7 +73,9 @@ export function EventForm({
           event={event}
           defaultDate={defaultDate}
           onOpenChange={onOpenChange}
-          onSuccess={onSuccess}
+          onEventCreate={onEventCreate}
+          onEventUpdate={onEventUpdate}
+          onEventDelete={onEventDelete}
         />
       )}
     </Dialog>
@@ -77,12 +86,16 @@ function EventFormContent({
   event,
   defaultDate,
   onOpenChange,
-  onSuccess,
+  onEventCreate,
+  onEventUpdate,
+  onEventDelete,
 }: {
   event?: CalendarEventData | null;
   defaultDate?: string;
   onOpenChange: (open: boolean) => void;
-  onSuccess: () => void;
+  onEventCreate: (event: CalendarEventData) => void;
+  onEventUpdate: (event: CalendarEventData) => void;
+  onEventDelete: (eventId: string) => void;
 }) {
   const isEditing = !!event;
   const [title, setTitle] = useState(event?.title ?? '');
@@ -104,24 +117,29 @@ function EventFormContent({
     startTransition(async () => {
       try {
         if (isEditing && event) {
-          await updateCalendarEvent(event.id, {
+          const updated = await updateCalendarEvent(event.id, {
             title,
             startDate,
             endDate,
             color,
             description: description || null,
           });
+          if (updated) {
+            onEventUpdate(updated as CalendarEventData);
+          }
         } else {
-          await createCalendarEvent({
+          const created = await createCalendarEvent({
             title,
             startDate,
             endDate,
             color,
             description: description || undefined,
           });
+          if (created) {
+            onEventCreate(created as CalendarEventData);
+          }
         }
         onOpenChange(false);
-        onSuccess();
       } catch (err) {
         setError(err instanceof Error ? err.message : '저장에 실패했습니다');
       }
@@ -134,8 +152,8 @@ function EventFormContent({
     startTransition(async () => {
       try {
         await deleteCalendarEvent(event.id);
+        onEventDelete(event.id);
         onOpenChange(false);
-        onSuccess();
       } catch (err) {
         setError(err instanceof Error ? err.message : '삭제에 실패했습니다');
       }

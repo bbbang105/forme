@@ -1,3 +1,4 @@
+import {Suspense} from 'react';
 import Link from 'next/link';
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
 import {Calendar, Headphones, Newspaper, StickyNote} from 'lucide-react';
@@ -36,6 +37,16 @@ const features = [
   },
 ];
 
+/** Generic skeleton for any dashboard widget while it streams in. */
+function WidgetSkeleton() {
+  return (
+    <div className="space-y-3 animate-pulse">
+      <div className="h-5 w-28 bg-muted rounded-md" />
+      <div className="rounded-xl border border-border/60 bg-muted/40 h-44" />
+    </div>
+  );
+}
+
 export default async function DashboardPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -57,6 +68,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto space-y-6">
+      {/* Greeting — rendered synchronously; profile fetch is fast and needed here */}
       <div className="space-y-1">
         <p className="text-xs text-muted-foreground">{dateStr}</p>
         <h2 className="text-2xl font-bold tracking-tight">안녕하세요, {displayName}님!</h2>
@@ -65,6 +77,7 @@ export default async function DashboardPage() {
         </p>
       </div>
 
+      {/* Feature shortcut grid — static, no async data needed */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {features.map(({ title, description, icon: Icon, href }) => (
           <Link key={href} href={href}>
@@ -83,14 +96,28 @@ export default async function DashboardPage() {
         ))}
       </div>
 
+      {/*
+        Each widget is wrapped in its own Suspense boundary so they stream
+        in parallel rather than sequentially. The page shell and greeting are
+        sent immediately; each widget resolves independently as its data
+        arrives from the database. Users see the page structure instantly
+        with skeletons that swap out as each widget loads.
+      */}
+
       {/* Today's calendar & todos */}
-      <DashboardCalendar />
+      <Suspense fallback={<WidgetSkeleton />}>
+        <DashboardCalendar />
+      </Suspense>
 
       {/* Recent memos */}
-      <DashboardMemo />
+      <Suspense fallback={<WidgetSkeleton />}>
+        <DashboardMemo />
+      </Suspense>
 
       {/* Latest curation items */}
-      <DashboardCuration />
+      <Suspense fallback={<WidgetSkeleton />}>
+        <DashboardCuration />
+      </Suspense>
     </div>
   );
 }

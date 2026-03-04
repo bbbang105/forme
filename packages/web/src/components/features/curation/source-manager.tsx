@@ -27,7 +27,17 @@ import {
 import {cn} from '@/lib/utils';
 import {getCategoryStyle} from '@/lib/curation-utils';
 import {SourceForm} from './source-form';
-import {CrawlProgress} from './crawl-progress';
+import dynamic from 'next/dynamic';
+
+const CrawlProgress = dynamic(
+  () => import('./crawl-progress').then((m) => m.CrawlProgress),
+  {
+    ssr: true,
+    loading: () => (
+      <div className="animate-pulse bg-muted rounded-lg h-32 w-full" />
+    ),
+  }
+);
 
 interface Source {
   id: string;

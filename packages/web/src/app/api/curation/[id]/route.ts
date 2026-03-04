@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { db, curationItems, curationSources } from '@forme/shared';
-import { eq, and } from 'drizzle-orm';
+import {NextResponse} from 'next/server';
+import {createClient} from '@/lib/supabase/server';
+import {curationItems, curationSources, db} from '@forme/shared';
+import {and, eq} from 'drizzle-orm';
+import {withTracing} from '@/lib/logger';
 
 // ── Constants ──
 
@@ -25,10 +26,8 @@ interface PatchBody {
  *
  * Response: updated item
  */
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export const PATCH = withTracing('PATCH /api/curation/[id]', async (request, ctx) => {
+  const { id } = await (ctx as { params: Promise<{ id: string }> }).params;
   // ── Auth ──
   const supabase = await createClient();
   const {
@@ -41,8 +40,6 @@ export async function PATCH(
   }
 
   // ── Validate route param ──
-  const { id } = await params;
-
   if (!id || !UUID_RE.test(id)) {
     return NextResponse.json(
       { error: 'Invalid item id: must be a UUID' },
@@ -152,4 +149,4 @@ export async function PATCH(
       { status: 500 }
     );
   }
-}
+});

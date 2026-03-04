@@ -1,14 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { db, profiles } from '@forme/shared';
-import { eq } from 'drizzle-orm';
+import {NextResponse} from 'next/server';
+import {createClient} from '@/lib/supabase/server';
+import {db, profiles} from '@forme/shared';
+import {eq} from 'drizzle-orm';
+import {withTracing} from '@/lib/logger';
 
 /**
  * GET /api/profile — 현재 프로필 조회
  *
  * 프로필이 없으면 Discord identity에서 기본값으로 자동 생성 (upsert)
  */
-export async function GET() {
+export const GET = withTracing('GET /api/profile', async () => {
   const supabase = await createClient();
   const {
     data: { user },
@@ -75,12 +76,12 @@ export async function GET() {
       { status: 500 },
     );
   }
-}
+});
 
 /**
  * PUT /api/profile — 프로필 수정 (관심사 포함)
  */
-export async function PUT(request: NextRequest) {
+export const PUT = withTracing('PUT /api/profile', async (request) => {
   const supabase = await createClient();
   const {
     data: { user },
@@ -157,4 +158,4 @@ export async function PUT(request: NextRequest) {
       { status: 500 },
     );
   }
-}
+});

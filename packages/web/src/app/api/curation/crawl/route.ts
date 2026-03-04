@@ -1,12 +1,13 @@
-import { createClient } from '@/lib/supabase/server';
-import { crawlSource, getActiveSourcesForUser, type CrawlSourceResult } from '@/lib/crawl-feed';
+import {createClient} from '@/lib/supabase/server';
+import {crawlSource, type CrawlSourceResult, getActiveSourcesForUser} from '@/lib/crawl-feed';
+import {withTracing} from '@/lib/logger';
 
 /**
  * POST /api/curation/crawl
  * Triggers RSS crawl for all active sources belonging to the authenticated user.
  * Streams progress via Server-Sent Events.
  */
-export async function POST(request: Request) {
+export const POST = withTracing('POST /api/curation/crawl', async (request: Request) => {
   const supabase = await createClient();
 
   const {
@@ -109,4 +110,4 @@ export async function POST(request: Request) {
       Connection: 'keep-alive',
     },
   });
-}
+});

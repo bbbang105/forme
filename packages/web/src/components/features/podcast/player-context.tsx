@@ -1,6 +1,6 @@
 'use client';
 
-import {createContext, useCallback, useContext, useEffect, useRef, useState,} from 'react';
+import {createContext, useCallback, useContext, useEffect, useMemo, useRef, useState,} from 'react';
 
 export interface Episode {
   id: string;
@@ -58,7 +58,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   // Initialize audio element once
   useEffect(() => {
     const audio = new Audio();
-    audio.preload = 'metadata';
+    audio.preload = 'auto';
     audioRef.current = audio;
 
     const onTimeUpdate = () => setCurrentTime(audio.currentTime);
@@ -172,15 +172,16 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       volume,
     }));
 
-    if (startTime && startTime > 0) {
-      const onLoaded = () => {
+    // 충분히 버퍼링된 후 재생 시작 (모바일 네트워크 대응)
+    const onReady = () => {
+      if (startTime && startTime > 0) {
         audio.currentTime = startTime;
-        audio.removeEventListener('loadedmetadata', onLoaded);
-      };
-      audio.addEventListener('loadedmetadata', onLoaded);
-    }
-
-    audio.play().catch(console.error);
+      }
+      audio.play().catch(console.error);
+      audio.removeEventListener('canplay', onReady);
+    };
+    audio.addEventListener('canplay', onReady);
+    audio.load();
   }, [playbackRate, volume]);
 
   const pause = useCallback(() => {
@@ -250,29 +251,53 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem(STORAGE_KEY);
   }, []);
 
+  // Memoize the context value so that consumers only re-render when a piece of
+  // state they actually depend on changes, not on every unrelated update.
+  const value = useMemo(
+    () => ({
+      episode,
+      isPlaying,
+      isRestored,
+      currentTime,
+      duration,
+      volume,
+      playbackRate,
+      isLoading,
+      play,
+      pause,
+      resume,
+      togglePlay,
+      seek,
+      setVolume,
+      setPlaybackRate,
+      skipForward,
+      skipBackward,
+      close,
+    }),
+    [
+      episode,
+      isPlaying,
+      isRestored,
+      currentTime,
+      duration,
+      volume,
+      playbackRate,
+      isLoading,
+      play,
+      pause,
+      resume,
+      togglePlay,
+      seek,
+      setVolume,
+      setPlaybackRate,
+      skipForward,
+      skipBackward,
+      close,
+    ],
+  );
+
   return (
-    <PlayerContext.Provider
-      value={{
-        episode,
-        isPlaying,
-        isRestored,
-        currentTime,
-        duration,
-        volume,
-        playbackRate,
-        isLoading,
-        play,
-        pause,
-        resume,
-        togglePlay,
-        seek,
-        setVolume,
-        setPlaybackRate,
-        skipForward,
-        skipBackward,
-        close,
-      }}
-    >
+    <PlayerContext.Provider value={value}>
       {children}
     </PlayerContext.Provider>
   );

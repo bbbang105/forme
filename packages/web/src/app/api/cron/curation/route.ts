@@ -1,6 +1,7 @@
-import {NextRequest, NextResponse} from 'next/server';
+import {NextResponse} from 'next/server';
 import {crawlSource, type CrawlSourceResult, getActiveSourcesForUser} from '@/lib/crawl-feed';
 import {sendPushToUser} from '@/lib/push';
+import {withTracing} from '@/lib/logger';
 
 /**
  * GET /api/cron/curation
@@ -8,7 +9,7 @@ import {sendPushToUser} from '@/lib/push';
  * Requires Authorization: Bearer <CRON_SECRET> header (set by Vercel automatically).
  * Requires CRON_USER_ID env var to identify the single app user.
  */
-export async function GET(request: NextRequest) {
+export const GET = withTracing('GET /api/cron/curation', async (request) => {
   const authHeader = request.headers.get('authorization');
   const secret = process.env.CRON_SECRET;
   if (!secret || authHeader !== `Bearer ${secret}`) {
@@ -78,4 +79,4 @@ export async function GET(request: NextRequest) {
     summary,
     durationMs: Date.now() - startedAt,
   });
-}
+});

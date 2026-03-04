@@ -49,12 +49,19 @@ export async function uploadToR2(
   const bucket = getR2BucketName();
   const publicUrl = getR2PublicUrl();
 
+  const isAudio = contentType.startsWith('audio/');
+
   await client.send(
     new PutObjectCommand({
       Bucket: bucket,
       Key: key,
       Body: body,
       ContentType: contentType,
+      // 오디오: 30일 캐시 + Range 요청 지원으로 스트리밍/시킹 성능 개선
+      // 이미지: 7일 캐시
+      CacheControl: isAudio
+        ? 'public, max-age=2592000, immutable'
+        : 'public, max-age=604800',
     })
   );
 
