@@ -80,18 +80,21 @@ export function MemoList({ initialMemos, initialHasMore, initialNextOffset }: Me
     setActiveTag(null);
 
     setIsSearching(true);
+
+    let cancelled = false;
     searchTimerRef.current = setTimeout(async () => {
       try {
         const results = await searchMemos(searchQuery.trim());
-        setSearchResults(results as Memo[]);
+        if (!cancelled) setSearchResults(results as Memo[]);
       } catch {
-        setSearchResults(null);
+        if (!cancelled) setSearchResults(null);
       } finally {
-        setIsSearching(false);
+        if (!cancelled) setIsSearching(false);
       }
     }, 300);
 
     return () => {
+      cancelled = true;
       if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     };
   }, [searchQuery]);
@@ -287,6 +290,7 @@ export function MemoList({ initialMemos, initialHasMore, initialNextOffset }: Me
       <button
         onClick={handleNewMemo}
         disabled={isPending}
+        aria-label="새 메모 작성"
         className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-5 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 active:scale-95 transition-all flex items-center justify-center z-20 disabled:opacity-50"
       >
         <Plus className="h-6 w-6" />

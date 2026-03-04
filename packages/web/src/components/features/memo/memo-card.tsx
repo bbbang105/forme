@@ -46,7 +46,7 @@ function highlightText(text: string, query: string): ReactNode {
   return parts.map((part, i) =>
     part.toLowerCase() === query.toLowerCase()
       ? <mark key={i} className="bg-primary/20 text-foreground rounded-sm px-0.5">{part}</mark>
-      : part
+      : <span key={i}>{part}</span>
   );
 }
 

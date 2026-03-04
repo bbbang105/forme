@@ -10,6 +10,7 @@ const MAX_CONTENT_TEXT_LENGTH = 50000;
 const MAX_CONTENT_JSON_SIZE = 500000;
 const MAX_SEARCH_QUERY_LENGTH = 200;
 const ALLOWED_LINK_PROTOCOLS = ['http:', 'https:', 'mailto:'];
+const ALLOWED_IMAGE_PROTOCOLS = ['http:', 'https:'];
 
 async function requireAuth() {
   const supabase = await createClient();
@@ -41,6 +42,24 @@ function sanitizeNode(node: unknown): unknown {
 
   const obj = node as Record<string, unknown>;
   const result: Record<string, unknown> = {};
+
+  // Validate image src — only http: and https: allowed
+  if (obj.type === 'image' && obj.attrs && typeof obj.attrs === 'object') {
+    const attrs = obj.attrs as Record<string, unknown>;
+    if (typeof attrs.src === 'string') {
+      let srcAllowed = false;
+      try {
+        const url = new URL(attrs.src);
+        srcAllowed = ALLOWED_IMAGE_PROTOCOLS.includes(url.protocol);
+      } catch {
+        srcAllowed = false;
+      }
+      if (!srcAllowed) {
+        // Strip dangerous src, continue processing remaining keys normally
+        obj.attrs = { ...attrs, src: '' };
+      }
+    }
+  }
 
   for (const [key, value] of Object.entries(obj)) {
     if (key === 'marks' && Array.isArray(value)) {
@@ -278,7 +297,7 @@ export async function getMemosPage(offset = 0, limit = DEFAULT_PAGE_SIZE) {
     .offset(safeOffset);
 
   const filtered = rows.filter((m) => m.title?.trim() || m.contentText.trim());
-  const hasMore = rows.length > safeLimit;
+  const hasMore = filtered.length > safeLimit;
 
   return {
     memos: filtered.slice(0, safeLimit),
@@ -299,5 +318,6 @@ export async function getRecentMemos(limit = 3) {
     .orderBy(desc(memos.updatedAt))
     .limit(safeLimit);
 
-  return rows;
+  // Filter out empty ghost memos (created but never edited)
+  return rows.filter((m) => m.title?.trim() || m.contentText.trim());
 }

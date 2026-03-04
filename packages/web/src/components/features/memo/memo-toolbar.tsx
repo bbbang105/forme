@@ -54,6 +54,16 @@ export function MemoToolbar({ editor }: MemoToolbarProps) {
         return;
       }
       const { url } = await res.json() as { url: string };
+      try {
+        const parsed = new URL(url);
+        if (parsed.protocol !== 'https:') {
+          console.error('[MemoToolbar] Unexpected image URL protocol:', parsed.protocol);
+          return;
+        }
+      } catch {
+        console.error('[MemoToolbar] Invalid image URL');
+        return;
+      }
       editor.chain().focus().setImage({ src: url }).run();
     } catch (err) {
       console.error('[MemoToolbar] image upload error:', err);
@@ -136,28 +146,28 @@ export function MemoToolbar({ editor }: MemoToolbarProps) {
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleBold().run()}
         active={editor.isActive('bold')}
-        aria-label="Bold"
+        aria-label="굵게"
       >
         <Bold className="h-4 w-4" />
       </ToolbarButton>
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleItalic().run()}
         active={editor.isActive('italic')}
-        aria-label="Italic"
+        aria-label="기울임"
       >
         <Italic className="h-4 w-4" />
       </ToolbarButton>
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleUnderline().run()}
         active={editor.isActive('underline')}
-        aria-label="Underline"
+        aria-label="밑줄"
       >
         <Underline className="h-4 w-4" />
       </ToolbarButton>
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleStrike().run()}
         active={editor.isActive('strike')}
-        aria-label="Strikethrough"
+        aria-label="취소선"
       >
         <Strikethrough className="h-4 w-4" />
       </ToolbarButton>
@@ -167,21 +177,21 @@ export function MemoToolbar({ editor }: MemoToolbarProps) {
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
         active={editor.isActive('heading', { level: 1 })}
-        aria-label="Heading 1"
+        aria-label="제목 1"
       >
         <Heading1 className="h-4 w-4" />
       </ToolbarButton>
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
         active={editor.isActive('heading', { level: 2 })}
-        aria-label="Heading 2"
+        aria-label="제목 2"
       >
         <Heading2 className="h-4 w-4" />
       </ToolbarButton>
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
         active={editor.isActive('heading', { level: 3 })}
-        aria-label="Heading 3"
+        aria-label="제목 3"
       >
         <Heading3 className="h-4 w-4" />
       </ToolbarButton>
@@ -191,21 +201,21 @@ export function MemoToolbar({ editor }: MemoToolbarProps) {
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleBulletList().run()}
         active={editor.isActive('bulletList')}
-        aria-label="Bullet List"
+        aria-label="글머리 기호"
       >
         <List className="h-4 w-4" />
       </ToolbarButton>
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleOrderedList().run()}
         active={editor.isActive('orderedList')}
-        aria-label="Ordered List"
+        aria-label="번호 목록"
       >
         <ListOrdered className="h-4 w-4" />
       </ToolbarButton>
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleTaskList().run()}
         active={editor.isActive('taskList')}
-        aria-label="Task List"
+        aria-label="체크리스트"
       >
         <ListChecks className="h-4 w-4" />
       </ToolbarButton>
@@ -215,7 +225,7 @@ export function MemoToolbar({ editor }: MemoToolbarProps) {
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleBlockquote().run()}
         active={editor.isActive('blockquote')}
-        aria-label="Blockquote"
+        aria-label="인용"
       >
         <Quote className="h-4 w-4" />
       </ToolbarButton>
@@ -226,7 +236,7 @@ export function MemoToolbar({ editor }: MemoToolbarProps) {
           setShowLinkInput(true);
         }}
         active={editor.isActive('link')}
-        aria-label="Link"
+        aria-label="링크"
       >
         <Link className="h-4 w-4" />
       </ToolbarButton>
@@ -246,14 +256,14 @@ export function MemoToolbar({ editor }: MemoToolbarProps) {
       <ToolbarButton
         onClick={() => editor.chain().focus().undo().run()}
         disabled={!editor.can().undo()}
-        aria-label="Undo"
+        aria-label="실행 취소"
       >
         <Undo className="h-4 w-4" />
       </ToolbarButton>
       <ToolbarButton
         onClick={() => editor.chain().focus().redo().run()}
         disabled={!editor.can().redo()}
-        aria-label="Redo"
+        aria-label="다시 실행"
       >
         <Redo className="h-4 w-4" />
       </ToolbarButton>

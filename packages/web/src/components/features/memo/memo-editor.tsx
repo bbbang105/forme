@@ -12,6 +12,7 @@ import ImageExt from '@tiptap/extension-image';
 import Placeholder from '@tiptap/extension-placeholder';
 import CharacterCount from '@tiptap/extension-character-count';
 import {TaskListSort} from './task-list-sort';
+import {CollapsibleHeading} from './collapsible-heading';
 import {ArrowLeft, Check, Pin, Plus, RotateCcw, Trash2, X} from 'lucide-react';
 import {deleteMemo, toggleMemoPin, updateMemo} from '@/lib/actions/memos';
 import {MemoToolbar} from './memo-toolbar';
@@ -54,6 +55,7 @@ export function MemoEditor({ memo }: MemoEditorProps) {
   const saveTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
   const composingRef = useRef(false);
+  const isSavingRef = useRef(false);
   const tagInputRef = useRef<HTMLInputElement>(null);
 
   // Focus the tag input whenever it becomes visible
@@ -65,7 +67,11 @@ export function MemoEditor({ memo }: MemoEditorProps) {
 
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({
+        heading: false,    // replaced by CollapsibleHeading
+        link: false,       // configured separately below
+        underline: false,  // configured separately below
+      }),
       UnderlineExt,
       TaskList,
       TaskItem.extend({
@@ -106,32 +112,42 @@ export function MemoEditor({ memo }: MemoEditorProps) {
           class: 'max-w-full rounded-lg',
         },
       }),
+      CollapsibleHeading.configure({ levels: [1, 2, 3] }),
       Placeholder.configure({ placeholder: '내용을 입력하세요...' }),
       CharacterCount,
     ],
+    // Deep clone to strip ProseMirror null-prototype objects & RSC references
     content: (memo.content && typeof memo.content === 'object' && Object.keys(memo.content as Record<string, unknown>).length > 0)
-      ? memo.content
+      ? JSON.parse(JSON.stringify(memo.content))
       : undefined,
     immediatelyRender: false,
   });
 
-  const save = useCallback(async () => {
-    if (!editor) return;
+  const save = useCallback(async (): Promise<boolean> => {
+    if (!editor) return true;
+    if (isSavingRef.current) return true;
+    isSavingRef.current = true;
     setSaving(true);
     setSaveError(false);
     try {
+      // Deep clone to convert ProseMirror's null-prototype attrs to plain objects
+      // (prevents Next.js RSC "temporary client reference" serialization issues)
+      const json = JSON.parse(JSON.stringify(editor.getJSON())) as Record<string, unknown>;
       await updateMemo(memo.id, {
         title: title.trim(),
-        content: editor.getJSON() as Record<string, unknown>,
+        content: json,
         contentText: editor.getText(),
         tags,
       });
       setSaved(true);
       if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
       savedTimerRef.current = setTimeout(() => setSaved(false), 1500);
+      return true;
     } catch {
       setSaveError(true);
+      return false;
     } finally {
+      isSavingRef.current = false;
       setSaving(false);
     }
   }, [editor, memo.id, title, tags]);
@@ -182,17 +198,21 @@ export function MemoEditor({ memo }: MemoEditorProps) {
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tags]);
+  }, [tags, scheduleSave]);
 
-  // Save on blur
+  // Save on blur – store handler in ref so handleBack can remove it
+  const blurHandlerRef = useRef<(() => void) | null>(null);
   useEffect(() => {
     const handleBlur = () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       save();
     };
+    blurHandlerRef.current = handleBlur;
     window.addEventListener('blur', handleBlur);
-    return () => window.removeEventListener('blur', handleBlur);
+    return () => {
+      window.removeEventListener('blur', handleBlur);
+      blurHandlerRef.current = null;
+    };
   }, [save]);
 
   // Cleanup all timers on unmount
@@ -207,11 +227,18 @@ export function MemoEditor({ memo }: MemoEditorProps) {
     // Flush pending save
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
 
+    // Remove blur listener to prevent duplicate save during navigation
+    if (blurHandlerRef.current) {
+      window.removeEventListener('blur', blurHandlerRef.current);
+      blurHandlerRef.current = null;
+    }
+
     // Delete empty memo
     if (!title.trim() && (!editor || editor.isEmpty)) {
       await deleteMemo(memo.id);
     } else {
-      await save();
+      const ok = await save();
+      if (!ok) return; // Stay on page so user can retry
     }
 
     router.push('/memo');
