@@ -8,7 +8,7 @@ import UnderlineExt from '@tiptap/extension-underline';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import LinkExt from '@tiptap/extension-link';
-import ImageResize from 'tiptap-extension-resize-image';
+import {ImageBlock} from './image-block';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import {common, createLowlight} from 'lowlight';
 import Placeholder from '@tiptap/extension-placeholder';
@@ -117,9 +117,7 @@ export function MemoEditor({ memo }: MemoEditorProps) {
           target: '_blank',
         },
       }),
-      ImageResize.configure({
-        inline: false,
-      }),
+      ImageBlock,
       CollapsibleHeading.configure({ levels: [1, 2, 3] }),
       Placeholder.configure({ placeholder: '내용을 입력하세요...' }),
       CharacterCount,

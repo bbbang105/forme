@@ -135,7 +135,7 @@ export function createImageDropPlugin() {
               // Find where the placeholder was and insert image there
               const pluginState = imageDropPluginKey.getState(view.state);
               const insertPos = pluginState?.pending.get(id) ?? view.state.selection.from;
-              const imageNode = view.state.schema.nodes.imageResize.create({src: url});
+              const imageNode = view.state.schema.nodes.imageBlock.create({src: url});
               removeTr.insert(Math.min(insertPos, view.state.doc.content.size), imageNode);
             }
 
@@ -167,7 +167,7 @@ export function createImageDropPlugin() {
             if (url) {
               const pluginState = imageDropPluginKey.getState(view.state);
               const insertPos = pluginState?.pending.get(id) ?? view.state.selection.from;
-              const imageNode = view.state.schema.nodes.imageResize.create({src: url});
+              const imageNode = view.state.schema.nodes.imageBlock.create({src: url});
               removeTr.insert(Math.min(insertPos, view.state.doc.content.size), imageNode);
             }
 

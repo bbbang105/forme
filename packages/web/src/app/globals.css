@@ -354,24 +354,88 @@
 .dark .tiptap pre .hljs-meta,
 .dark .tiptap pre .hljs-params { color: #8b949e; }
 
-.tiptap img {
-  max-width: 100%;
-  height: auto;
-  border-radius: 0.5rem;
+/* ── Image Block ── */
+.image-block-wrapper {
   margin: 0.5rem 0;
 }
 
-/* Image resize handles (tiptap-extension-resize-image) */
-.tiptap .image-resizer {
-  display: inline-flex;
+.image-block {
   position: relative;
-  cursor: default;
+  display: inline-block;
+  max-width: 100%;
+  border-radius: 0.5rem;
+  overflow: visible;
+  transition: outline-color 0.15s;
+  outline: 2px solid transparent;
+  outline-offset: 2px;
 }
 
-.tiptap .image-resizer.focused {
-  outline: 2px solid hsl(var(--primary));
-  outline-offset: 2px;
+.image-block.selected {
+  outline-color: hsl(var(--primary));
+}
+
+.image-block img {
+  display: block;
   border-radius: 0.5rem;
+  max-width: 100%;
+  height: auto;
+}
+
+/* Delete button */
+.image-block-delete {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 10;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: hsl(var(--background) / 0.85);
+  backdrop-filter: blur(4px);
+  border: 1px solid hsl(var(--border));
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+
+.image-block-delete:hover {
+  background: hsl(var(--destructive));
+  color: hsl(var(--destructive-foreground));
+  border-color: transparent;
+}
+
+/* Resize handle */
+.image-block-resize-handle {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  width: 14px;
+  height: 14px;
+  border-radius: 2px;
+  background: hsl(var(--primary));
+  cursor: nwse-resize;
+  z-index: 10;
+  border: 2px solid hsl(var(--background));
+}
+
+/* Caption */
+.image-block-caption {
+  width: 100%;
+  text-align: center;
+  font-size: 0.8125rem;
+  color: hsl(var(--muted-foreground));
+  padding: 4px 4px 0;
+  outline: none;
+  min-height: 1.5em;
+}
+
+.image-block-caption:empty::before {
+  content: attr(data-placeholder);
+  color: hsl(var(--muted-foreground) / 0.5);
+  pointer-events: none;
 }
 
 /* Image upload placeholder */
