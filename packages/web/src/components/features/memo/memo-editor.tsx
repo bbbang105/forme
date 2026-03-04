@@ -9,8 +9,12 @@ import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import LinkExt from '@tiptap/extension-link';
 import ImageResize from 'tiptap-extension-resize-image';
+import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
+import {common, createLowlight} from 'lowlight';
 import Placeholder from '@tiptap/extension-placeholder';
 import CharacterCount from '@tiptap/extension-character-count';
+
+const lowlight = createLowlight(common);
 import {TaskListSort} from './task-list-sort';
 import {CollapsibleHeading} from './collapsible-heading';
 import {Extension} from '@tiptap/core';
@@ -73,6 +77,11 @@ export function MemoEditor({ memo }: MemoEditorProps) {
         heading: false,    // replaced by CollapsibleHeading
         link: false,       // configured separately below
         underline: false,  // configured separately below
+        codeBlock: false,  // replaced by CodeBlockLowlight
+      }),
+      CodeBlockLowlight.configure({
+        lowlight,
+        defaultLanguage: 'plaintext',
       }),
       UnderlineExt,
       TaskList,

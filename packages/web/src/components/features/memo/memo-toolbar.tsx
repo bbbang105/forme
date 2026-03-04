@@ -4,6 +4,7 @@ import '@tiptap/extension-image'; // type augmentation for setImage command
 import type {Editor} from '@tiptap/react';
 import {
     Bold,
+    Code,
     Heading1,
     Heading2,
     Heading3,
@@ -16,6 +17,7 @@ import {
     Loader2,
     Quote,
     Redo,
+    SquareCode,
     Strikethrough,
     Underline,
     Undo,
@@ -250,6 +252,23 @@ export function MemoToolbar({ editor }: MemoToolbarProps) {
           ? <Loader2 className="h-4 w-4 animate-spin" />
           : <ImageIcon className="h-4 w-4" />
         }
+      </ToolbarButton>
+
+      <ToolbarDivider />
+
+      <ToolbarButton
+        onClick={() => editor.chain().focus().toggleCode().run()}
+        active={editor.isActive('code')}
+        aria-label="인라인 코드"
+      >
+        <Code className="h-4 w-4" />
+      </ToolbarButton>
+      <ToolbarButton
+        onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+        active={editor.isActive('codeBlock')}
+        aria-label="코드 블록"
+      >
+        <SquareCode className="h-4 w-4" />
       </ToolbarButton>
 
       <ToolbarDivider />
