@@ -1,10 +1,18 @@
 'use client';
 
-import {useCallback, useMemo, useState, useTransition} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState, useTransition} from 'react';
 import {useRouter} from 'next/navigation';
-import {Plus, Search, StickyNote} from 'lucide-react';
-import {createMemo} from '@/lib/actions/memos';
+import {ArrowUpDown, Plus, Search, StickyNote, Tag, X} from 'lucide-react';
+import {createMemo, getMemosPage, searchMemos} from '@/lib/actions/memos';
 import {MemoCard} from './memo-card';
+import {cn} from '@/lib/utils';
+
+type SortKey = 'updatedAt' | 'createdAt' | 'title';
+const SORT_LABELS: Record<SortKey, string> = {
+  updatedAt: '수정일순',
+  createdAt: '생성일순',
+  title: '제목순',
+};
 
 interface Memo {
   id: string;
@@ -12,29 +20,117 @@ interface Memo {
   contentText: string;
   isPinned: boolean;
   updatedAt: Date;
+  createdAt: Date;
+  tags: string[] | null;
 }
 
 interface MemoListProps {
-  memos: Memo[];
+  initialMemos: Memo[];
+  initialHasMore: boolean;
+  initialNextOffset: number;
 }
 
-export function MemoList({ memos }: MemoListProps) {
+function sortMemos(list: Memo[], key: SortKey): Memo[] {
+  return [...list].sort((a, b) => {
+    if (key === 'title') {
+      return (a.title ?? '').localeCompare(b.title ?? '', 'ko');
+    }
+    return new Date(b[key]).getTime() - new Date(a[key]).getTime();
+  });
+}
+
+export function MemoList({ initialMemos, initialHasMore, initialNextOffset }: MemoListProps) {
   const router = useRouter();
+  const [memos, setMemos] = useState<Memo[]>(initialMemos);
+  const [hasMore, setHasMore] = useState(initialHasMore);
+  const [nextOffset, setNextOffset] = useState(initialNextOffset);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Memo[] | null>(null);
+  const [sortKey, setSortKey] = useState<SortKey>('updatedAt');
+  const [showSortMenu, setShowSortMenu] = useState(false);
+  const [activeTag, setActiveTag] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [isSearching, setIsSearching] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const sortRef = useRef<HTMLDivElement>(null);
 
-  const filtered = useMemo(() => {
-    if (!searchQuery.trim()) return memos;
-    const q = searchQuery.toLowerCase();
-    return memos.filter(
-      (m) =>
-        (m.title?.toLowerCase().includes(q)) ||
-        m.contentText.toLowerCase().includes(q)
-    );
-  }, [memos, searchQuery]);
+  // Close sort menu on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (sortRef.current && !sortRef.current.contains(e.target as Node)) {
+        setShowSortMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
-  const pinned = useMemo(() => filtered.filter((m) => m.isPinned), [filtered]);
-  const unpinned = useMemo(() => filtered.filter((m) => !m.isPinned), [filtered]);
+  // Debounced server search
+  useEffect(() => {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+
+    if (!searchQuery.trim()) {
+      setSearchResults(null);
+      setIsSearching(false);
+      return;
+    }
+
+    // Clear tag filter when searching
+    setActiveTag(null);
+
+    setIsSearching(true);
+    searchTimerRef.current = setTimeout(async () => {
+      try {
+        const results = await searchMemos(searchQuery.trim());
+        setSearchResults(results as Memo[]);
+      } catch {
+        setSearchResults(null);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+
+    return () => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    };
+  }, [searchQuery]);
+
+  const loadMore = useCallback(async () => {
+    if (isLoadingMore || !hasMore) return;
+    setIsLoadingMore(true);
+    try {
+      const result = await getMemosPage(nextOffset);
+      setMemos((prev) => [...prev, ...(result.memos as Memo[])]);
+      setHasMore(result.hasMore);
+      setNextOffset(result.nextOffset);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [hasMore, isLoadingMore, nextOffset]);
+
+  // Collect all unique tags from the full memo list (not filtered)
+  const allTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    for (const m of memos) {
+      for (const tag of m.tags ?? []) {
+        if (tag) tagSet.add(tag);
+      }
+    }
+    return Array.from(tagSet).sort((a, b) => a.localeCompare(b, 'ko'));
+  }, [memos]);
+
+  const displayMemos = searchResults ?? memos;
+
+  // Apply tag filter client-side
+  const tagFiltered = useMemo(() => {
+    if (!activeTag) return displayMemos;
+    return displayMemos.filter((m) => (m.tags ?? []).includes(activeTag));
+  }, [displayMemos, activeTag]);
+
+  const sorted = useMemo(() => sortMemos(tagFiltered, sortKey), [tagFiltered, sortKey]);
+  const pinned = useMemo(() => sorted.filter((m) => m.isPinned), [sorted]);
+  const unpinned = useMemo(() => sorted.filter((m) => !m.isPinned), [sorted]);
 
   const handleNewMemo = useCallback(() => {
     startTransition(async () => {
@@ -54,6 +150,31 @@ export function MemoList({ memos }: MemoListProps) {
               {memos.length}개의 메모
             </p>
           </div>
+          {/* Sort */}
+          <div className="relative" ref={sortRef}>
+            <button
+              onClick={() => setShowSortMenu((v) => !v)}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1.5 rounded-lg hover:bg-accent"
+            >
+              <ArrowUpDown className="h-3.5 w-3.5" />
+              {SORT_LABELS[sortKey]}
+            </button>
+            {showSortMenu && (
+              <div className="absolute right-0 top-full mt-1 bg-popover border border-border rounded-lg shadow-lg py-1 z-20 min-w-[120px]">
+                {(Object.keys(SORT_LABELS) as SortKey[]).map((key) => (
+                  <button
+                    key={key}
+                    onClick={() => { setSortKey(key); setShowSortMenu(false); }}
+                    className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
+                      sortKey === key ? 'text-primary font-medium bg-accent/50' : 'text-foreground hover:bg-accent'
+                    }`}
+                  >
+                    {SORT_LABELS[key]}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Search */}
@@ -66,7 +187,36 @@ export function MemoList({ memos }: MemoListProps) {
             placeholder="메모 검색..."
             className="w-full pl-9 pr-4 py-2.5 text-sm bg-accent/50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-primary/20 placeholder:text-muted-foreground/60 transition-shadow"
           />
+          {isSearching && (
+            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+              <div className="h-4 w-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+            </div>
+          )}
         </div>
+
+        {/* Tag filter chips */}
+        {allTags.length > 0 && (
+          <div className="flex items-center gap-1.5 mt-3 overflow-x-auto scrollbar-hide pb-0.5">
+            <Tag className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            {allTags.map((tag) => (
+              <button
+                key={tag}
+                onClick={() => setActiveTag((prev) => (prev === tag ? null : tag))}
+                className={cn(
+                  'inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs transition-colors shrink-0',
+                  activeTag === tag
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-accent text-accent-foreground hover:bg-accent/80',
+                )}
+              >
+                {tag}
+                {activeTag === tag && (
+                  <X className="h-3 w-3" />
+                )}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Memo list */}
@@ -81,10 +231,12 @@ export function MemoList({ memos }: MemoListProps) {
               새 메모를 작성해보세요
             </p>
           </div>
-        ) : filtered.length === 0 ? (
+        ) : sorted.length === 0 ? (
           <div className="flex flex-col items-center justify-center min-h-[30vh] text-center px-4">
             <p className="text-sm text-muted-foreground">
-              &ldquo;{searchQuery}&rdquo; 검색 결과가 없습니다
+              {activeTag
+                ? `'${activeTag}' 태그가 달린 메모가 없습니다`
+                : `"${searchQuery}" 검색 결과가 없습니다`}
             </p>
           </div>
         ) : (
@@ -96,8 +248,8 @@ export function MemoList({ memos }: MemoListProps) {
                     고정됨
                   </span>
                 </div>
-                {pinned.map((memo) => (
-                  <MemoCard key={memo.id} memo={memo} />
+                {pinned.map((m) => (
+                  <MemoCard key={m.id} memo={m} highlight={searchQuery.trim()} />
                 ))}
               </div>
             )}
@@ -110,9 +262,21 @@ export function MemoList({ memos }: MemoListProps) {
                     </span>
                   </div>
                 )}
-                {unpinned.map((memo) => (
-                  <MemoCard key={memo.id} memo={memo} />
+                {unpinned.map((m) => (
+                  <MemoCard key={m.id} memo={m} highlight={searchQuery.trim()} />
                 ))}
+              </div>
+            )}
+            {/* Load more */}
+            {hasMore && !searchQuery.trim() && !activeTag && (
+              <div className="px-4 py-4 text-center">
+                <button
+                  onClick={loadMore}
+                  disabled={isLoadingMore}
+                  className="text-sm text-primary hover:underline disabled:opacity-50"
+                >
+                  {isLoadingMore ? '불러오는 중...' : '더 보기'}
+                </button>
               </div>
             )}
           </>

@@ -8,7 +8,13 @@ export async function DashboardMemo() {
   try {
     recentMemos = await getRecentMemos(3);
   } catch {
-    return null;
+    return (
+      <Card>
+        <CardContent className="p-4 text-center">
+          <p className="text-xs text-muted-foreground">메모를 불러올 수 없습니다</p>
+        </CardContent>
+      </Card>
+    );
   }
 
   if (recentMemos.length === 0) return null;

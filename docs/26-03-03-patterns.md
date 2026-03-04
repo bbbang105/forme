@@ -215,12 +215,13 @@ import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client
 export async function uploadToR2(key: string, body: Buffer, contentType: string)
   : Promise<{ url: string }> {
   // S3Client → Cloudflare R2 (S3-compatible)
-  // key: "podcast/{userId}/{uuid}.{ext}"
+  // key: "podcast/{userId}/{uuid}.{ext}" 또는 "memo-images/{userId}/{uuid}.{ext}"
   // MIME 기반 확장자만 허용 (파일명 무시)
   return { url: `${R2_PUBLIC_URL}/${key}` }
 }
 
-// Route: POST /api/podcast/upload (FormData, maxDuration=300)
+// Route: POST /api/podcast/upload (FormData, 오디오, 200MB)
+// Route: POST /api/memo/image (FormData, 이미지, 5MB, JPEG/PNG/GIF/WebP)
 // MIME 검증 → 사이즈 검증 → R2 업로드 → URL 반환
 ```
 
@@ -297,9 +298,21 @@ function escapeLikePattern(input: string) {
   return input.replace(/[%_\\]/g, '\\$&');
 }
 
+// 태그 검증: 최대 5개, 각 20자 이내, 공백 트리밍
+function validateTags(tags: string[]): string[] {
+  if (tags.length > 5) throw new Error('태그는 최대 5개');
+  return tags.map(t => t.trim()).filter(Boolean);
+}
+
 // 자동저장: 클라이언트에서 1초 debounce + blur 시 즉시 저장
+// 저장 실패: 에러 UI + 재시도 버튼 (saveError 상태)
+// IME 처리: compositionstart/end 이벤트로 한글 입력 중 저장 방지
 // 빈 메모: getMemos()에서 title/contentText 모두 빈 레코드 필터링
 // 에디터 뒤로가기 시 빈 메모 자동 삭제
+// 체크리스트: TaskListSort 플러그인으로 체크된 항목 자동 하단 정렬 (stable sort)
+// 이미지: POST /api/memo/image (R2 업로드, 5MB, JPEG/PNG/GIF/WebP)
+// 페이지네이션: getMemosPage(offset, limit) — offset 기반, "더 보기" UI
+// 검색: searchMemos() 서버 액션 + 300ms debounce + 하이라이트
 ```
 
 ## 컴포넌트 Import 패턴

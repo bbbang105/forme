@@ -51,3 +51,6 @@ next-env.d.ts
 # serena
 .serena/
 .vercel
+
+# playwright
+.playwright-mcp

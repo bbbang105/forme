@@ -2,22 +2,25 @@
 
 import type {Editor} from '@tiptap/react';
 import {
-  Bold,
-  Italic,
-  Underline,
-  Strikethrough,
-  Heading1,
-  Heading2,
-  List,
-  ListOrdered,
-  ListChecks,
-  Link,
-  Quote,
-  Undo,
-  Redo,
+    Bold,
+    Heading1,
+    Heading2,
+    Heading3,
+    Image as ImageIcon,
+    Italic,
+    Link,
+    List,
+    ListChecks,
+    ListOrdered,
+    Loader2,
+    Quote,
+    Redo,
+    Strikethrough,
+    Underline,
+    Undo,
 } from 'lucide-react';
 import {cn} from '@/lib/utils';
-import {useCallback, useState} from 'react';
+import {useCallback, useRef, useState} from 'react';
 
 interface MemoToolbarProps {
   editor: Editor | null;
@@ -26,6 +29,38 @@ interface MemoToolbarProps {
 export function MemoToolbar({ editor }: MemoToolbarProps) {
   const [showLinkInput, setShowLinkInput] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!editor) return;
+    const file = e.target.files?.[0];
+    if (!fileInputRef.current) return;
+    // Reset input so the same file can be re-selected if needed
+    fileInputRef.current.value = '';
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+      const res = await fetch('/api/memo/image', {
+        method: 'POST',
+        body: formData,
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        console.error('[MemoToolbar] image upload failed:', data);
+        return;
+      }
+      const { url } = await res.json() as { url: string };
+      editor.chain().focus().setImage({ src: url }).run();
+    } catch (err) {
+      console.error('[MemoToolbar] image upload error:', err);
+    } finally {
+      setUploading(false);
+    }
+  }, [editor]);
 
   const handleLinkSubmit = useCallback(() => {
     if (!editor) return;
@@ -59,7 +94,7 @@ export function MemoToolbar({ editor }: MemoToolbarProps) {
 
   if (showLinkInput) {
     return (
-      <div className="flex items-center gap-2 px-3 py-2 border-t border-border bg-background">
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-background">
         <input
           type="url"
           value={linkUrl}
@@ -89,7 +124,15 @@ export function MemoToolbar({ editor }: MemoToolbarProps) {
   }
 
   return (
-    <div className="flex items-center gap-0.5 px-2 py-1.5 border-t border-border bg-background overflow-x-auto scrollbar-hide">
+    <div className="flex items-center gap-0.5 px-2 py-1.5 border-b border-border bg-background overflow-x-auto scrollbar-hide">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/gif,image/webp"
+        className="hidden"
+        aria-hidden="true"
+        onChange={handleImageFileChange}
+      />
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleBold().run()}
         active={editor.isActive('bold')}
@@ -135,6 +178,13 @@ export function MemoToolbar({ editor }: MemoToolbarProps) {
       >
         <Heading2 className="h-4 w-4" />
       </ToolbarButton>
+      <ToolbarButton
+        onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+        active={editor.isActive('heading', { level: 3 })}
+        aria-label="Heading 3"
+      >
+        <Heading3 className="h-4 w-4" />
+      </ToolbarButton>
 
       <ToolbarDivider />
 
@@ -179,6 +229,16 @@ export function MemoToolbar({ editor }: MemoToolbarProps) {
         aria-label="Link"
       >
         <Link className="h-4 w-4" />
+      </ToolbarButton>
+      <ToolbarButton
+        onClick={() => fileInputRef.current?.click()}
+        disabled={uploading}
+        aria-label="이미지 삽입"
+      >
+        {uploading
+          ? <Loader2 className="h-4 w-4 animate-spin" />
+          : <ImageIcon className="h-4 w-4" />
+        }
       </ToolbarButton>
 
       <ToolbarDivider />

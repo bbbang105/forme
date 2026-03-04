@@ -13,7 +13,7 @@ pnpm 모노레포: `packages/web` (Next.js 16 PWA) + `packages/shared` (DB 스�
 | 프레임워크 | Next.js 16, React 19, TypeScript |
 | DB & Auth | Supabase (Auth + PostgreSQL + RLS) |
 | ORM | Drizzle ORM (`packages/shared/src/schema/`) |
-| 스토리지 | Cloudflare R2 (팟캐스트 음성) |
+| 스토리지 | Cloudflare R2 (팟캐스트 음성, 메모 이미지) |
 | 스타일링 | Tailwind CSS 4 + shadcn/ui + Radix UI |
 | 푸시알림 | web-push + Service Worker |
 | RSS | feedsmith |
@@ -86,13 +86,15 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/components/features/calendar/event-list.tsx` | 이벤트 목록 (선택 날짜별 필터링) |
 | `packages/web/src/components/features/calendar/dashboard-calendar.tsx` | 대시보드 캘린더 위젯 (오늘 할일 + 다가오는 일정) |
 | `packages/web/src/hooks/use-swipe.ts` | 터치 스와이프 훅 (모바일 월 이동) |
-| `packages/shared/src/schema/memos.ts` | 메모 스키마 (JSONB content + contentText) |
-| `packages/web/src/lib/actions/memos.ts` | 메모 Server Actions (CRUD + 검색 + 고정 + TipTap JSON 검증) |
-| `packages/web/src/components/features/memo/memo-editor.tsx` | TipTap 에디터 (자동저장, 고정/삭제) |
-| `packages/web/src/components/features/memo/memo-toolbar.tsx` | 에디터 서식 툴바 (B/I/U/S, H1/H2, 리스트, 체크리스트, 링크) |
-| `packages/web/src/components/features/memo/memo-list.tsx` | 메모 목록 (검색, 고정 섹션, FAB) |
-| `packages/web/src/components/features/memo/memo-card.tsx` | 메모 카드 (제목+날짜+미리보기) |
-| `packages/web/src/components/features/memo/dashboard-memo.tsx` | 대시보드 최근 메모 위젯 |
+| `packages/shared/src/schema/memos.ts` | 메모 스키마 (JSONB content + contentText + tags) |
+| `packages/web/src/lib/actions/memos.ts` | 메모 Server Actions (CRUD + 검색 + 고정 + 페이지네이션 + 태그 + TipTap JSON 검증) |
+| `packages/web/src/components/features/memo/memo-editor.tsx` | TipTap 에디터 (자동저장, 고정/삭제, 태그, 이미지, 에러 재시도) |
+| `packages/web/src/components/features/memo/memo-toolbar.tsx` | 에디터 서식 툴바 (B/I/U/S, H1-H3, 리스트, 체크리스트, 링크, 이미지) |
+| `packages/web/src/components/features/memo/memo-list.tsx` | 메모 목록 (서버 검색, 하이라이트, 정렬, 태그 필터, 페이지네이션) |
+| `packages/web/src/components/features/memo/memo-card.tsx` | 메모 카드 (제목+날짜+미리보기, React.memo) |
+| `packages/web/src/components/features/memo/dashboard-memo.tsx` | 대시보드 최근 메모 위젯 (에러 폴백) |
+| `packages/web/src/components/features/memo/task-list-sort.ts` | ProseMirror 플러그인 (체크된 아이템 하단 자동정렬) |
+| `packages/web/src/app/api/memo/image/route.ts` | 메모 이미지 R2 업로드 API (5MB, JPEG/PNG/GIF/WebP) |
 
 ## 인증 구조
 

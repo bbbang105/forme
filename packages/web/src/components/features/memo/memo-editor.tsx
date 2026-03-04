@@ -2,18 +2,34 @@
 
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {useRouter} from 'next/navigation';
-import {useEditor, EditorContent} from '@tiptap/react';
+import {EditorContent, useEditor} from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import UnderlineExt from '@tiptap/extension-underline';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import LinkExt from '@tiptap/extension-link';
+import ImageExt from '@tiptap/extension-image';
 import Placeholder from '@tiptap/extension-placeholder';
 import CharacterCount from '@tiptap/extension-character-count';
-import {ArrowLeft, EllipsisVertical, Pin, PinOff, Trash2, Check} from 'lucide-react';
-import {updateMemo, deleteMemo, toggleMemoPin} from '@/lib/actions/memos';
+import {TaskListSort} from './task-list-sort';
+import {ArrowLeft, Check, Pin, Plus, RotateCcw, Trash2, X} from 'lucide-react';
+import {deleteMemo, toggleMemoPin, updateMemo} from '@/lib/actions/memos';
 import {MemoToolbar} from './memo-toolbar';
 import {cn} from '@/lib/utils';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+
+const MAX_TAGS = 5;
+const MAX_TAG_LENGTH = 20;
 
 interface MemoEditorProps {
   memo: {
@@ -21,6 +37,7 @@ interface MemoEditorProps {
     title: string | null;
     content: unknown;
     isPinned: boolean;
+    tags?: string[] | null;
   };
 }
 
@@ -28,26 +45,65 @@ export function MemoEditor({ memo }: MemoEditorProps) {
   const router = useRouter();
   const [title, setTitle] = useState(memo.title ?? '');
   const [isPinned, setIsPinned] = useState(memo.isPinned);
-  const [showMenu, setShowMenu] = useState(false);
+  const [tags, setTags] = useState<string[]>(memo.tags ?? []);
+  const [tagInput, setTagInput] = useState('');
+  const [showTagInput, setShowTagInput] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const hasContentRef = useRef(false);
+  const composingRef = useRef(false);
+  const tagInputRef = useRef<HTMLInputElement>(null);
+
+  // Focus the tag input whenever it becomes visible
+  useEffect(() => {
+    if (showTagInput) {
+      tagInputRef.current?.focus();
+    }
+  }, [showTagInput]);
 
   const editor = useEditor({
     extensions: [
       StarterKit,
       UnderlineExt,
       TaskList,
-      TaskItem.configure({ nested: true }),
+      TaskItem.extend({
+        addAttributes() {
+          return {
+            checked: {
+              default: false,
+              keepOnSplit: false,
+              parseHTML: (element: HTMLElement) => element.getAttribute('data-checked') === 'true',
+              renderHTML: (attributes: Record<string, unknown>) => ({
+                'data-checked': attributes.checked,
+              }),
+            },
+            taskId: {
+              default: null,
+              parseHTML: (element: HTMLElement) => element.getAttribute('data-task-id'),
+              renderHTML: (attributes: Record<string, unknown>) => {
+                if (!attributes.taskId) return {};
+                return {'data-task-id': attributes.taskId};
+              },
+            },
+          };
+        },
+      }).configure({nested: true}),
+      TaskListSort,
       LinkExt.configure({
-        openOnClick: false,
+        openOnClick: true,
         protocols: ['http', 'https', 'mailto'],
         HTMLAttributes: {
           class: 'text-primary underline',
           rel: 'noopener noreferrer',
+          target: '_blank',
+        },
+      }),
+      ImageExt.configure({
+        allowBase64: false,
+        HTMLAttributes: {
+          class: 'max-w-full rounded-lg',
         },
       }),
       Placeholder.configure({ placeholder: '내용을 입력하세요...' }),
@@ -57,39 +113,60 @@ export function MemoEditor({ memo }: MemoEditorProps) {
       ? memo.content
       : undefined,
     immediatelyRender: false,
-    onUpdate: () => {
-      scheduleSave();
-    },
   });
-
-  // Track if memo has content
-  useEffect(() => {
-    if (editor) {
-      hasContentRef.current = !editor.isEmpty || title.trim() !== '';
-    }
-  }, [editor, title]);
 
   const save = useCallback(async () => {
     if (!editor) return;
     setSaving(true);
+    setSaveError(false);
     try {
       await updateMemo(memo.id, {
         title: title.trim(),
         content: editor.getJSON() as Record<string, unknown>,
         contentText: editor.getText(),
+        tags,
       });
       setSaved(true);
       if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
       savedTimerRef.current = setTimeout(() => setSaved(false), 1500);
+    } catch {
+      setSaveError(true);
     } finally {
       setSaving(false);
     }
-  }, [editor, memo.id, title]);
+  }, [editor, memo.id, title, tags]);
 
   const scheduleSave = useCallback(() => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => save(), 1000);
   }, [save]);
+
+  // Track IME composition to prevent save during Korean input
+  useEffect(() => {
+    if (!editor) return;
+    const dom = editor.view.dom;
+    const onStart = () => { composingRef.current = true; };
+    const onEnd = () => {
+      composingRef.current = false;
+      scheduleSave();
+    };
+    dom.addEventListener('compositionstart', onStart);
+    dom.addEventListener('compositionend', onEnd);
+    return () => {
+      dom.removeEventListener('compositionstart', onStart);
+      dom.removeEventListener('compositionend', onEnd);
+    };
+  }, [editor, scheduleSave]);
+
+  // Save on any document change (checkbox toggles, text input, etc.)
+  useEffect(() => {
+    if (!editor) return;
+    const onDocChange = () => {
+      if (!composingRef.current) scheduleSave();
+    };
+    editor.on('update', onDocChange);
+    return () => { editor.off('update', onDocChange); };
+  }, [editor, scheduleSave]);
 
   // Save on title change with debounce
   useEffect(() => {
@@ -98,6 +175,15 @@ export function MemoEditor({ memo }: MemoEditorProps) {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     };
   }, [title, scheduleSave]);
+
+  // Save when tags change
+  useEffect(() => {
+    scheduleSave();
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tags]);
 
   // Save on blur
   useEffect(() => {
@@ -115,17 +201,6 @@ export function MemoEditor({ memo }: MemoEditorProps) {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
     };
-  }, []);
-
-  // Close menu on outside click
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setShowMenu(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
   }, []);
 
   const handleBack = useCallback(async () => {
@@ -150,8 +225,30 @@ export function MemoEditor({ memo }: MemoEditorProps) {
   const handleTogglePin = useCallback(async () => {
     const result = await toggleMemoPin(memo.id);
     if (result) setIsPinned(result.isPinned);
-    setShowMenu(false);
   }, [memo.id]);
+
+  const addTag = useCallback(() => {
+    const trimmed = tagInput.trim();
+    if (!trimmed) {
+      setShowTagInput(false);
+      setTagInput('');
+      return;
+    }
+    if (trimmed.length > MAX_TAG_LENGTH) return;
+    if (tags.includes(trimmed)) {
+      setTagInput('');
+      setShowTagInput(false);
+      return;
+    }
+    if (tags.length >= MAX_TAGS) return;
+    setTags((prev) => [...prev, trimmed]);
+    setTagInput('');
+    setShowTagInput(false);
+  }, [tagInput, tags]);
+
+  const removeTag = useCallback((tag: string) => {
+    setTags((prev) => prev.filter((t) => t !== tag));
+  }, []);
 
   return (
     <div className="flex flex-col h-[calc(100vh-env(safe-area-inset-top)-env(safe-area-inset-bottom))]">
@@ -166,42 +263,52 @@ export function MemoEditor({ memo }: MemoEditorProps) {
         </button>
 
         <div className="flex items-center gap-1">
-          {(saving || saved) && (
-            <span className="text-xs text-muted-foreground mr-2 flex items-center gap-1">
-              {saving ? '저장 중...' : <><Check className="h-3 w-3 text-primary" />저장됨</>}
+          {(saving || saved || saveError) && (
+            <span className={cn('text-xs mr-2 flex items-center gap-1', saveError ? 'text-destructive' : 'text-muted-foreground')}>
+              {saving ? '저장 중...' : saveError ? (
+                <button onClick={save} className="flex items-center gap-1 hover:underline">
+                  <RotateCcw className="h-3 w-3" />저장 실패 · 재시도
+                </button>
+              ) : <><Check className="h-3 w-3 text-primary" />저장됨</>}
             </span>
           )}
-          {isPinned && (
-            <Pin className="h-3.5 w-3.5 text-primary" />
-          )}
-          <div className="relative" ref={menuRef}>
-            <button
-              onClick={() => setShowMenu(!showMenu)}
-              className="p-2 rounded-md hover:bg-accent transition-colors"
-            >
-              <EllipsisVertical className="h-5 w-5" />
-            </button>
-            {showMenu && (
-              <div className="absolute right-0 top-full mt-1 w-40 rounded-lg border border-border bg-background shadow-lg py-1 z-20">
-                <button
-                  onClick={handleTogglePin}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent transition-colors"
-                >
-                  {isPinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
-                  {isPinned ? '고정 해제' : '고정'}
-                </button>
-                <button
-                  onClick={handleDelete}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-accent transition-colors"
-                >
-                  <Trash2 className="h-4 w-4" />
+          <button
+            onClick={handleTogglePin}
+            className="p-2 rounded-md hover:bg-accent transition-colors min-w-[40px] min-h-[40px] flex items-center justify-center"
+            aria-label={isPinned ? '고정 해제' : '고정'}
+            aria-pressed={isPinned}
+          >
+            <Pin className={cn('h-5 w-5 transition-colors', isPinned ? 'text-primary' : 'text-muted-foreground')} />
+          </button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <button
+                className="p-2 rounded-md hover:bg-accent transition-colors text-muted-foreground hover:text-destructive min-w-[40px] min-h-[40px] flex items-center justify-center"
+                aria-label="삭제"
+              >
+                <Trash2 className="h-5 w-5" />
+              </button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>메모를 삭제할까요?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  삭제된 메모는 복구할 수 없습니다.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>취소</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
                   삭제
-                </button>
-              </div>
-            )}
-          </div>
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
+
+      {/* Toolbar - 상단 고정 */}
+      <MemoToolbar editor={editor} />
 
       {/* Editor area */}
       <div className="flex-1 overflow-y-auto px-4 py-4">
@@ -211,28 +318,75 @@ export function MemoEditor({ memo }: MemoEditorProps) {
           onChange={(e) => setTitle(e.target.value)}
           placeholder="제목"
           maxLength={200}
-          className="w-full text-2xl font-bold bg-transparent outline-none placeholder:text-muted-foreground/50 mb-4"
+          className="w-full text-2xl font-bold bg-transparent outline-none placeholder:text-muted-foreground/50 mb-3"
         />
+
+        {/* Tag input area */}
+        <div className="flex flex-wrap items-center gap-1.5 mb-4 min-h-[28px]">
+          {tags.map((tag) => (
+            <span
+              key={tag}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent text-xs text-accent-foreground"
+            >
+              {tag}
+              <button
+                type="button"
+                onClick={() => removeTag(tag)}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+                aria-label={`태그 '${tag}' 제거`}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
+
+          {showTagInput ? (
+            <input
+              ref={tagInputRef}
+              type="text"
+              value={tagInput}
+              onChange={(e) => setTagInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  addTag();
+                }
+                if (e.key === 'Escape') {
+                  setTagInput('');
+                  setShowTagInput(false);
+                }
+              }}
+              onBlur={() => {
+                addTag();
+              }}
+              placeholder="태그 입력..."
+              maxLength={MAX_TAG_LENGTH}
+              className="text-xs bg-accent/60 rounded-full px-2.5 py-0.5 outline-none w-24 placeholder:text-muted-foreground/60"
+            />
+          ) : tags.length < MAX_TAGS ? (
+            <button
+              type="button"
+              onClick={() => setShowTagInput(true)}
+              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              aria-label="태그 추가"
+            >
+              <Plus className="h-3 w-3" />
+              <span>태그</span>
+            </button>
+          ) : null}
+        </div>
+
         <EditorContent
           editor={editor}
           className={cn(
-            'prose prose-sm dark:prose-invert max-w-none min-h-[50vh]',
+            'prose dark:prose-invert max-w-none min-h-[50vh]',
             'prose-p:my-1 prose-headings:mb-2 prose-headings:mt-4',
             'prose-ul:my-1 prose-ol:my-1 prose-li:my-0',
-            'prose-blockquote:my-2 prose-blockquote:border-primary/30',
+            'prose-blockquote:my-2',
             'prose-a:text-primary prose-a:no-underline hover:prose-a:underline',
-            '[&_.tiptap]:outline-none [&_.tiptap]:min-h-[50vh]',
-            '[&_ul[data-type=taskList]]:list-none [&_ul[data-type=taskList]]:pl-0',
-            '[&_ul[data-type=taskList]_li]:flex [&_ul[data-type=taskList]_li]:items-start [&_ul[data-type=taskList]_li]:gap-2',
-            '[&_ul[data-type=taskList]_li_label]:mt-0.5',
-            '[&_ul[data-type=taskList]_li_input]:mt-1 [&_ul[data-type=taskList]_li_input]:accent-primary',
+            '[&_.tiptap]:min-h-[50vh]',
           )}
         />
-      </div>
-
-      {/* Toolbar */}
-      <div className="sticky bottom-0">
-        <MemoToolbar editor={editor} />
       </div>
     </div>
   );

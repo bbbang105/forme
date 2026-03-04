@@ -1,5 +1,7 @@
 'use client';
 
+import type {ReactNode} from 'react';
+import {memo, useMemo} from 'react';
 import Link from 'next/link';
 import {Pin} from 'lucide-react';
 import {cn} from '@/lib/utils';
@@ -12,6 +14,7 @@ interface MemoCardProps {
     isPinned: boolean;
     updatedAt: Date;
   };
+  highlight?: string;
 }
 
 function formatRelativeDate(date: Date): string {
@@ -35,9 +38,24 @@ function formatRelativeDate(date: Date): string {
   return '방금';
 }
 
-export function MemoCard({ memo }: MemoCardProps) {
+function highlightText(text: string, query: string): ReactNode {
+  if (!query) return text;
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const parts = text.split(new RegExp(`(${escaped})`, 'gi'));
+  if (parts.length === 1) return text;
+  return parts.map((part, i) =>
+    part.toLowerCase() === query.toLowerCase()
+      ? <mark key={i} className="bg-primary/20 text-foreground rounded-sm px-0.5">{part}</mark>
+      : part
+  );
+}
+
+export const MemoCard = memo(function MemoCard({ memo, highlight = '' }: MemoCardProps) {
   const displayTitle = memo.title?.trim() || '제목 없음';
   const preview = memo.contentText.slice(0, 100);
+
+  const titleNode = useMemo(() => highlightText(displayTitle, highlight), [displayTitle, highlight]);
+  const previewNode = useMemo(() => highlightText(preview, highlight), [preview, highlight]);
 
   return (
     <Link
@@ -57,7 +75,7 @@ export function MemoCard({ memo }: MemoCardProps) {
               'text-sm font-semibold truncate',
               !memo.title?.trim() && 'text-muted-foreground',
             )}>
-              {displayTitle}
+              {titleNode}
             </h3>
           </div>
           <div className="flex items-center gap-2">
@@ -68,7 +86,7 @@ export function MemoCard({ memo }: MemoCardProps) {
               <>
                 <span className="text-xs text-muted-foreground/50">·</span>
                 <p className="text-xs text-muted-foreground truncate">
-                  {preview}
+                  {previewNode}
                 </p>
               </>
             )}
@@ -77,4 +95,4 @@ export function MemoCard({ memo }: MemoCardProps) {
       </div>
     </Link>
   );
-}
+});

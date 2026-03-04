@@ -7,6 +7,7 @@ export const memos = pgTable('memos', {
   content: jsonb('content').notNull().default({}),
   contentText: text('content_text').notNull().default(''),
   isPinned: boolean('is_pinned').notNull().default(false),
+  tags: text('tags').array(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({

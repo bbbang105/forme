@@ -117,12 +117,30 @@ export async function createMemo() {
   return row;
 }
 
+const MAX_TAGS = 5;
+const MAX_TAG_LENGTH = 20;
+
+function validateTags(tags: string[]): string[] {
+  if (tags.length > MAX_TAGS) {
+    throw new Error(`태그는 최대 ${MAX_TAGS}개까지 추가할 수 있습니다`);
+  }
+  return tags.map((t) => {
+    const trimmed = t.trim();
+    if (trimmed.length === 0) throw new Error('태그는 공백일 수 없습니다');
+    if (trimmed.length > MAX_TAG_LENGTH) {
+      throw new Error(`태그는 ${MAX_TAG_LENGTH}자 이내여야 합니다`);
+    }
+    return trimmed;
+  });
+}
+
 export async function updateMemo(
   id: string,
   data: {
     title?: string;
     content?: Record<string, unknown>;
     contentText?: string;
+    tags?: string[];
   }
 ) {
   const user = await requireAuth();
@@ -146,6 +164,7 @@ export async function updateMemo(
     }
   }
   if (data.contentText !== undefined) updates.contentText = data.contentText;
+  if (data.tags !== undefined) updates.tags = validateTags(data.tags);
 
   const [row] = await db
     .update(memos)
@@ -161,6 +180,15 @@ export async function updateMemo(
   revalidatePath('/memo');
   revalidatePath('/dashboard');
   return row;
+}
+
+export async function getMemoTags() {
+  const user = await requireAuth();
+  const rows = await db
+    .selectDistinct({ tag: sql<string>`unnest(${memos.tags})` })
+    .from(memos)
+    .where(eq(memos.userId, user.id));
+  return rows.map((r) => r.tag).filter(Boolean);
 }
 
 export async function deleteMemo(id: string) {
@@ -231,6 +259,32 @@ export async function searchMemos(query: string) {
     .orderBy(desc(memos.isPinned), desc(memos.updatedAt));
 
   return rows;
+}
+
+const DEFAULT_PAGE_SIZE = 20;
+
+export async function getMemosPage(offset = 0, limit = DEFAULT_PAGE_SIZE) {
+  const user = await requireAuth();
+
+  const safeLimit = Math.min(Math.max(1, limit), 50);
+  const safeOffset = Math.max(0, offset);
+
+  const rows = await db
+    .select()
+    .from(memos)
+    .where(eq(memos.userId, user.id))
+    .orderBy(desc(memos.isPinned), desc(memos.updatedAt))
+    .limit(safeLimit + 1) // fetch one extra to check if more exist
+    .offset(safeOffset);
+
+  const filtered = rows.filter((m) => m.title?.trim() || m.contentText.trim());
+  const hasMore = rows.length > safeLimit;
+
+  return {
+    memos: filtered.slice(0, safeLimit),
+    hasMore,
+    nextOffset: safeOffset + safeLimit,
+  };
 }
 
 export async function getRecentMemos(limit = 3) {

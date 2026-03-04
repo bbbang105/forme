@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
+@plugin '@tailwindcss/typography';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -180,6 +181,63 @@
 }
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
+}
+
+/* ── TipTap Editor ── */
+.tiptap {
+  outline: none;
+  caret-color: hsl(var(--foreground));
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}
+
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: hsl(var(--muted-foreground));
+  pointer-events: none;
+  height: 0;
+}
+
+.tiptap ul[data-type='taskList'] {
+  list-style: none;
+  padding-left: 0;
+}
+
+.tiptap ul[data-type='taskList'] li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tiptap ul[data-type='taskList'] li label {
+  display: flex;
+  align-items: center;
+}
+
+.tiptap ul[data-type='taskList'] li input[type='checkbox'] {
+  width: 1rem;
+  height: 1rem;
+  accent-color: hsl(var(--primary));
+}
+
+.tiptap ul[data-type='taskList'] li[data-checked='true'] > div {
+  text-decoration: line-through;
+  color: hsl(var(--muted-foreground));
+  opacity: 0.6;
+}
+
+.tiptap blockquote {
+  border-left: 3px solid hsl(var(--border));
+  padding-left: 1rem;
+  color: hsl(var(--muted-foreground));
+}
+
+.tiptap img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+  margin: 0.5rem 0;
 }
 
 /* Calendar month slide animations */

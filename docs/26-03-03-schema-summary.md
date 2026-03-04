@@ -112,6 +112,7 @@ auth.users (Supabase 관리)
 | content | JSONB | NOT NULL | DEFAULT '{}', TipTap JSON 포맷 |
 | content_text | TEXT | NOT NULL | DEFAULT '', 검색/미리보기용 plain text |
 | is_pinned | BOOLEAN | NOT NULL | DEFAULT false |
+| tags | TEXT[] | NULL | 최대 5개, 각 20자 이내 |
 | created_at | TIMESTAMPTZ | NOT NULL | DEFAULT NOW() |
 | updated_at | TIMESTAMPTZ | NOT NULL | DEFAULT NOW() |
 
