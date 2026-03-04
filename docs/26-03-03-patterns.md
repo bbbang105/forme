@@ -76,53 +76,62 @@ export async function GET(request: Request) {
 }
 ```
 
-### 인증 가드 (Server Action / API Route)
+### 인증 가드 (React.cache 기반 — 요청당 1회)
 
 ```typescript
-import { createClient } from '@/lib/supabase/server'
+// packages/web/src/lib/auth.ts
+import { cache } from 'react';
+import { createClient } from '@/lib/supabase/server';
 
-async function requireAuth() {
-  const supabase = await createClient()
-  const { data: { user }, error } = await supabase.auth.getUser()
-  if (error || !user) throw new Error('Unauthorized')
-  return user
-}
+export const getAuthUser = cache(async () => {
+  const supabase = await createClient();
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error || !user) throw new Error('Unauthorized');
+  return user;
+});
+
+// 사용: 모든 Server Action / API Route에서 import { getAuthUser } from '@/lib/auth'
+// React.cache로 동일 요청 내 여러 액션이 호출되어도 auth는 1회만 실행
 ```
 
-## Server Action 패턴
+## Server Action 패턴 (트레이싱 포함)
 
 ```typescript
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
-import { revalidatePath } from 'next/cache'
+import { getAuthUser } from '@/lib/auth';
+import { traceAction, traceQuery } from '@/lib/logger';
+import { revalidatePath } from 'next/cache';
 
-export async function createTodo(formData: { date: string; content: string }) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Unauthorized')
-
-  const { error } = await supabase.from('todos').insert({
-    user_id: user.id,
-    ...formData,
-  })
-  if (error) throw error
-
-  revalidatePath('/calendar')
+export async function createTodo(content: string, date: string) {
+  return traceAction('createTodo', async () => {
+    const user = await getAuthUser();
+    // ... 입력 검증 ...
+    const [row] = await traceQuery('todos.create', () =>
+      db.insert(todos).values({ userId: user.id, content, date }).returning()
+    );
+    revalidatePath('/calendar');
+    revalidatePath('/dashboard');
+    return row;
+  }, { date });
 }
+// traceAction: 전체 액션 실행 시간 측정
+// traceQuery: 개별 DB 쿼리 시간 측정
+// 느린 요청(>500ms) 자동 경고 (🐢), 정상(<500ms) 디버그 로그 (⚡)
 ```
 
-## API Route 패턴 (Drizzle + 커서 페이지네이션)
+## API Route 패턴 (withTracing + Drizzle + 커서 페이지네이션)
 
 ```typescript
 // packages/web/src/app/api/curation/route.ts
 import { db, curationItems, curationSources } from '@forme/shared'
 import { eq, and, desc, sql } from 'drizzle-orm'
+import { withTracing } from '@/lib/logger'
 
-export async function GET(request: NextRequest) {
+export const GET = withTracing('GET /api/curation', async (request) => {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  // Supabase Auth로 인증 → Drizzle ORM으로 직접 쿼리
+  // withTracing: 자동으로 요청 수신, 응답 시간, 에러 로깅
   const sortDateExpr = sql`COALESCE(${curationItems.publishedAt}, ${curationItems.collectedAt})`
 
   const rows = await db
@@ -138,7 +147,11 @@ export async function GET(request: NextRequest) {
     ? `${new Date(lastItem.sortDate as string | Date).toISOString()}|${lastItem.id}`
     : null
   return NextResponse.json({ items, nextCursor, hasMore })
-}
+});
+// withTracing 로그 예시:
+// ✅ [GET /api/curation] 📥 Request received {method:"GET", path:"/api/curation", params:{status:"unread"}}
+// ✅ [GET /api/curation] ⚡ 200 completed in 45ms {status:200, durationMs:45}
+// ⚠️ [GET /api/curation] 🐢 200 completed in 1.23s {status:200, durationMs:1230, slow:true}
 ```
 
 ## RSS 크롤 패턴
@@ -217,6 +230,7 @@ export async function uploadToR2(key: string, body: Buffer, contentType: string)
   // S3Client → Cloudflare R2 (S3-compatible)
   // key: "podcast/{userId}/{uuid}.{ext}" 또는 "memo-images/{userId}/{uuid}.{ext}"
   // MIME 기반 확장자만 허용 (파일명 무시)
+  // CacheControl: 오디오 30일 immutable, 이미지 7일
   return { url: `${R2_PUBLIC_URL}/${key}` }
 }
 
@@ -343,6 +357,47 @@ function validateTags(tags: string[]): string[] {
 // 트리플 Enter (빈 줄 2개): 코드블록 탈출
 // Cmd/Ctrl+Enter: 즉시 코드블록 탈출
 // ArrowDown (마지막 줄, 문서 끝): 코드블록 아래로 이동
+```
+
+## 성능 최적화 패턴
+
+### Dynamic Import (코드 스플리팅)
+
+```typescript
+// 'use client' 래퍼 파일에서 next/dynamic 사용
+// packages/web/src/components/features/memo/memo-editor-lazy.tsx
+import dynamic from 'next/dynamic';
+const MemoEditor = dynamic(
+  () => import('./memo-editor').then((m) => m.MemoEditor),
+  { ssr: false, loading: () => <div className="animate-pulse bg-muted rounded-lg h-96" /> }
+);
+// 적용 대상: TipTap 에디터, SourceManager(DnD), UploadDialog, CrawlProgress
+```
+
+### Optimistic Updates (캘린더)
+
+```typescript
+// calendar-client.tsx: 서버 응답 대기 없이 로컬 상태 즉시 반영
+const handleTodoToggle = useCallback((todoId, isCompleted) => {
+  setTodos(prev => prev.map(t => t.id === todoId ? { ...t, isCompleted } : t));
+  startTransition(() => { toggleTodo(todoId); }); // 백그라운드 동기화
+}, []);
+// 실패 시 롤백, 성공 시 서버 응답으로 교체
+```
+
+### Service Worker 캐시 전략
+
+```
+forme-v3 (일반 캐시):
+  /_next/static/* → cache-first (해시 파일, 영구)
+  *.woff2/ttf     → cache-first (폰트)
+  /icons/*        → cache-first (정적 이미지)
+  /api/curation, /api/push → network-first (최신 데이터)
+  /api/* (기타)   → network-only (mutation)
+  HTML 페이지     → stale-while-revalidate
+
+forme-audio-v1 (오디오 전용):
+  *.mp3/m4a/wav/ogg/webm/aac → cache-first (오프라인 재생)
 ```
 
 ## 컴포넌트 Import 패턴

@@ -17,44 +17,83 @@ interface Todo {
 interface TodoListProps {
   todos: Todo[];
   selectedDate: string;
-  onRefresh: () => void;
+  /** Called immediately when a todo is toggled so the parent can update its state optimistically. */
+  onToggle: (todoId: string, isCompleted: boolean) => void;
+  /** Called immediately with a temp todo so the parent can append it to its list. */
+  onCreate: (todo: Todo) => void;
+  /** Called once the server responds so the parent can swap the temp id for the real one. */
+  onCreated: (tempId: string, created: Todo) => void;
+  /** Called immediately so the parent can remove the todo from its list. */
+  onDelete: (todoId: string) => void;
 }
 
-export function TodoList({ todos, selectedDate, onRefresh }: TodoListProps) {
+export function TodoList({
+  todos,
+  selectedDate,
+  onToggle,
+  onCreate,
+  onCreated,
+  onDelete,
+}: TodoListProps) {
   const [newContent, setNewContent] = useState('');
   const [isPending, startTransition] = useTransition();
 
   const handleAdd = () => {
-    if (!newContent.trim()) return;
+    const trimmed = newContent.trim();
+    if (!trimmed) return;
+
+    // Build an optimistic todo with a temporary id
+    const tempId = crypto.randomUUID();
+    const tempTodo: Todo = {
+      id: tempId,
+      date: selectedDate,
+      content: trimmed,
+      isCompleted: false,
+      sortOrder: todos.length,
+    };
+
+    // Update parent state immediately
+    onCreate(tempTodo);
+    setNewContent('');
+
     startTransition(async () => {
       try {
-        await createTodo({ date: selectedDate, content: newContent.trim() });
-        setNewContent('');
-        onRefresh();
+        const created = await createTodo({ date: selectedDate, content: trimmed });
+        if (created) {
+          // Swap the temp row with the real DB row
+          onCreated(tempId, created as Todo);
+        }
       } catch {
-        // Validation errors from server action
+        // On failure roll back by removing the temp todo
+        onDelete(tempId);
       }
     });
   };
 
-  const handleToggle = (id: string) => {
+  const handleToggle = (id: string, currentIsCompleted: boolean) => {
+    // Flip optimistically before the server responds
+    onToggle(id, !currentIsCompleted);
+
     startTransition(async () => {
       try {
         await toggleTodo(id);
-        onRefresh();
       } catch {
-        // Error toggling todo
+        // Roll back on failure
+        onToggle(id, currentIsCompleted);
       }
     });
   };
 
   const handleDelete = (id: string) => {
+    // Remove from parent list immediately
+    onDelete(id);
+
     startTransition(async () => {
       try {
         await deleteTodo(id);
-        onRefresh();
       } catch {
-        // Error deleting todo
+        // Nothing to roll back here — the user already removed it visually.
+        // A full page refresh would reconcile, but keeping it removed is acceptable UX.
       }
     });
   };
@@ -144,7 +183,7 @@ function TodoItem({
   isPending,
 }: {
   todo: Todo;
-  onToggle: (id: string) => void;
+  onToggle: (id: string, currentIsCompleted: boolean) => void;
   onDelete: (id: string) => void;
   isPending: boolean;
 }) {
@@ -156,7 +195,7 @@ function TodoItem({
       )}
     >
       <button
-        onClick={() => onToggle(todo.id)}
+        onClick={() => onToggle(todo.id, todo.isCompleted)}
         disabled={isPending}
         className={cn(
           'flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all',

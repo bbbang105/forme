@@ -1,6 +1,6 @@
 # forme - 아키텍처 & 기술 선정 이유
 
-> 최종 업데이트: 2026-03-04
+> 최종 업데이트: 2026-03-04 (성능 최적화 반영)
 
 개인 올인원 PWA. 큐레이션(RSS), 캘린더, 메모(리치 에디터), 팟캐스트를 하나의 앱에 통합.
 모바일 퍼스트, 오프라인 지원, 푸시 알림까지 네이티브 앱 수준의 경험을 웹으로 제공.
@@ -20,8 +20,10 @@ graph TB
 
   subgraph Vercel["Vercel Edge"]
     NJ[Next.js 16<br/>App Router + Proxy]
-    SA[Server Actions<br/>CRUD + 검증]
-    API[API Routes<br/>업로드 / 크롤 / 크론]
+    SA[Server Actions<br/>CRUD + 검증 + traceAction]
+    API[API Routes<br/>withTracing 래퍼]
+    AUTH[lib/auth.ts<br/>React.cache 인증]
+    LOG[lib/logger.ts<br/>구조화 로깅]
   end
 
   subgraph External["External Services"]
@@ -34,6 +36,8 @@ graph TB
   RC -->|Server Actions| SA
   RC -->|fetch| API
   SA -->|Drizzle ORM| SB
+  SA --> AUTH
+  API --> LOG
   API -->|S3 SDK| R2
   API -->|feedsmith| RSS
   NJ -->|세션 갱신| SB
@@ -41,7 +45,7 @@ graph TB
   SW -->|web-push| API
 ```
 
-**핵심 원칙**: Server Components 우선, RLS로 데이터 격리, 서버 측 입력 검증 필수, 최소한의 클라이언트 상태.
+**핵심 원칙**: Server Components 우선, RLS로 데이터 격리, 서버 측 입력 검증 필수, 최소한의 클라이언트 상태, 무거운 컴포넌트 지연 로딩, 인터랙션 optimistic updates.
 
 ---
 
@@ -164,8 +168,10 @@ flowchart LR
 **패턴 요약**:
 - **읽기**: Server Component → Drizzle → RLS 적용된 결과 직접 렌더
 - **쓰기**: Server Action → 서버 측 검증 → Drizzle insert/update → revalidatePath
-- **업로드**: API Route → FormData → R2 업로드 → URL 반환
+- **업로드**: API Route → FormData → R2 업로드 (Cache-Control 포함) → URL 반환
 - **크롤링**: Cron/SSE → feedsmith 파싱 → SSRF 방어 → DB 적재
+- **인증**: `React.cache` 기반 `getAuthUser()` — 동일 요청 내 중복 인증 제거
+- **캘린더**: Optimistic updates — 로컬 상태 즉시 반영, 서버 백그라운드 동기화
 
 ---
 
@@ -276,6 +282,44 @@ erDiagram
 | 리다이렉트 | `ALLOWED_PATHS` 화이트리스트 |
 | 업로드 | MIME 검증, 크기 제한, 안전한 키 생성 |
 | 푸시 | HTTPS endpoint 강제, 소유자 확인 |
+
+---
+
+## 성능 최적화
+
+### 번들 최적화
+
+| 전략 | 대상 | 효과 |
+|------|------|------|
+| `next/dynamic` + `ssr: false` | TipTap 에디터, DnD Kit, 다이얼로그 | 초기 번들 -1.5MB+ |
+| LayoutShell 분리 | PlayerProvider → MiniPlayer만 래핑 | 서버 컴포넌트 활용 극대화 |
+| Dashboard Suspense | 위젯 3개 병렬 스트리밍 | 순차 → 병렬 로딩 |
+| DashboardCuration 서버화 | 클라이언트 → 서버 컴포넌트 전환 | 클라이언트 JS 제거 |
+
+### 캐싱 전략
+
+| 계층 | 전략 | 세부 |
+|------|------|------|
+| Service Worker | cache-first | `/_next/static/`, 폰트, 아이콘, 오디오 |
+| Service Worker | stale-while-revalidate | HTML 페이지 |
+| Service Worker | network-first | `/api/curation`, `/api/push` |
+| R2 업로드 | `Cache-Control` 헤더 | 오디오 30일 immutable, 이미지 7일 |
+| 인증 | `React.cache` | 요청당 `getUser()` 1회 |
+| Header 아바타 | `sessionStorage` | 세션당 `/api/profile` 1회 |
+
+### DB 인덱싱
+
+| 테이블 | 인덱스 | 쿼리 패턴 |
+|--------|--------|-----------|
+| `calendar_events` | `(userId, startDate, endDate)` 복합 | 월간 이벤트 조회 |
+| `todos` | `(userId, date)` 복합 | 날짜별 투두 조회 |
+| `curation_items` | `(sourceId, url)` unique | 중복 방지 |
+
+### 트레이싱
+
+- **API Routes**: `withTracing()` 래퍼 — 요청/응답 시간, 느린 요청(>1s) 자동 경고
+- **Server Actions**: `traceAction()` — 전체 액션 시간 측정
+- **DB Queries**: `traceQuery()` — 개별 쿼리 시간 측정 (>200ms 경고)
 
 ---
 

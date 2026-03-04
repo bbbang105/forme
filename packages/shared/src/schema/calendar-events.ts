@@ -11,6 +11,5 @@ export const calendarEvents = pgTable('calendar_events', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
-  datesIdx: index('idx_calendar_events_dates').on(table.startDate, table.endDate),
-  userIdx: index('idx_calendar_events_user').on(table.userId),
+  userDatesIdx: index('idx_calendar_events_user_dates').on(table.userId, table.startDate, table.endDate),
 }));

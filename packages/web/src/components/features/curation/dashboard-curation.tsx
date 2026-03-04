@@ -1,50 +1,84 @@
-'use client';
-
-import {useEffect, useState} from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import {ArrowRight, ExternalLink} from 'lucide-react';
-import {Skeleton} from '@/components/ui/skeleton';
 import {cn} from '@/lib/utils';
 import {formatRelativeDate, getArticleGradient, getCategoryStyle,} from '@/lib/curation-utils';
-import type {CurationItemData} from './curation-card';
+import {createClient} from '@/lib/supabase/server';
+import {curationItems, curationSources, db} from '@forme/shared';
+import {and, desc, eq, sql} from 'drizzle-orm';
+import {MiniCardThumbnail} from './mini-card-thumbnail';
 
-export function DashboardCuration() {
-  const [items, setItems] = useState<CurationItemData[]>([]);
-  const [loading, setLoading] = useState(true);
+/**
+ * Server-side shape mirroring the serialized API response used by
+ * MiniCard. Dates are pre-formatted strings for display.
+ */
+interface MiniCardItem {
+  id: string;
+  title: string;
+  url: string;
+  thumbnailUrl: string | null;
+  publishedAt: string | null;
+  category: string;
+  sourceName: string | null;
+}
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch('/api/curation?status=unread&limit=3');
-        if (res.ok) {
-          const data = await res.json();
-          setItems(data.items);
-        }
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
+/**
+ * DashboardCuration — async server component.
+ *
+ * Fetches the 3 most recent unread curation items directly via Drizzle ORM,
+ * bypassing the HTTP round-trip that the previous 'use client' version made
+ * to /api/curation. Rendering happens server-side: zero client JS, no
+ * loading state, no layout shift from a useEffect fetch, and the data is
+ * available the moment the Suspense boundary resolves.
+ *
+ * The only interactive sub-component is MiniCardThumbnail (image error
+ * fallback), which is a small 'use client' island. Everything else is plain
+ * server-rendered HTML.
+ */
+export async function DashboardCuration() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (loading) {
-    return (
-      <div className="space-y-3">
-        <Skeleton className="h-5 w-24" />
-        {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="flex items-center gap-3 p-3 rounded-lg border border-border/60">
-            <Skeleton className="w-16 h-12 rounded-md shrink-0" />
-            <div className="flex-1 space-y-1.5">
-              <Skeleton className="h-4 w-3/4" />
-              <Skeleton className="h-3 w-1/2" />
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  }
+  if (!user) return null;
 
-  if (items.length === 0) return null;
+  // Replicate the /api/curation?status=unread&limit=3 query used previously.
+  // COALESCE(publishedAt, collectedAt) matches the sort date expression in the
+  // full curation API route so results stay consistent.
+  const sortDateExpr = sql`COALESCE(${curationItems.publishedAt}, ${curationItems.collectedAt})`;
+
+  const rows = await db
+    .select({
+      id: curationItems.id,
+      title: curationItems.title,
+      url: curationItems.url,
+      thumbnailUrl: curationItems.thumbnailUrl,
+      publishedAt: curationItems.publishedAt,
+      category: curationItems.category,
+      sourceName: curationSources.name,
+    })
+    .from(curationItems)
+    .innerJoin(curationSources, eq(curationItems.sourceId, curationSources.id))
+    .where(
+      and(
+        eq(curationSources.userId, user.id),
+        eq(curationItems.isRead, false),
+      )
+    )
+    .orderBy(sql`${sortDateExpr} DESC`, desc(curationItems.id))
+    .limit(3);
+
+  if (rows.length === 0) return null;
+
+  const items: MiniCardItem[] = rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    url: row.url,
+    thumbnailUrl: row.thumbnailUrl ?? null,
+    publishedAt: row.publishedAt ? row.publishedAt.toISOString() : null,
+    category: row.category,
+    sourceName: row.sourceName ?? null,
+  }));
 
   return (
     <div className="space-y-3">
@@ -68,10 +102,10 @@ export function DashboardCuration() {
   );
 }
 
-function MiniCard({ item }: { item: CurationItemData }) {
+/** Server-rendered mini card — no client state except the thumbnail island. */
+function MiniCard({ item }: { item: MiniCardItem }) {
   const catStyle = getCategoryStyle(item.category);
   const relativeDate = formatRelativeDate(item.publishedAt);
-  const [imgFailed, setImgFailed] = useState(false);
   const gradient = getArticleGradient(item.title);
 
   return (
@@ -84,23 +118,12 @@ function MiniCard({ item }: { item: CurationItemData }) {
         'hover:border-primary/30 hover:shadow-sm transition-all',
       )}
     >
-      {/* Mini thumbnail */}
+      {/* Thumbnail — client island handles img error fallback */}
       <div className="w-16 h-12 rounded-md overflow-hidden bg-muted shrink-0">
-        {item.thumbnailUrl && !imgFailed ? (
-          <Image
-            src={item.thumbnailUrl}
-            alt=""
-            width={64}
-            height={48}
-            unoptimized
-            className="w-full h-full object-cover"
-            onError={() => setImgFailed(true)}
-          />
-        ) : (
-          <div className={cn('w-full h-full bg-gradient-to-br flex items-center justify-center', gradient)}>
-            <span className="text-sm select-none opacity-60">📄</span>
-          </div>
-        )}
+        <MiniCardThumbnail
+          src={item.thumbnailUrl}
+          gradient={gradient}
+        />
       </div>
 
       {/* Content */}

@@ -1,12 +1,13 @@
-import {NextRequest, NextResponse} from 'next/server';
+import {NextResponse} from 'next/server';
 import {createClient} from '@/lib/supabase/server';
 import {db, pushSubscriptions} from '@forme/shared';
 import {and, eq} from 'drizzle-orm';
+import {withTracing} from '@/lib/logger';
 
 /**
  * POST /api/push/subscribe — 푸시 구독 등록/갱신
  */
-export async function POST(request: NextRequest) {
+export const POST = withTracing('POST /api/push/subscribe', async (request) => {
   const supabase = await createClient();
   const {
     data: { user },
@@ -107,12 +108,12 @@ export async function POST(request: NextRequest) {
     console.error('[POST /api/push/subscribe]', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+});
 
 /**
  * DELETE /api/push/subscribe — 푸시 구독 비활성화
  */
-export async function DELETE(request: NextRequest) {
+export const DELETE = withTracing('DELETE /api/push/subscribe', async (request) => {
   const supabase = await createClient();
   const {
     data: { user },
@@ -150,12 +151,12 @@ export async function DELETE(request: NextRequest) {
     console.error('[DELETE /api/push/subscribe]', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+});
 
 /**
  * GET /api/push/subscribe — 현재 유저의 구독 상태 확인
  */
-export async function GET() {
+export const GET = withTracing('GET /api/push/subscribe', async () => {
   const supabase = await createClient();
   const {
     data: { user },
@@ -183,4 +184,4 @@ export async function GET() {
     console.error('[GET /api/push/subscribe]', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+});

@@ -1,7 +1,8 @@
-import {NextRequest, NextResponse} from 'next/server';
+import {NextResponse} from 'next/server';
 import {createClient} from '@/lib/supabase/server';
 import {ALLOWED_AUDIO_TYPES, MAX_AUDIO_SIZE_BYTES, uploadToR2} from '@/lib/r2';
 import {randomUUID} from 'crypto';
+import {withTracing} from '@/lib/logger';
 
 // Vercel serverless: 대용량 업로드를 위한 타임아웃 확장 (5분)
 export const maxDuration = 300;
@@ -14,7 +15,7 @@ export const maxDuration = 300;
  *
  * Returns: { audioUrl, duration?, fileSize }
  */
-export async function POST(request: NextRequest) {
+export const POST = withTracing('POST /api/podcast/upload', async (request) => {
   // Auth
   const supabase = await createClient();
   const {
@@ -76,7 +77,7 @@ export async function POST(request: NextRequest) {
     console.error('[POST /api/podcast/upload]', err);
     return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
   }
-}
+});
 
 function getExtension(mimeType: string): string {
   // MIME 기반으로만 확장자 결정 (파일명 기반은 위험)

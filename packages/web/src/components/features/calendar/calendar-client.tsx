@@ -1,6 +1,6 @@
 'use client';
 
-import {useCallback, useEffect, useState, useTransition} from 'react';
+import {useCallback, useEffect, useMemo, useState, useTransition} from 'react';
 import {addMonths, endOfMonth, format, startOfMonth, subMonths} from 'date-fns';
 import {ko} from 'date-fns/locale';
 import {CalendarDays, ChevronLeft, ChevronRight, Plus} from 'lucide-react';
@@ -107,20 +107,56 @@ export function CalendarClient() {
     setShowEventForm(true);
   };
 
-  const handleRefresh = () => {
-    startTransition(() => {
-      fetchData();
-    });
-  };
+  // ─── Optimistic todo callbacks ────────────────────────────────────────────
 
-  // Touch swipe for month navigation
+  const handleTodoToggle = useCallback((todoId: string, isCompleted: boolean) => {
+    // Update local state immediately for instant feedback
+    setTodos((prev) =>
+      prev.map((t) => (t.id === todoId ? { ...t, isCompleted } : t))
+    );
+  }, []);
+
+  const handleTodoCreate = useCallback((todo: Todo) => {
+    setTodos((prev) => [...prev, todo]);
+  }, []);
+
+  // Replace temp id produced by optimistic insert with the real DB row
+  const handleTodoCreated = useCallback((tempId: string, created: Todo) => {
+    setTodos((prev) =>
+      prev.map((t) => (t.id === tempId ? created : t))
+    );
+  }, []);
+
+  const handleTodoDelete = useCallback((todoId: string) => {
+    setTodos((prev) => prev.filter((t) => t.id !== todoId));
+  }, []);
+
+  // ─── Optimistic event callbacks ───────────────────────────────────────────
+
+  const handleEventCreate = useCallback((event: CalendarEvent) => {
+    setEvents((prev) => [...prev, event]);
+  }, []);
+
+  const handleEventUpdate = useCallback((updated: CalendarEvent) => {
+    setEvents((prev) =>
+      prev.map((e) => (e.id === updated.id ? updated : e))
+    );
+  }, []);
+
+  const handleEventDelete = useCallback((eventId: string) => {
+    setEvents((prev) => prev.filter((e) => e.id !== eventId));
+  }, []);
+
+  // ─── Touch swipe for month navigation ────────────────────────────────────
+
   const swipeHandlers = useSwipe({
     onSwipeLeft: handleNextMonth,
     onSwipeRight: handlePrevMonth,
     threshold: 60,
   });
 
-  // Keyboard navigation (Google Calendar style)
+  // ─── Keyboard navigation (Google Calendar style) ──────────────────────────
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't capture keys when dialog/input is focused
@@ -185,9 +221,16 @@ export function CalendarClient() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [currentMonth]);
 
-  // Filter todos for selected date
-  const selectedDateTodos = todos.filter((t) => t.date === selectedDateStr);
-  const completedCount = selectedDateTodos.filter((t) => t.isCompleted).length;
+  // ─── Derived state ────────────────────────────────────────────────────────
+
+  const selectedDateTodos = useMemo(
+    () => todos.filter((t) => t.date === selectedDateStr),
+    [todos, selectedDateStr]
+  );
+  const completedCount = useMemo(
+    () => selectedDateTodos.filter((t) => t.isCompleted).length,
+    [selectedDateTodos]
+  );
   const totalCount = selectedDateTodos.length;
 
   return (
@@ -284,7 +327,10 @@ export function CalendarClient() {
           <TodoList
             todos={selectedDateTodos}
             selectedDate={selectedDateStr}
-            onRefresh={handleRefresh}
+            onToggle={handleTodoToggle}
+            onCreate={handleTodoCreate}
+            onCreated={handleTodoCreated}
+            onDelete={handleTodoDelete}
           />
         </Card>
       </div>
@@ -298,7 +344,9 @@ export function CalendarClient() {
         }}
         event={editingEvent}
         defaultDate={selectedDateStr}
-        onSuccess={handleRefresh}
+        onEventCreate={handleEventCreate}
+        onEventUpdate={handleEventUpdate}
+        onEventDelete={handleEventDelete}
       />
     </div>
   );

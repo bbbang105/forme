@@ -4,10 +4,19 @@ import {useCallback, useEffect, useRef, useState} from 'react';
 import {AlertCircle, Headphones, Loader2, RefreshCw} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {Skeleton} from '@/components/ui/skeleton';
+import dynamic from 'next/dynamic';
 import {EpisodeCard} from './episode-card';
-import {EditEpisodeDialog} from './edit-episode-dialog';
-import {DeleteEpisodeDialog} from './delete-episode-dialog';
 import type {Episode} from './player-context';
+
+const EditEpisodeDialog = dynamic(
+  () => import('./edit-episode-dialog').then((m) => m.EditEpisodeDialog),
+  { ssr: false }
+);
+
+const DeleteEpisodeDialog = dynamic(
+  () => import('./delete-episode-dialog').then((m) => m.DeleteEpisodeDialog),
+  { ssr: false }
+);
 
 const PAGE_SIZE = 20;
 

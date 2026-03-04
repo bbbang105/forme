@@ -1,8 +1,9 @@
-import {NextRequest, NextResponse} from 'next/server';
+import {NextResponse} from 'next/server';
 import {createClient} from '@/lib/supabase/server';
 import {curationItems, curationSources, db, profiles} from '@forme/shared';
 import {and, desc, eq, inArray, sql, type SQL} from 'drizzle-orm';
 import {escapeIlike} from '@/lib/curation-utils';
+import {withTracing} from '@/lib/logger';
 
 // ── Helpers ──
 
@@ -76,7 +77,7 @@ function serializeItem(item: RawItem) {
  *
  * Response: { items, nextCursor, hasMore }
  */
-export async function GET(request: NextRequest) {
+export const GET = withTracing('GET /api/curation', async (request) => {
   // ── Auth ──
   const supabase = await createClient();
   const {
@@ -387,4 +388,4 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+});

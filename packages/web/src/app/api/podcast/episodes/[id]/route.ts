@@ -1,8 +1,9 @@
-import {NextRequest, NextResponse} from 'next/server';
+import {NextResponse} from 'next/server';
 import {createClient} from '@/lib/supabase/server';
 import {db, podcastEpisodes} from '@forme/shared';
 import {and, eq} from 'drizzle-orm';
 import {deleteFromR2, extractR2Key} from '@/lib/r2';
+import {withTracing} from '@/lib/logger';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -10,11 +11,8 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
  * PATCH /api/podcast/episodes/[id]
  * Update title and/or description.
  */
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params;
+export const PATCH = withTracing('PATCH /api/podcast/episodes/[id]', async (request, ctx) => {
+  const { id } = await (ctx as { params: Promise<{ id: string }> }).params;
   if (!UUID_RE.test(id)) {
     return NextResponse.json({ error: 'Invalid episode id' }, { status: 400 });
   }
@@ -71,17 +69,14 @@ export async function PATCH(
     console.error('[PATCH /api/podcast/episodes/:id]', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+});
 
 /**
  * DELETE /api/podcast/episodes/[id]
  * Deletes the episode record and its R2 audio file.
  */
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params;
+export const DELETE = withTracing('DELETE /api/podcast/episodes/[id]', async (request, ctx) => {
+  const { id } = await (ctx as { params: Promise<{ id: string }> }).params;
   if (!UUID_RE.test(id)) {
     return NextResponse.json({ error: 'Invalid episode id' }, { status: 400 });
   }
@@ -123,4 +118,4 @@ export async function DELETE(
     console.error('[DELETE /api/podcast/episodes/:id]', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+});

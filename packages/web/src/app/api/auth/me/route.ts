@@ -1,7 +1,8 @@
-import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import {NextResponse} from 'next/server';
+import {createClient} from '@/lib/supabase/server';
+import {withTracing} from '@/lib/logger';
 
-export async function GET() {
+export const GET = withTracing('GET /api/auth/me', async () => {
   const supabase = await createClient();
 
   const {
@@ -31,4 +32,4 @@ export async function GET() {
       },
     }
   );
-}
+});

@@ -1,15 +1,14 @@
-import {NextRequest, NextResponse} from 'next/server';
+import {NextResponse} from 'next/server';
 import {createClient} from '@/lib/supabase/server';
 import {curationSources, db} from '@forme/shared';
 import {and, eq} from 'drizzle-orm';
+import {withTracing} from '@/lib/logger';
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export const PATCH = withTracing('PATCH /api/curation/sources/[id]', async (request, ctx) => {
+  const { id } = await (ctx as { params: Promise<{ id: string }> }).params;
   // Auth first
   const supabase = await createClient();
   const {
@@ -20,8 +19,6 @@ export async function PATCH(
   if (error || !user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-
-  const { id } = await params;
   if (!UUID_REGEX.test(id)) {
     return NextResponse.json({ error: 'Invalid source id' }, { status: 400 });
   }
@@ -148,12 +145,10 @@ export async function PATCH(
       { status: 500 }
     );
   }
-}
+});
 
-export async function DELETE(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export const DELETE = withTracing('DELETE /api/curation/sources/[id]', async (_request, ctx) => {
+  const { id } = await (ctx as { params: Promise<{ id: string }> }).params;
   // Auth first
   const supabase = await createClient();
   const {
@@ -164,8 +159,6 @@ export async function DELETE(
   if (error || !user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-
-  const { id } = await params;
   if (!UUID_REGEX.test(id)) {
     return NextResponse.json({ error: 'Invalid source id' }, { status: 400 });
   }
@@ -196,4 +189,4 @@ export async function DELETE(
       { status: 500 }
     );
   }
-}
+});

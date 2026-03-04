@@ -8,7 +8,17 @@ import {Skeleton} from '@/components/ui/skeleton';
 import {CurationCard, type CurationItemData, CurationListRow} from './curation-card';
 import {CurationFilters, type StatusFilter} from './curation-filters';
 import {CurationSearch} from './curation-search';
-import {SourceManager} from './source-manager';
+import dynamic from 'next/dynamic';
+
+const SourceManager = dynamic(
+  () => import('./source-manager').then((m) => m.SourceManager),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="animate-pulse bg-muted rounded-md h-9 w-24" />
+    ),
+  }
+);
 
 const PAGE_SIZE = 12;
 

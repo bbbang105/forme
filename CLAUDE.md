@@ -38,12 +38,17 @@ pnpm db:push          # 스키마 직접 push (dev용)
 ## 코딩 컨벤션
 
 - Server Actions → `packages/web/src/lib/actions/`, Server Components 우선
+- 인증: `getAuthUser()` from `lib/auth.ts` (React.cache로 요청당 1회 인증)
 - 인증 필요 페이지 → `(main)` route group, 비인증 → `(auth)` route group
 - DB 접근 시 RLS 의존 (`auth.uid() = user_id`), 추가 권한 체크 불필요
 - 스타일: Tailwind 유틸리티 클래스, 하드코딩 색상 금지 (CSS 변수 사용)
 - 컴포넌트: shadcn/ui 기반, `components/ui/`에 위치
 - Server Actions 입력 검증: 날짜(YYYY-MM-DD), 색상(#hex), 길이 제한 등 서버측 검증 필수
 - KST 시간대: `Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' })` 사용
+- API 트레이싱: `withTracing()` 래퍼로 모든 API 라우트 자동 타이밍 측정
+- Server Action 트레이싱: `traceAction()` + `traceQuery()` 래퍼로 DB 쿼리 성능 측정
+- 무거운 컴포넌트: `next/dynamic` + `ssr: false`로 지연 로딩 (TipTap, DnD Kit 등)
+- 캘린더 인터랙션: Optimistic updates 패턴 (로컬 상태 즉시 반영, 서버 백그라운드 동기화)
 - 테스트: Vitest + `vi.hoisted()` Proxy 기반 DB 목 패턴 (`packages/web/src/__tests__/`)
 
 ## 핵심 파일
@@ -51,7 +56,7 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | 파일 | 설명 |
 |------|------|
 | `packages/web/src/proxy.ts` | Next.js 16 proxy (인증 리다이렉트) |
-| `packages/web/src/app/(main)/layout.tsx` | 인증 레이아웃 + 하단 탭바 |
+| `packages/web/src/app/(main)/layout.tsx` | 인증 레이아웃 (LayoutShell + 탭바) |
 | `packages/web/src/app/(auth)/login/page.tsx` | Discord 로그인 |
 | `packages/web/src/app/auth/callback/route.ts` | OAuth 콜백 (open redirect 방어) |
 | `packages/web/src/lib/supabase/middleware.ts` | 세션 갱신 유틸 |
@@ -65,7 +70,10 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/shared/src/db.ts` | DB 싱글톤 (SSL 강제) |
 | `packages/web/src/lib/crawl-feed.ts` | RSS 크롤 (feedsmith, since 필터, SSRF 방어) |
 | `packages/web/src/lib/url-safety.ts` | SSRF 방어 유틸 |
-| `packages/web/src/lib/r2.ts` | Cloudflare R2 업로드/삭제 유틸 |
+| `packages/web/src/lib/auth.ts` | 인증 유틸 (React.cache 기반 getAuthUser) |
+| `packages/web/src/lib/logger.ts` | 구조화 로거 (withTracing, traceAction, traceQuery) |
+| `packages/web/src/lib/r2.ts` | Cloudflare R2 업로드/삭제 유틸 (Cache-Control 포함) |
+| `packages/web/src/components/layout/layout-shell.tsx` | 클라이언트 레이아웃 셸 (PlayerProvider + MiniPlayer) |
 | `packages/web/src/lib/push.ts` | 푸시 알림 발송 (sendPushToUser) |
 | `packages/web/src/lib/greetings.ts` | 대시보드 인사 문구 (100개 랜덤) |
 | `packages/web/src/app/api/curation/crawl/route.ts` | SSE 수동 크롤 API |
@@ -74,15 +82,17 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/app/api/podcast/upload/route.ts` | 팟캐스트 오디오 R2 업로드 |
 | `packages/web/src/app/api/podcast/episodes/route.ts` | 팟캐스트 에피소드 CRUD |
 | `packages/web/src/app/api/push/subscribe/route.ts` | 푸시 구독 등록/해제/조회 |
-| `packages/web/src/components/features/podcast/player-context.tsx` | 팟캐스트 플레이어 (localStorage 이어듣기) |
-| `packages/web/public/sw.js` | Service Worker (PWA + 푸시 + network-first 캐시) |
+| `packages/web/src/components/features/podcast/player-context.tsx` | 팟캐스트 플레이어 (preload auto, canplay 대기, localStorage 이어듣기) |
+| `packages/web/src/components/features/memo/memo-editor-lazy.tsx` | MemoEditor 지연 로딩 래퍼 (next/dynamic, ssr: false) |
+| `packages/web/src/components/features/curation/mini-card-thumbnail.tsx` | 대시보드 큐레이션 썸네일 (클라이언트 onError 폴백) |
+| `packages/web/public/sw.js` | Service Worker (PWA + 푸시 + 전략별 캐싱 + 오디오 오프라인) |
 | `packages/web/src/app/manifest.ts` | PWA 매니페스트 (MetadataRoute) |
 | `packages/web/src/lib/actions/calendar.ts` | 캘린더 이벤트 Server Actions (CRUD + 입력 검증) |
 | `packages/web/src/lib/actions/todos.ts` | 투두 Server Actions (CRUD + 토글 + 입력 검증) |
-| `packages/web/src/components/features/calendar/calendar-client.tsx` | 캘린더 메인 클라이언트 (월간뷰, 스와이프, 키보드 내비) |
-| `packages/web/src/components/features/calendar/calendar-grid.tsx` | 캘린더 그리드 (날짜 셀, 이벤트/투두 도트) |
-| `packages/web/src/components/features/calendar/todo-list.tsx` | 투두 리스트 (추가/토글/삭제, IME 처리) |
-| `packages/web/src/components/features/calendar/event-form.tsx` | 이벤트 폼 (생성/수정/삭제 확인 다이얼로그) |
+| `packages/web/src/components/features/calendar/calendar-client.tsx` | 캘린더 메인 클라이언트 (월간뷰, 스와이프, optimistic updates) |
+| `packages/web/src/components/features/calendar/calendar-grid.tsx` | 캘린더 그리드 (DayCell React.memo, 이벤트/투두 도트) |
+| `packages/web/src/components/features/calendar/todo-list.tsx` | 투두 리스트 (optimistic 추가/토글/삭제, IME 처리) |
+| `packages/web/src/components/features/calendar/event-form.tsx` | 이벤트 폼 (생성/수정/삭제, optimistic 콜백) |
 | `packages/web/src/components/features/calendar/event-list.tsx` | 이벤트 목록 (선택 날짜별 필터링) |
 | `packages/web/src/components/features/calendar/dashboard-calendar.tsx` | 대시보드 캘린더 위젯 (오늘 할일 + 다가오는 일정) |
 | `packages/web/src/hooks/use-swipe.ts` | 터치 스와이프 훅 (모바일 월 이동) |

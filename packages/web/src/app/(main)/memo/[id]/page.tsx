@@ -1,6 +1,6 @@
 import {notFound} from 'next/navigation';
 import {getMemo} from '@/lib/actions/memos';
-import {MemoEditor} from '@/components/features/memo/memo-editor';
+import {MemoEditorLazy} from '@/components/features/memo/memo-editor-lazy';
 
 export default async function MemoEditPage({
   params,
@@ -12,5 +12,5 @@ export default async function MemoEditPage({
 
   if (!memo) notFound();
 
-  return <MemoEditor memo={memo} />;
+  return <MemoEditorLazy memo={memo} />;
 }
