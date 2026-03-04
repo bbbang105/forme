@@ -88,15 +88,60 @@ export function MemoEditor({ memo }: MemoEditorProps) {
         addKeyboardShortcuts() {
           return {
             ...this.parent?.(),
+            // Cmd/Ctrl+A: select only within code block
             'Mod-a': ({editor}) => {
               const {$from} = editor.state.selection;
-              // If cursor is inside a codeBlock, select only that block
               const codeBlock = $from.node($from.depth);
               if (codeBlock?.type.name === 'codeBlock') {
                 const start = $from.start($from.depth);
                 const end = start + codeBlock.content.size;
                 editor.commands.setTextSelection({from: start, to: end});
                 return true;
+              }
+              return false;
+            },
+            // Enter on empty last line or Mod+Enter → exit code block
+            Enter: ({editor}) => {
+              const {$from} = editor.state.selection;
+              if ($from.parent.type.name !== 'codeBlock') return false;
+              const text = $from.parent.textContent;
+              const lines = text.split('\n');
+              const isAtEnd = $from.parentOffset === text.length;
+              // Triple Enter: last 2 lines empty + currently at end
+              if (isAtEnd && lines.length >= 3 && lines[lines.length - 1] === '' && lines[lines.length - 2] === '') {
+                // Remove the trailing empty lines and exit
+                const start = $from.start($from.depth);
+                const trimmed = lines.slice(0, -2).join('\n');
+                editor.chain()
+                  .command(({tr}) => {
+                    tr.replaceWith(start, start + text.length, editor.state.schema.text(trimmed || ' '));
+                    return true;
+                  })
+                  .exitCode()
+                  .run();
+                return true;
+              }
+              return false;
+            },
+            'Mod-Enter': ({editor}) => {
+              const {$from} = editor.state.selection;
+              if ($from.parent.type.name !== 'codeBlock') return false;
+              return editor.commands.exitCode();
+            },
+            // ArrowDown at last line → exit
+            ArrowDown: ({editor}) => {
+              const {$from, empty} = editor.state.selection;
+              if (!empty || $from.parent.type.name !== 'codeBlock') return false;
+              const text = $from.parent.textContent;
+              const isAtEnd = $from.parentOffset === text.length;
+              const lastNewline = text.lastIndexOf('\n');
+              const isOnLastLine = $from.parentOffset > lastNewline;
+              if (isAtEnd || isOnLastLine) {
+                // Check if this is the last node in the doc
+                const after = $from.after($from.depth);
+                if (after >= editor.state.doc.content.size) {
+                  return editor.commands.exitCode();
+                }
               }
               return false;
             },
