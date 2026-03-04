@@ -1,5 +1,6 @@
 'use client';
 
+import '@tiptap/extension-image'; // type augmentation for setImage command
 import type {Editor} from '@tiptap/react';
 import {
     Bold,
@@ -104,7 +105,7 @@ export function MemoToolbar({ editor }: MemoToolbarProps) {
 
   if (showLinkInput) {
     return (
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-background">
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-background shrink-0">
         <input
           type="url"
           value={linkUrl}
@@ -134,7 +135,7 @@ export function MemoToolbar({ editor }: MemoToolbarProps) {
   }
 
   return (
-    <div className="flex items-center gap-0.5 px-2 py-1.5 border-b border-border bg-background overflow-x-auto scrollbar-hide">
+    <div className="flex items-center gap-0.5 px-2 py-1.5 border-b border-border bg-background overflow-x-auto scrollbar-hide shrink-0">
       <input
         ref={fileInputRef}
         type="file"

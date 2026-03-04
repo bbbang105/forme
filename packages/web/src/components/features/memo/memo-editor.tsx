@@ -8,11 +8,13 @@ import UnderlineExt from '@tiptap/extension-underline';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import LinkExt from '@tiptap/extension-link';
-import ImageExt from '@tiptap/extension-image';
+import ImageResize from 'tiptap-extension-resize-image';
 import Placeholder from '@tiptap/extension-placeholder';
 import CharacterCount from '@tiptap/extension-character-count';
 import {TaskListSort} from './task-list-sort';
 import {CollapsibleHeading} from './collapsible-heading';
+import {Extension} from '@tiptap/core';
+import {createImageDropPlugin} from './image-drop-plugin';
 import {ArrowLeft, Check, Pin, Plus, RotateCcw, Trash2, X} from 'lucide-react';
 import {deleteMemo, toggleMemoPin, updateMemo} from '@/lib/actions/memos';
 import {MemoToolbar} from './memo-toolbar';
@@ -106,15 +108,18 @@ export function MemoEditor({ memo }: MemoEditorProps) {
           target: '_blank',
         },
       }),
-      ImageExt.configure({
-        allowBase64: false,
-        HTMLAttributes: {
-          class: 'max-w-full rounded-lg',
-        },
+      ImageResize.configure({
+        inline: false,
       }),
       CollapsibleHeading.configure({ levels: [1, 2, 3] }),
       Placeholder.configure({ placeholder: '내용을 입력하세요...' }),
       CharacterCount,
+      Extension.create({
+        name: 'imageDropUpload',
+        addProseMirrorPlugins() {
+          return [createImageDropPlugin()];
+        },
+      }),
     ],
     // Deep clone to strip ProseMirror null-prototype objects & RSC references
     content: (memo.content && typeof memo.content === 'object' && Object.keys(memo.content as Record<string, unknown>).length > 0)
@@ -285,9 +290,9 @@ export function MemoEditor({ memo }: MemoEditorProps) {
   }, []);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-env(safe-area-inset-top)-env(safe-area-inset-bottom))]">
+    <div className="fixed inset-0 z-50 bg-background flex flex-col pt-[env(safe-area-inset-top)]">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-10">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-background shrink-0">
         <button
           onClick={handleBack}
           className="flex items-center gap-1 text-sm text-primary -ml-1 p-1"
@@ -345,7 +350,7 @@ export function MemoEditor({ memo }: MemoEditorProps) {
       <MemoToolbar editor={editor} />
 
       {/* Editor area */}
-      <div className="flex-1 overflow-y-auto px-4 py-4">
+      <div className="flex-1 overflow-y-auto px-4 py-4 pb-[env(safe-area-inset-bottom)]">
         <input
           type="text"
           value={title}
