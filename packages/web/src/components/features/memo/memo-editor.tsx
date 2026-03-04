@@ -10,9 +10,11 @@ import TaskItem from '@tiptap/extension-task-item';
 import LinkExt from '@tiptap/extension-link';
 import {ImageBlock} from './image-block';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
+import {ReactNodeViewRenderer} from '@tiptap/react';
 import {common, createLowlight} from 'lowlight';
 import Placeholder from '@tiptap/extension-placeholder';
 import CharacterCount from '@tiptap/extension-character-count';
+import {CodeBlockView} from './code-block-view';
 
 const lowlight = createLowlight(common);
 import {TaskListSort} from './task-list-sort';
@@ -79,9 +81,30 @@ export function MemoEditor({ memo }: MemoEditorProps) {
         underline: false,  // configured separately below
         codeBlock: false,  // replaced by CodeBlockLowlight
       }),
-      CodeBlockLowlight.configure({
+      CodeBlockLowlight.extend({
+        addNodeView() {
+          return ReactNodeViewRenderer(CodeBlockView);
+        },
+        addKeyboardShortcuts() {
+          return {
+            ...this.parent?.(),
+            'Mod-a': ({editor}) => {
+              const {$from} = editor.state.selection;
+              // If cursor is inside a codeBlock, select only that block
+              const codeBlock = $from.node($from.depth);
+              if (codeBlock?.type.name === 'codeBlock') {
+                const start = $from.start($from.depth);
+                const end = start + codeBlock.content.size;
+                editor.commands.setTextSelection({from: start, to: end});
+                return true;
+              }
+              return false;
+            },
+          };
+        },
+      }).configure({
         lowlight,
-        defaultLanguage: 'plaintext',
+        defaultLanguage: null,
       }),
       UnderlineExt,
       TaskList,
