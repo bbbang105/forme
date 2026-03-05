@@ -1,9 +1,19 @@
 'use client';
 
-import {useMemo} from 'react';
+import {useMemo, useState} from 'react';
 import {format} from 'date-fns';
 import {CheckCircle2, Circle, MapPin, Pencil, Trash2} from 'lucide-react';
 import {cn} from '@/lib/utils';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import type {CalendarEvent, EventCategory} from './types';
 
 interface EventListProps {
@@ -16,6 +26,7 @@ interface EventListProps {
 }
 
 export function EventList({ events, selectedDate, categories, onEdit, onDelete, onToggle }: EventListProps) {
+  const [deleteTarget, setDeleteTarget] = useState<CalendarEvent | null>(null);
   const dateStr = format(selectedDate, 'yyyy-MM-dd');
 
   const dayEvents = useMemo(() =>
@@ -115,7 +126,7 @@ export function EventList({ events, selectedDate, categories, onEdit, onDelete, 
                 <Pencil className="h-3.5 w-3.5" />
               </button>
               <button
-                onClick={() => onDelete(event.id)}
+                onClick={() => setDeleteTarget(event)}
                 className="p-1.5 rounded hover:bg-destructive/10 text-destructive/50 hover:text-destructive transition-colors"
               >
                 <Trash2 className="h-3.5 w-3.5" />
@@ -124,6 +135,29 @@ export function EventList({ events, selectedDate, categories, onEdit, onDelete, 
           </div>
         );
       })}
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>일정을 삭제하시겠습니까?</AlertDialogTitle>
+            <AlertDialogDescription>
+              &ldquo;{deleteTarget?.title}&rdquo; 일정이 삭제됩니다. 이 작업은 되돌릴 수 없습니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteTarget) onDelete(deleteTarget.id);
+                setDeleteTarget(null);
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              삭제
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

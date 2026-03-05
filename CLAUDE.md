@@ -48,7 +48,7 @@ pnpm db:push          # 스키마 직접 push (dev용)
 - API 트레이싱: `withTracing()` 래퍼로 모든 API 라우트 자동 타이밍 측정
 - Server Action 트레이싱: `traceAction()` + `traceQuery()` 래퍼로 DB 쿼리 성능 측정
 - 무거운 컴포넌트: `next/dynamic` + `ssr: false`로 지연 로딩 (TipTap, DnD Kit, EventForm, CategoryManager 등)
-- 캘린더 인터랙션: Optimistic updates 패턴 (로컬 상태 즉시 반영, 서버 백그라운드 동기화), 데스크톱 2컬럼 (`lg:flex-row`), 모바일 단일 컬럼
+- 캘린더 인터랙션: Optimistic updates 패턴, 데스크톱 2컬럼 (`lg:flex-row`), lane 기반 이벤트 배치 (hazel-admin 스타일, greedy lane 할당 + 멀티데이 바 연결), 삭제 시 AlertDialog 확인 모달
 - 게이미피케이션: 출석 스트릭, 데일리 미션 (큐레이션 5개/팟캐스트 10분/투두 완료), 하이브리드 데이터 (전용 테이블 + 기존 데이터 계산)
 - 외부 API: Open-Meteo (서울 날씨, 서버 컴포넌트 fetch, revalidate 3600)
 - 팟캐스트 플레이어: `usePlayer()` (상태/컨트롤) + `usePlayerTime()` (currentTime/duration) 컨텍스트 분리
@@ -95,7 +95,7 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/lib/actions/calendar.ts` | 캘린더 이벤트 Server Actions (CRUD + 입력 검증) |
 | `packages/web/src/lib/actions/todos.ts` | 투두 Server Actions (CRUD + 토글 + 입력 검증) |
 | `packages/web/src/components/features/calendar/calendar-client.tsx` | 캘린더 메인 클라이언트 (월간뷰, 스와이프, optimistic updates, 데스크톱 2컬럼 레이아웃) |
-| `packages/web/src/components/features/calendar/calendar-grid.tsx` | 캘린더 그리드 (DayCell React.memo, 이벤트/투두 도트) |
+| `packages/web/src/components/features/calendar/calendar-grid.tsx` | 캘린더 그리드 (lane 기반 이벤트 배치, 세로 격자, 멀티데이 바 연결) |
 | `packages/web/src/components/features/calendar/todo-list.tsx` | 투두 리스트 (optimistic 추가/토글/삭제, IME 처리) |
 | `packages/web/src/components/features/calendar/event-form.tsx` | 이벤트 폼 (생성/수정/삭제, optimistic 콜백) |
 | `packages/web/src/components/features/calendar/event-list.tsx` | 이벤트 목록 (선택 날짜별 필터링) |

@@ -16,25 +16,8 @@ import {cn} from '@/lib/utils';
 import type {CalendarEvent, EventCategory, Todo} from './types';
 
 // ---------------------------------------------------------------------------
-// Internal types
+// Types
 // ---------------------------------------------------------------------------
-
-interface SpanSlot {
-  event: CalendarEvent;
-  /** 0-based column within the week (0 = Sunday) */
-  startCol: number;
-  /** 0-based column within the week (0 = Sunday) */
-  endCol: number;
-  /** Event actually starts in this week (not carried over from previous week) */
-  isStart: boolean;
-  /** Event actually ends in this week (not carried over to next week) */
-  isEnd: boolean;
-}
-
-interface WeekSpanRow {
-  slots: SpanSlot[][];   // slots[row] = array of non-overlapping events in that row
-  overflow: number;
-}
 
 interface CalendarGridProps {
   currentMonth: Date;
@@ -50,10 +33,7 @@ interface CalendarGridProps {
 // ---------------------------------------------------------------------------
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'] as const;
-const MAX_SPAN_ROWS = 2;
-const MAX_SINGLE_EVENTS = 2;
-/** Height in px reserved per spanning bar row above the day cells */
-const SPAN_ROW_HEIGHT = 22; // px — bar 18px + 2px gap top + 2px gap bottom
+const MAX_VISIBLE_EVENTS = 4;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -63,303 +43,256 @@ function dateToKey(date: Date): string {
   return format(date, 'yyyy-MM-dd');
 }
 
-/**
- * Parse a YYYY-MM-DD string as a local midnight Date (avoids UTC shift).
- */
 function parseLocalDate(dateStr: string): Date {
   const [y, m, d] = dateStr.split('-').map(Number);
   return new Date(y, m - 1, d);
 }
 
-/** Number of calendar days an event spans (1 = same day, 2 = two days, …) */
-function eventDaySpan(startDate: string, endDate: string): number {
-  const s = parseLocalDate(startDate);
-  const e = parseLocalDate(endDate);
-  return Math.round((e.getTime() - s.getTime()) / 86_400_000) + 1;
-}
-
-/** Threshold: events spanning 2+ days use spanning bars; single-day events go in cells */
-const MIN_SPAN_DAYS = 2;
+// ---------------------------------------------------------------------------
+// Lane computation (hazel-admin style)
+// ---------------------------------------------------------------------------
 
 /**
- * For a given week (array of 7 days), compute SpanSlot assignments for
- * multi-day events. Uses a greedy row-allocation algorithm capped at MAX_SPAN_ROWS.
+ * Assign a lane number to each event so that overlapping events
+ * occupy different lanes. Lane 0 is the topmost row.
+ *
+ * Also returns eventsByDate: each date maps to the events that cover it.
  */
-function computeWeekSpans(
-  weekDays: Date[],
-  multiDayEvents: CalendarEvent[],
-): WeekSpanRow {
-  const weekStart = weekDays[0];
-  const weekEnd = weekDays[6];
-
-  const candidates: SpanSlot[] = [];
-
-  for (const event of multiDayEvents) {
-    const evStart = parseLocalDate(event.startDate);
-    const evEnd = parseLocalDate(event.endDate);
-
-    // Does this event overlap with the current week at all?
-    if (evEnd < weekStart || evStart > weekEnd) continue;
-
-    const isStart = evStart >= weekStart;
-    const isEnd = evEnd <= weekEnd;
-
-    const startCol = isStart ? evStart.getDay() : 0;
-    const endCol = isEnd ? evEnd.getDay() : 6;
-
-    candidates.push({ event, startCol, endCol, isStart, isEnd });
-  }
-
-  // Sort: events that start earlier in the week first; longer events first
-  candidates.sort((a, b) => {
-    if (a.startCol !== b.startCol) return a.startCol - b.startCol;
-    return (b.endCol - b.startCol) - (a.endCol - a.startCol);
+function computeEventLanes(events: CalendarEvent[]) {
+  // 1. Sort: start date ascending → longer duration first → id for stability
+  const sorted = [...events].sort((a, b) => {
+    const startCmp = a.startDate.localeCompare(b.startDate);
+    if (startCmp !== 0) return startCmp;
+    const endCmp = b.endDate.localeCompare(a.endDate);
+    if (endCmp !== 0) return endCmp;
+    return a.id.localeCompare(b.id);
   });
 
-  // Greedy row allocation — multiple events per row if they don't overlap
-  const rows: SpanSlot[][] = [[], []];
-  const occupiedUntil: number[] = [-1, -1];
-  let overflow = 0;
+  // 2. Greedy lane assignment
+  const laneMap = new Map<string, number>();
+  const occupied: { start: string; end: string; lane: number }[] = [];
 
-  for (const slot of candidates) {
-    let placed = false;
-    for (let row = 0; row < MAX_SPAN_ROWS; row++) {
-      if (occupiedUntil[row] < slot.startCol) {
-        rows[row].push(slot);
-        occupiedUntil[row] = slot.endCol;
-        placed = true;
-        break;
-      }
+  for (const event of sorted) {
+    let lane = 0;
+    while (
+      occupied.some(
+        (o) => o.lane === lane && o.start <= event.endDate && o.end >= event.startDate,
+      )
+    ) {
+      lane++;
     }
-    if (!placed) overflow++;
+    laneMap.set(event.id, lane);
+    occupied.push({ start: event.startDate, end: event.endDate, lane });
   }
 
-  return { slots: rows, overflow };
+  // 3. Spread multi-day events into each date they cover
+  const map = new Map<string, CalendarEvent[]>();
+  for (const event of events) {
+    const current = parseLocalDate(event.startDate);
+    const end = parseLocalDate(event.endDate);
+    while (current <= end) {
+      const key = dateToKey(current);
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(event);
+      current.setDate(current.getDate() + 1);
+    }
+  }
+
+  // 4. Sort each day's events by lane
+  for (const list of map.values()) {
+    list.sort((a, b) => (laneMap.get(a.id) ?? 0) - (laneMap.get(b.id) ?? 0));
+  }
+
+  return { eventsByDate: map, eventLaneMap: laneMap };
 }
 
 // ---------------------------------------------------------------------------
-// SpanBar — a single multi-day event bar rendered inside a week row
+// DayCell
 // ---------------------------------------------------------------------------
 
-interface SpanBarProps {
-  slot: SpanSlot;
-  categoryIcon?: string;
-}
-
-const SpanBar = React.memo(function SpanBar({ slot, categoryIcon }: SpanBarProps) {
-  const { event, startCol, endCol, isStart, isEnd } = slot;
-
-  // Grid column: CSS grid is 1-indexed
-  const colStart = startCol + 1;
-  const colSpan = endCol - startCol + 1;
-
-  const bgColor = `${event.color}20`;
-  const textColor = event.color;
-
-  return (
-    <div
-      style={{
-        gridColumnStart: colStart,
-        gridColumnEnd: `span ${colSpan}`,
-        backgroundColor: bgColor,
-        color: textColor,
-      }}
-      className={cn(
-        'flex items-center gap-0.5 px-0.5 sm:px-1.5 overflow-hidden whitespace-nowrap select-none',
-        'h-[16px] sm:h-[18px] text-[9px] sm:text-[11px] leading-[16px] sm:leading-[18px]',
-        isStart ? 'rounded-l-full' : 'rounded-l-none',
-        isEnd ? 'rounded-r-full' : 'rounded-r-none',
-        // When it doesn't start here, remove left padding so it butts flush
-        !isStart && 'pl-0.5',
-      )}
-      title={event.title}
-    >
-      {categoryIcon && isStart && (
-        <span className="shrink-0 leading-none">{categoryIcon}</span>
-      )}
-      {isStart && (
-        <span className="overflow-hidden font-medium" style={{ textOverflow: 'clip' }}>{event.title}</span>
-      )}
-      {isStart && event.startTime && (
-        <span className="shrink-0 ml-auto opacity-70" style={{ fontSize: '8px' }}>{event.startTime.slice(0, 5)}</span>
-      )}
-    </div>
-  );
-});
-
-// ---------------------------------------------------------------------------
-// WeekRow — renders spanning bars + day cells for a single calendar week
-// ---------------------------------------------------------------------------
-
-interface WeekRowProps {
-  weekDays: Date[];
+interface DayCellProps {
+  day: Date;
+  colIdx: number;
   selectedDate: Date;
   currentMonth: Date;
-  spanRow: WeekSpanRow;
-  categories: EventCategory[];
-  /** Map: dateKey -> single-day events */
-  singleDayEventsByDate: Map<string, CalendarEvent[]>;
-  /** Map: dateKey -> todos */
-  todosByDate: Map<string, Todo[]>;
+  dayEvents: CalendarEvent[];
+  eventLaneMap: Map<string, number>;
+  categoryMap: Map<string, EventCategory>;
+  dayTodos: Todo[];
   onSelectDate: (date: Date) => void;
 }
 
-const WeekRow = React.memo(function WeekRow({
-  weekDays,
+const DayCell = React.memo(function DayCell({
+  day,
+  colIdx,
   selectedDate,
   currentMonth,
-  spanRow,
-  categories,
-  singleDayEventsByDate,
-  todosByDate,
-  onSelectDate,
-}: WeekRowProps) {
-  const categoryMap = useMemo(() => {
-    const m = new Map<string, EventCategory>();
-    for (const cat of categories) m.set(cat.id, cat);
-    return m;
-  }, [categories]);
-
-  const hasSpans = spanRow.slots[0].length > 0 || spanRow.slots[1].length > 0;
-
-  return (
-    <div>
-      {/* ── Day columns: date number + cell content (unified click/hover) ── */}
-      <div className="grid grid-cols-7">
-        {weekDays.map((day) => {
-          const dayOfWeek = day.getDay();
-          const isCurrent = isToday(day);
-          const isSelectedDay = isSameDay(day, selectedDate);
-          const inMonth = isSameMonth(day, currentMonth);
-          const dateKey = dateToKey(day);
-          return (
-            <button
-              key={dateKey}
-              type="button"
-              onClick={() => onSelectDate(day)}
-              className={cn(
-                'flex flex-col items-center w-full text-left',
-                'hover:bg-muted/30 transition-colors',
-                !inMonth && 'opacity-40',
-              )}
-            >
-              {/* Date number */}
-              <div className="pt-1 pb-0.5">
-                <span
-                  className={cn(
-                    'flex items-center justify-center w-6 h-6 rounded-full text-xs font-medium',
-                    isCurrent && 'bg-primary text-primary-foreground font-bold',
-                    isSelectedDay && !isCurrent && 'bg-foreground text-background font-semibold',
-                    !isSelectedDay && !isCurrent && dayOfWeek === 0 && 'text-red-400',
-                    !isSelectedDay && !isCurrent && dayOfWeek === 6 && 'text-blue-400',
-                    !isSelectedDay && !isCurrent && dayOfWeek !== 0 && dayOfWeek !== 6 && 'text-foreground',
-                  )}
-                >
-                  {format(day, 'd')}
-                </span>
-              </div>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* ── Spanning bars (below date numbers, pointer-events-none) ── */}
-      {hasSpans &&
-        spanRow.slots.map((rowSlots, rowIdx) =>
-          rowSlots.length > 0 ? (
-            <div
-              key={rowIdx}
-              className="grid grid-cols-7 pointer-events-none"
-              style={{ paddingTop: '1px' }}
-            >
-              {rowSlots.map((slot) => (
-                <SpanBar
-                  key={slot.event.id}
-                  slot={slot}
-                  categoryIcon={
-                    slot.event.categoryId
-                      ? categoryMap.get(slot.event.categoryId)?.icon
-                      : undefined
-                  }
-                />
-              ))}
-            </div>
-          ) : null
-        )
-      }
-
-      {/* ── Single-day events + todo dots (clickable per cell) ── */}
-      <div className="grid grid-cols-7">
-        {weekDays.map((day) => {
-          const dateKey = dateToKey(day);
-          const inMonth = isSameMonth(day, currentMonth);
-          return (
-            <DayCellContent
-              key={dateKey}
-              day={day}
-              isCurrentMonth={inMonth}
-              singleDayEvents={singleDayEventsByDate.get(dateKey) ?? []}
-              dayTodos={todosByDate.get(dateKey) ?? []}
-              onSelect={onSelectDate}
-            />
-          );
-        })}
-      </div>
-    </div>
-  );
-});
-
-// ---------------------------------------------------------------------------
-// DayCellContent — event list + todo indicator below date numbers & span bars
-// ---------------------------------------------------------------------------
-
-interface DayCellContentProps {
-  day: Date;
-  isCurrentMonth: boolean;
-  singleDayEvents: CalendarEvent[];
-  dayTodos: Todo[];
-  onSelect: (date: Date) => void;
-}
-
-const DayCellContent = React.memo(function DayCellContent({
-  day,
-  isCurrentMonth,
-  singleDayEvents,
+  dayEvents,
+  eventLaneMap,
+  categoryMap,
   dayTodos,
-  onSelect,
-}: DayCellContentProps) {
+  onSelectDate,
+}: DayCellProps) {
+  const dayOfWeek = day.getDay();
+  const isCurrent = isToday(day);
+  const isSelectedDay = isSameDay(day, selectedDate);
+  const inMonth = isSameMonth(day, currentMonth);
+  const dateKey = dateToKey(day);
   const incompleteTodos = useMemo(
     () => dayTodos.filter((t) => !t.isCompleted).length,
     [dayTodos],
   );
 
-  const visibleEvents = singleDayEvents.slice(0, MAX_SINGLE_EVENTS);
-  const eventOverflow = singleDayEvents.length - MAX_SINGLE_EVENTS;
+  // Build lane array with nulls for empty lanes
+  const lanes = useMemo(() => {
+    if (dayEvents.length === 0) return [];
+    const maxLane = Math.max(...dayEvents.map((e) => eventLaneMap.get(e.id) ?? 0));
+    const arr: (CalendarEvent | null)[] = Array(maxLane + 1).fill(null);
+    for (const event of dayEvents) {
+      const lane = eventLaneMap.get(event.id) ?? 0;
+      arr[lane] = event;
+    }
+    return arr;
+  }, [dayEvents, eventLaneMap]);
+
+  const visibleLanes = lanes.slice(0, MAX_VISIBLE_EVENTS);
+  const overflowCount = lanes.length - MAX_VISIBLE_EVENTS;
 
   return (
     <button
+      key={dateKey}
       type="button"
-      onClick={() => onSelect(day)}
+      onClick={() => onSelectDate(day)}
       className={cn(
-        'relative flex flex-col w-full text-left px-0.5 sm:px-1 pb-1',
-        'min-h-[28px] sm:min-h-[36px]',
+        'relative flex flex-col w-full text-left overflow-hidden',
+        'min-h-[80px] sm:min-h-[92px]',
         'hover:bg-muted/30 transition-colors',
-        !isCurrentMonth && 'opacity-40',
+        !inMonth && 'opacity-40',
+        colIdx < 6 && 'border-r border-border/30',
       )}
     >
-      {/* Single-day events */}
-      <div className="flex flex-col gap-px w-full min-w-0 flex-1">
-        {visibleEvents.map((event) => (
-          <SingleDayEvent key={event.id} event={event} />
-        ))}
-        {eventOverflow > 0 && (
-          <span className="text-[8px] sm:text-[10px] text-muted-foreground pl-0.5 leading-tight">
-            +{eventOverflow}개
-          </span>
-        )}
+      {/* Date number */}
+      <div className="flex justify-center pt-0.5 pb-px">
+        <span
+          className={cn(
+            'flex items-center justify-center w-6 h-6 rounded-full text-xs font-medium',
+            isCurrent && 'bg-primary text-primary-foreground font-bold',
+            isSelectedDay && !isCurrent && 'bg-foreground text-background font-semibold',
+            !isSelectedDay && !isCurrent && dayOfWeek === 0 && 'text-red-400',
+            !isSelectedDay && !isCurrent && dayOfWeek === 6 && 'text-blue-400',
+            !isSelectedDay && !isCurrent && dayOfWeek !== 0 && dayOfWeek !== 6 && 'text-foreground',
+          )}
+        >
+          {format(day, 'd')}
+        </span>
       </div>
 
-      {/* Todo indicator — bottom-right */}
+      {/* Event bars (lane-based) */}
+      {visibleLanes.length > 0 && (
+        <div className="flex flex-col gap-px">
+          {visibleLanes.map((event, lane) => {
+            if (!event) {
+              // Empty lane spacer — invisible but reserves height
+              return (
+                <div
+                  key={`spacer-${lane}`}
+                  className="text-[9px] sm:text-[11px] leading-tight py-px invisible"
+                  aria-hidden="true"
+                >
+                  {'\u00A0'}
+                </div>
+              );
+            }
+
+            const isStart = event.startDate === dateKey;
+            const isEnd = event.endDate === dateKey;
+            const isSingle = isStart && isEnd;
+            const isMultiDay = !isSingle;
+            const category = event.categoryId ? categoryMap.get(event.categoryId) : undefined;
+
+            if (isMultiDay) {
+              // Multi-day event bar (connected across cells)
+              return (
+                <div
+                  key={event.id}
+                  className={cn(
+                    'text-[9px] sm:text-[11px] leading-tight px-1 py-px font-medium truncate -mx-px',
+                    isStart && 'overflow-visible whitespace-nowrap relative z-10',
+                  )}
+                  style={{
+                    backgroundColor: `${event.color}20`,
+                    color: event.color,
+                    borderRadius: isStart
+                      ? '3px 0 0 3px'
+                      : isEnd
+                        ? '0 3px 3px 0'
+                        : '0',
+                  }}
+                  title={event.title}
+                >
+                  {isStart ? (
+                    <span className="flex items-center gap-0.5">
+                      {category && <span className="shrink-0">{category.icon}</span>}
+                      <span className="truncate">{event.title}</span>
+                      {event.startTime && (
+                        <span className="shrink-0 ml-auto opacity-70" style={{ fontSize: '8px' }}>
+                          {event.startTime.slice(0, 5)}
+                        </span>
+                      )}
+                    </span>
+                  ) : (
+                    '\u00A0'
+                  )}
+                </div>
+              );
+            }
+
+            // Single-day event
+            if (!event.startTime) {
+              // All-day single-day
+              return (
+                <div
+                  key={event.id}
+                  className="text-[9px] sm:text-[11px] leading-tight px-1 py-px font-medium truncate rounded-sm"
+                  style={{
+                    backgroundColor: `${event.color}20`,
+                    color: event.color,
+                  }}
+                  title={event.title}
+                >
+                  {category && <span className="mr-0.5">{category.icon}</span>}
+                  {event.title}
+                </div>
+              );
+            }
+
+            // Timed single-day
+            return (
+              <div
+                key={event.id}
+                className="flex items-center gap-px text-[9px] sm:text-[11px] leading-tight py-px px-0.5 truncate"
+                title={`${event.startTime} ${event.title}`}
+              >
+                <span
+                  className="shrink-0 rounded-full"
+                  style={{ width: '2px', height: '9px', backgroundColor: event.color }}
+                />
+                <span className="text-foreground truncate">{event.title}</span>
+                <span className="shrink-0 ml-auto text-muted-foreground opacity-70" style={{ fontSize: '8px' }}>
+                  {event.startTime.slice(0, 5)}
+                </span>
+              </div>
+            );
+          })}
+          {overflowCount > 0 && (
+            <span className="text-[8px] sm:text-[10px] text-muted-foreground pl-1 leading-tight">
+              +{overflowCount}개
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Todo indicator */}
       {incompleteTodos > 0 && (
         <span
           className={cn(
@@ -376,57 +309,6 @@ const DayCellContent = React.memo(function DayCellContent({
 });
 
 // ---------------------------------------------------------------------------
-// SingleDayEvent — mini event row inside a day cell
-// ---------------------------------------------------------------------------
-
-interface SingleDayEventProps {
-  event: CalendarEvent;
-}
-
-const SingleDayEvent = React.memo(function SingleDayEvent({ event }: SingleDayEventProps) {
-  const isAllDay = event.startTime === null;
-
-  if (isAllDay) {
-    return (
-      <div
-        className="w-full overflow-hidden rounded-sm px-0.5 sm:px-1 leading-[15px] text-[9px] sm:text-[11px]"
-        style={{
-          backgroundColor: `${event.color}20`,
-          color: event.color,
-          height: '15px',
-          textOverflow: 'clip',
-          whiteSpace: 'nowrap',
-        }}
-        title={event.title}
-      >
-        <span className="font-medium">{event.title}</span>
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className="flex items-center w-full overflow-hidden text-[9px] sm:text-[11px]"
-      style={{ height: '15px', whiteSpace: 'nowrap', textOverflow: 'clip' }}
-      title={`${event.startTime} ${event.title}`}
-    >
-      <span
-        className="shrink-0 rounded-full mr-px"
-        style={{
-          width: '2px',
-          height: '9px',
-          backgroundColor: event.color,
-        }}
-      />
-      <span className="text-foreground overflow-hidden" style={{ textOverflow: 'clip' }}>{event.title}</span>
-      <span className="shrink-0 ml-auto text-muted-foreground opacity-70" style={{ fontSize: '8px' }}>
-        {event.startTime!.slice(0, 5)}
-      </span>
-    </div>
-  );
-});
-
-// ---------------------------------------------------------------------------
 // CalendarGrid — root export
 // ---------------------------------------------------------------------------
 
@@ -438,7 +320,6 @@ export function CalendarGrid({
   todos,
   categories,
 }: CalendarGridProps) {
-  // ── All calendar days (padded to complete weeks) ──
   const calendarDays = useMemo(() => {
     const monthStart = startOfMonth(currentMonth);
     const monthEnd = endOfMonth(currentMonth);
@@ -447,7 +328,6 @@ export function CalendarGrid({
     return eachDayOfInterval({ start: calStart, end: calEnd });
   }, [currentMonth]);
 
-  // ── Split days into weeks ──
   const weeks = useMemo(() => {
     const result: Date[][] = [];
     for (let i = 0; i < calendarDays.length; i += 7) {
@@ -456,33 +336,12 @@ export function CalendarGrid({
     return result;
   }, [calendarDays]);
 
-  // ── Multi-day events (3+ days → spanning bars) ──
-  const multiDayEvents = useMemo(
-    () => events.filter((e) => eventDaySpan(e.startDate, e.endDate) >= MIN_SPAN_DAYS),
+  // Lane-based event computation (all events, no spanning bar distinction)
+  const { eventsByDate, eventLaneMap } = useMemo(
+    () => computeEventLanes(events),
     [events],
   );
 
-  // ── Cell events: same-day + short multi-day (1-2 days), grouped by each date they cover ──
-  const singleDayEventsByDate = useMemo(() => {
-    const map = new Map<string, CalendarEvent[]>();
-    for (const event of events) {
-      const span = eventDaySpan(event.startDate, event.endDate);
-      if (span < MIN_SPAN_DAYS) {
-        // Add to every date the event covers
-        const start = parseLocalDate(event.startDate);
-        for (let d = 0; d < span; d++) {
-          const date = new Date(start);
-          date.setDate(date.getDate() + d);
-          const key = dateToKey(date);
-          if (!map.has(key)) map.set(key, []);
-          map.get(key)!.push(event);
-        }
-      }
-    }
-    return map;
-  }, [events]);
-
-  // ── Todos grouped by date ──
   const todosByDate = useMemo(() => {
     const map = new Map<string, Todo[]>();
     for (const todo of todos) {
@@ -492,22 +351,23 @@ export function CalendarGrid({
     return map;
   }, [todos]);
 
-  // ── Spanning slot computation per week ──
-  const weekSpans = useMemo(
-    () => weeks.map((weekDays) => computeWeekSpans(weekDays, multiDayEvents)),
-    [weeks, multiDayEvents],
-  );
+  const categoryMap = useMemo(() => {
+    const m = new Map<string, EventCategory>();
+    for (const cat of categories) m.set(cat.id, cat);
+    return m;
+  }, [categories]);
 
   return (
     <div className="select-none w-full">
       {/* Weekday headers */}
-      <div className="grid grid-cols-7 mb-1 border-b border-border/40">
+      <div className="grid grid-cols-7 border-b border-border/40">
         {WEEKDAYS.map((label, i) => (
           <div
             key={label}
             className={cn(
               'text-center text-xs font-medium py-2',
               i === 0 ? 'text-red-400' : i === 6 ? 'text-blue-400' : 'text-muted-foreground',
+              i < 6 && 'border-r border-border/30',
             )}
           >
             {label}
@@ -517,18 +377,26 @@ export function CalendarGrid({
 
       {/* Week rows */}
       <div className="flex flex-col divide-y divide-border/40">
-        {weeks.map((weekDays, weekIndex) => (
-          <WeekRow
-            key={dateToKey(weekDays[0])}
-            weekDays={weekDays}
-            selectedDate={selectedDate}
-            currentMonth={currentMonth}
-            spanRow={weekSpans[weekIndex]}
-            categories={categories}
-            singleDayEventsByDate={singleDayEventsByDate}
-            todosByDate={todosByDate}
-            onSelectDate={onSelectDate}
-          />
+        {weeks.map((weekDays) => (
+          <div key={dateToKey(weekDays[0])} className="grid grid-cols-7">
+            {weekDays.map((day, colIdx) => {
+              const dateKey = dateToKey(day);
+              return (
+                <DayCell
+                  key={dateKey}
+                  day={day}
+                  colIdx={colIdx}
+                  selectedDate={selectedDate}
+                  currentMonth={currentMonth}
+                  dayEvents={eventsByDate.get(dateKey) ?? []}
+                  eventLaneMap={eventLaneMap}
+                  categoryMap={categoryMap}
+                  dayTodos={todosByDate.get(dateKey) ?? []}
+                  onSelectDate={onSelectDate}
+                />
+              );
+            })}
+          </div>
         ))}
       </div>
     </div>
