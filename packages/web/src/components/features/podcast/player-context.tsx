@@ -1,6 +1,7 @@
 'use client';
 
 import {createContext, useCallback, useContext, useEffect, useMemo, useRef, useState,} from 'react';
+import { addListeningTime } from '@/lib/actions/activity';
 
 export interface Episode {
   id: string;
@@ -150,6 +151,19 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       window.removeEventListener('beforeunload', save);
     };
   }, [episode, isRestored, playbackRate, volume]);
+
+  // Sync podcast listening time to DB for gamification (every 10s while playing)
+  useEffect(() => {
+    if (!isPlaying) return;
+
+    const interval = setInterval(async () => {
+      try {
+        await addListeningTime(10);
+      } catch { /* gamification non-critical */ }
+    }, 10_000);
+
+    return () => clearInterval(interval);
+  }, [isPlaying]);
 
   const play = useCallback((ep: Episode, startTime?: number) => {
     const audio = audioRef.current;

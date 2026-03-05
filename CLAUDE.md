@@ -49,6 +49,8 @@ pnpm db:push          # 스키마 직접 push (dev용)
 - Server Action 트레이싱: `traceAction()` + `traceQuery()` 래퍼로 DB 쿼리 성능 측정
 - 무거운 컴포넌트: `next/dynamic` + `ssr: false`로 지연 로딩 (TipTap, DnD Kit 등)
 - 캘린더 인터랙션: Optimistic updates 패턴 (로컬 상태 즉시 반영, 서버 백그라운드 동기화)
+- 게이미피케이션: 출석 스트릭, 데일리 미션 (큐레이션 5개/팟캐스트 10분/투두 완료), 하이브리드 데이터 (전용 테이블 + 기존 데이터 계산)
+- 외부 API: Open-Meteo (서울 날씨, 서버 컴포넌트 fetch, revalidate 3600)
 - 테스트: Vitest + `vi.hoisted()` Proxy 기반 DB 목 패턴 (`packages/web/src/__tests__/`)
 
 ## 핵심 파일
@@ -82,7 +84,7 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/app/api/podcast/upload/route.ts` | 팟캐스트 오디오 R2 업로드 |
 | `packages/web/src/app/api/podcast/episodes/route.ts` | 팟캐스트 에피소드 CRUD |
 | `packages/web/src/app/api/push/subscribe/route.ts` | 푸시 구독 등록/해제/조회 |
-| `packages/web/src/components/features/podcast/player-context.tsx` | 팟캐스트 플레이어 (preload auto, canplay 대기, localStorage 이어듣기) |
+| `packages/web/src/components/features/podcast/player-context.tsx` | 팟캐스트 플레이어 (preload auto, canplay 대기, localStorage 이어듣기, 30초 청취시간 DB 동기화) |
 | `packages/web/src/components/features/memo/memo-editor-lazy.tsx` | MemoEditor 지연 로딩 래퍼 (next/dynamic, ssr: false) |
 | `packages/web/src/components/features/curation/mini-card-thumbnail.tsx` | 대시보드 큐레이션 썸네일 (클라이언트 onError 폴백) |
 | `packages/web/public/sw.js` | Service Worker (PWA + 푸시 + 전략별 캐싱 + 오디오 오프라인) |
@@ -108,6 +110,13 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/components/features/memo/dashboard-memo.tsx` | 대시보드 최근 메모 위젯 (에러 폴백) |
 | `packages/web/src/components/features/memo/task-list-sort.ts` | ProseMirror 플러그인 (체크된 아이템 하단 자동정렬) |
 | `packages/web/src/app/api/memo/image/route.ts` | 메모 이미지 R2 업로드 API (5MB, JPEG/PNG/GIF/WebP) |
+| `packages/shared/src/schema/user-daily-activity.ts` | 일별 활동 스키마 (출석, 팟캐스트 청취시간) |
+| `packages/web/src/lib/weather.ts` | 서울 날씨 유틸 (Open-Meteo API, 1시간 캐시) |
+| `packages/web/src/lib/actions/activity.ts` | 게이미피케이션 Server Actions (출석/스트릭/미션 통계, Promise.all 병렬 쿼리) |
+| `packages/web/src/components/features/dashboard/weather-widget.tsx` | 서울 날씨 위젯 (서버 컴포넌트, WMO 픽토그램) |
+| `packages/web/src/components/features/dashboard/daily-missions.tsx` | 데일리 미션 카드 (프로그레스 바, 스트릭 표시) |
+| `packages/web/src/components/features/dashboard/attendance-recorder.tsx` | 출석 기록 (클라이언트, 방문 시 자동 호출) |
+| `packages/web/src/components/features/curation/mini-card-link.tsx` | 대시보드 큐레이션 클릭 시 읽음 처리 래퍼 |
 
 ## 인증 구조
 
@@ -144,3 +153,4 @@ study-admin 스타일: Sky Blue `#0ea5e9` 포인트, Pretendard 폰트, 다크�
 | `docs/26-03-03-schema-summary.md` | DB 스키마 요약 (테이블, FK, enum) |
 | `docs/26-03-03-patterns.md` | 인증/API/ORM 코드 패턴 |
 | `docs/plans/26-03-04-memo-design.md` | 메모 기능 설계 문서 |
+| `docs/plans/26-03-04-dashboard-redesign.md` | 대시보드 리디자인 설계 (날씨+게이미피케이션) |

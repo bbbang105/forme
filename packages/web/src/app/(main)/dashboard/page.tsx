@@ -1,48 +1,39 @@
 import {Suspense} from 'react';
-import Link from 'next/link';
-import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
-import {Calendar, Headphones, Newspaper, StickyNote} from 'lucide-react';
 import {DashboardCuration} from '@/components/features/curation/dashboard-curation';
 import {DashboardCalendar} from '@/components/features/calendar/dashboard-calendar';
 import {DashboardMemo} from '@/components/features/memo/dashboard-memo';
+import {WeatherWidget} from '@/components/features/dashboard/weather-widget';
+import {DailyMissions} from '@/components/features/dashboard/daily-missions';
+import {AttendanceRecorder} from '@/components/features/dashboard/attendance-recorder';
 import {createClient} from '@/lib/supabase/server';
 import {db, profiles} from '@forme/shared';
 import {eq} from 'drizzle-orm';
 import {getFormattedDate, getGreeting} from '@/lib/greetings';
 
-const features = [
-  {
-    title: '큐레이션',
-    description: 'RSS 피드 구독 & 읽기',
-    icon: Newspaper,
-    href: '/curation',
-  },
-  {
-    title: '캘린더',
-    description: '일정 & 할 일 관리',
-    icon: Calendar,
-    href: '/calendar',
-  },
-  {
-    title: '메모',
-    description: '리치 텍스트 메모장',
-    icon: StickyNote,
-    href: '/memo',
-  },
-  {
-    title: '팟캐스트',
-    description: 'AI 팟캐스트 플레이어',
-    icon: Headphones,
-    href: '/podcast',
-  },
-];
-
-/** Generic skeleton for any dashboard widget while it streams in. */
 function WidgetSkeleton() {
   return (
     <div className="space-y-3 animate-pulse">
       <div className="h-5 w-28 bg-muted rounded-md" />
       <div className="rounded-xl border border-border/60 bg-muted/40 h-44" />
+    </div>
+  );
+}
+
+function MissionsSkeleton() {
+  return (
+    <div className="rounded-xl border border-border/60 p-4 space-y-4 animate-pulse">
+      <div className="flex items-center justify-between">
+        <div className="h-4 w-24 bg-muted rounded" />
+        <div className="h-4 w-32 bg-muted rounded" />
+      </div>
+      <div className="space-y-3">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="space-y-1.5">
+            <div className="h-4 w-full bg-muted rounded" />
+            <div className="h-2 w-full bg-muted rounded-full" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -67,56 +58,38 @@ export default async function DashboardPage() {
   const dateStr = getFormattedDate();
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto space-y-6">
-      {/* Greeting — rendered synchronously; profile fetch is fast and needed here */}
-      <div className="space-y-1">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto space-y-5">
+      {/* Record attendance on visit */}
+      <AttendanceRecorder />
+
+      {/* Hero: Greeting + Weather */}
+      <div className="space-y-2">
         <p className="text-xs text-muted-foreground">{dateStr}</p>
         <h2 className="text-2xl font-bold tracking-tight">안녕하세요, {displayName}님!</h2>
-        <p className="text-sm text-muted-foreground">
-          {greeting}
-        </p>
+        <p className="text-sm text-muted-foreground">{greeting}</p>
+        <Suspense fallback={<div className="h-5" />}>
+          <WeatherWidget />
+        </Suspense>
       </div>
 
-      {/* Feature shortcut grid — static, no async data needed */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {features.map(({ title, description, icon: Icon, href }) => (
-          <Link key={href} href={href}>
-            <Card className="h-full hover:border-primary/50 transition-colors cursor-pointer">
-              <CardHeader className="pb-2 p-4">
-                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center mb-2">
-                  <Icon className="h-4 w-4 text-primary" />
-                </div>
-                <CardTitle className="text-sm font-semibold">{title}</CardTitle>
-              </CardHeader>
-              <CardContent className="p-4 pt-0">
-                <p className="text-xs text-muted-foreground">{description}</p>
-              </CardContent>
-            </Card>
-          </Link>
-        ))}
-      </div>
-
-      {/*
-        Each widget is wrapped in its own Suspense boundary so they stream
-        in parallel rather than sequentially. The page shell and greeting are
-        sent immediately; each widget resolves independently as its data
-        arrives from the database. Users see the page structure instantly
-        with skeletons that swap out as each widget loads.
-      */}
+      {/* Daily Missions */}
+      <Suspense fallback={<MissionsSkeleton />}>
+        <DailyMissions />
+      </Suspense>
 
       {/* Today's calendar & todos */}
       <Suspense fallback={<WidgetSkeleton />}>
         <DashboardCalendar />
       </Suspense>
 
-      {/* Recent memos */}
-      <Suspense fallback={<WidgetSkeleton />}>
-        <DashboardMemo />
-      </Suspense>
-
       {/* Latest curation items */}
       <Suspense fallback={<WidgetSkeleton />}>
         <DashboardCuration />
+      </Suspense>
+
+      {/* Recent memos */}
+      <Suspense fallback={<WidgetSkeleton />}>
+        <DashboardMemo />
       </Suspense>
     </div>
   );
