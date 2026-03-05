@@ -3,6 +3,8 @@ import {crawlSource, type CrawlSourceResult, getActiveSourcesForUser} from '@/li
 import {sendPushToUser} from '@/lib/push';
 import {withTracing} from '@/lib/logger';
 
+export const maxDuration = 300;
+
 /**
  * GET /api/cron/curation
  * Vercel Cron job: runs daily to crawl all active RSS sources for the app user.
@@ -34,12 +36,22 @@ export const GET = withTracing('GET /api/cron/curation', async (request) => {
     });
   }
 
-  const results: CrawlSourceResult[] = [];
-
-  for (const source of sources) {
-    const result = await crawlSource(source, { since });
-    results.push(result);
-  }
+  const settled = await Promise.allSettled(
+    sources.map((source) => crawlSource(source, { since })),
+  );
+  const results: CrawlSourceResult[] = settled.map((r, i) =>
+    r.status === 'fulfilled'
+      ? r.value
+      : {
+          sourceId: sources[i]!.id,
+          sourceName: sources[i]!.name,
+          success: false,
+          itemsFound: 0,
+          newItemsAdded: 0,
+          itemsFilteredOut: 0,
+          error: r.reason instanceof Error ? r.reason.message : 'Unknown error',
+        },
+  );
 
   const totalNewItems = results.reduce((sum, r) => sum + r.newItemsAdded, 0);
   const summary = {

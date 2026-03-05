@@ -1,10 +1,10 @@
 /**
  * Shared RSS crawl logic used by both the SSE crawl endpoint and the Vercel Cron job.
  */
-import { and, eq } from 'drizzle-orm';
-import { parseFeed } from 'feedsmith';
-import { db, curationSources, curationItems } from '@forme/shared';
-import { isSafeUrl } from './url-safety';
+import {and, eq} from 'drizzle-orm';
+import {parseFeed} from 'feedsmith';
+import {curationItems, curationSources, db} from '@forme/shared';
+import {isSafeUrl} from './url-safety';
 
 export interface CrawlSourceResult {
   sourceId: string;
@@ -285,7 +285,8 @@ export async function getActiveSourcesForUser(userId: string) {
   const allSources = await db
     .select()
     .from(curationSources)
-    .where(and(eq(curationSources.userId, userId), eq(curationSources.isActive, true)));
+    .where(and(eq(curationSources.userId, userId), eq(curationSources.isActive, true)))
+    .limit(50);
 
   return allSources
     .filter((s) => s.rssUrl)

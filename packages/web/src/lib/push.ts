@@ -8,7 +8,7 @@ function ensureVapid() {
   if (vapidConfigured) return;
   const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
   const privateKey = process.env.VAPID_PRIVATE_KEY;
-  const subject = process.env.VAPID_SUBJECT || 'mailto:admin@forme.app';
+  const subject = process.env.VAPID_SUBJECT || 'mailto:admin@forme.dev';
   if (!publicKey || !privateKey) {
     throw new Error('VAPID 키가 설정되지 않았습니다');
   }
