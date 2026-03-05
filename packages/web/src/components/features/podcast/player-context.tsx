@@ -152,15 +152,15 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     };
   }, [episode, isRestored, playbackRate, volume]);
 
-  // Sync podcast listening time to DB for gamification (every 30s while playing)
+  // Sync podcast listening time to DB for gamification (every 10s while playing)
   useEffect(() => {
     if (!isPlaying) return;
 
     const interval = setInterval(async () => {
       try {
-        await addListeningTime(30);
+        await addListeningTime(10);
       } catch { /* gamification non-critical */ }
-    }, 30_000);
+    }, 10_000);
 
     return () => clearInterval(interval);
   }, [isPlaying]);
