@@ -95,7 +95,7 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/lib/actions/calendar.ts` | 캘린더 이벤트 Server Actions (CRUD + 입력 검증) |
 | `packages/web/src/lib/actions/todos.ts` | 투두 Server Actions (CRUD + 토글 + 입력 검증) |
 | `packages/web/src/components/features/calendar/calendar-client.tsx` | 캘린더 메인 클라이언트 (월간뷰, 스와이프, optimistic updates, 데스크톱 2컬럼 레이아웃) |
-| `packages/web/src/components/features/calendar/calendar-grid.tsx` | 캘린더 그리드 (DayCell React.memo, 이벤트/투두 도트) |
+| `packages/web/src/components/features/calendar/calendar-grid.tsx` | 캘린더 그리드 (통합 셀: 날짜+이벤트, 세로 격자, spanning bars 인라인) |
 | `packages/web/src/components/features/calendar/todo-list.tsx` | 투두 리스트 (optimistic 추가/토글/삭제, IME 처리) |
 | `packages/web/src/components/features/calendar/event-form.tsx` | 이벤트 폼 (생성/수정/삭제, optimistic 콜백) |
 | `packages/web/src/components/features/calendar/event-list.tsx` | 이벤트 목록 (선택 날짜별 필터링) |

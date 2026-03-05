@@ -222,25 +222,36 @@ const WeekRow = React.memo(function WeekRow({
 
   const hasSpans = spanRow.slots[0].length > 0 || spanRow.slots[1].length > 0;
 
+  // Count how many span rows are actually used
+  const spanRowCount = spanRow.slots.filter((r) => r.length > 0).length;
+
   return (
-    <div>
-      {/* ── Day columns: date number + cell content (unified click/hover) ── */}
+    <div className="relative">
+      {/* ── Day columns: date number + spanning bars + events unified ── */}
       <div className="grid grid-cols-7">
-        {weekDays.map((day) => {
+        {weekDays.map((day, colIdx) => {
           const dayOfWeek = day.getDay();
           const isCurrent = isToday(day);
           const isSelectedDay = isSameDay(day, selectedDate);
           const inMonth = isSameMonth(day, currentMonth);
           const dateKey = dateToKey(day);
+          const singleDayEvents = singleDayEventsByDate.get(dateKey) ?? [];
+          const dayTodos = todosByDate.get(dateKey) ?? [];
+          const incompleteTodos = dayTodos.filter((t) => !t.isCompleted).length;
+          const visibleEvents = singleDayEvents.slice(0, MAX_SINGLE_EVENTS);
+          const eventOverflow = singleDayEvents.length - MAX_SINGLE_EVENTS;
+
           return (
             <button
               key={dateKey}
               type="button"
               onClick={() => onSelectDate(day)}
               className={cn(
-                'flex flex-col items-center w-full text-left',
+                'relative flex flex-col items-center w-full text-left',
                 'hover:bg-muted/30 transition-colors',
+                'min-h-[60px] sm:min-h-[72px]',
                 !inMonth && 'opacity-40',
+                colIdx < 6 && 'border-r border-border/30',
               )}
             >
               {/* Date number */}
@@ -258,120 +269,71 @@ const WeekRow = React.memo(function WeekRow({
                   {format(day, 'd')}
                 </span>
               </div>
+
+              {/* Spacer for spanning bars (reserves vertical space) */}
+              {spanRowCount > 0 && (
+                <div style={{ height: `${spanRowCount * SPAN_ROW_HEIGHT}px` }} />
+              )}
+
+              {/* Single-day events */}
+              <div className="flex flex-col gap-px w-full min-w-0 flex-1 px-0.5 sm:px-1">
+                {visibleEvents.map((event) => (
+                  <SingleDayEvent key={event.id} event={event} />
+                ))}
+                {eventOverflow > 0 && (
+                  <span className="text-[8px] sm:text-[10px] text-muted-foreground pl-0.5 leading-tight">
+                    +{eventOverflow}개
+                  </span>
+                )}
+              </div>
+
+              {/* Todo indicator — bottom-right */}
+              {incompleteTodos > 0 && (
+                <span
+                  className={cn(
+                    'absolute bottom-0.5 right-1 flex items-center gap-0.5',
+                    'text-[10px] text-primary leading-none font-medium',
+                  )}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary inline-block" />
+                  {incompleteTodos >= 2 && <span>{incompleteTodos}</span>}
+                </span>
+              )}
             </button>
           );
         })}
       </div>
 
-      {/* ── Spanning bars (below date numbers, pointer-events-none) ── */}
-      {hasSpans &&
-        spanRow.slots.map((rowSlots, rowIdx) =>
-          rowSlots.length > 0 ? (
-            <div
-              key={rowIdx}
-              className="grid grid-cols-7 pointer-events-none"
-              style={{ paddingTop: '1px' }}
-            >
-              {rowSlots.map((slot) => (
-                <SpanBar
-                  key={slot.event.id}
-                  slot={slot}
-                  categoryIcon={
-                    slot.event.categoryId
-                      ? categoryMap.get(slot.event.categoryId)?.icon
-                      : undefined
-                  }
-                />
-              ))}
-            </div>
-          ) : null
-        )
-      }
-
-      {/* ── Single-day events + todo dots (clickable per cell) ── */}
-      <div className="grid grid-cols-7">
-        {weekDays.map((day) => {
-          const dateKey = dateToKey(day);
-          const inMonth = isSameMonth(day, currentMonth);
-          return (
-            <DayCellContent
-              key={dateKey}
-              day={day}
-              isCurrentMonth={inMonth}
-              singleDayEvents={singleDayEventsByDate.get(dateKey) ?? []}
-              dayTodos={todosByDate.get(dateKey) ?? []}
-              onSelect={onSelectDate}
-            />
-          );
-        })}
-      </div>
-    </div>
-  );
-});
-
-// ---------------------------------------------------------------------------
-// DayCellContent — event list + todo indicator below date numbers & span bars
-// ---------------------------------------------------------------------------
-
-interface DayCellContentProps {
-  day: Date;
-  isCurrentMonth: boolean;
-  singleDayEvents: CalendarEvent[];
-  dayTodos: Todo[];
-  onSelect: (date: Date) => void;
-}
-
-const DayCellContent = React.memo(function DayCellContent({
-  day,
-  isCurrentMonth,
-  singleDayEvents,
-  dayTodos,
-  onSelect,
-}: DayCellContentProps) {
-  const incompleteTodos = useMemo(
-    () => dayTodos.filter((t) => !t.isCompleted).length,
-    [dayTodos],
-  );
-
-  const visibleEvents = singleDayEvents.slice(0, MAX_SINGLE_EVENTS);
-  const eventOverflow = singleDayEvents.length - MAX_SINGLE_EVENTS;
-
-  return (
-    <button
-      type="button"
-      onClick={() => onSelect(day)}
-      className={cn(
-        'relative flex flex-col w-full text-left px-0.5 sm:px-1 pb-1',
-        'min-h-[28px] sm:min-h-[36px]',
-        'hover:bg-muted/30 transition-colors',
-        !isCurrentMonth && 'opacity-40',
-      )}
-    >
-      {/* Single-day events */}
-      <div className="flex flex-col gap-px w-full min-w-0 flex-1">
-        {visibleEvents.map((event) => (
-          <SingleDayEvent key={event.id} event={event} />
-        ))}
-        {eventOverflow > 0 && (
-          <span className="text-[8px] sm:text-[10px] text-muted-foreground pl-0.5 leading-tight">
-            +{eventOverflow}개
-          </span>
-        )}
-      </div>
-
-      {/* Todo indicator — bottom-right */}
-      {incompleteTodos > 0 && (
-        <span
-          className={cn(
-            'absolute bottom-0.5 right-1 flex items-center gap-0.5',
-            'text-[10px] text-primary leading-none font-medium',
-          )}
+      {/* ── Spanning bars (absolute overlay, positioned below date numbers) ── */}
+      {hasSpans && (
+        <div
+          className="absolute left-0 right-0 pointer-events-none"
+          style={{ top: '32px' }}
         >
-          <span className="w-1.5 h-1.5 rounded-full bg-primary inline-block" />
-          {incompleteTodos >= 2 && <span>{incompleteTodos}</span>}
-        </span>
+          {spanRow.slots.map((rowSlots, rowIdx) =>
+            rowSlots.length > 0 ? (
+              <div
+                key={rowIdx}
+                className="grid grid-cols-7"
+                style={{ height: `${SPAN_ROW_HEIGHT}px`, paddingTop: '2px' }}
+              >
+                {rowSlots.map((slot) => (
+                  <SpanBar
+                    key={slot.event.id}
+                    slot={slot}
+                    categoryIcon={
+                      slot.event.categoryId
+                        ? categoryMap.get(slot.event.categoryId)?.icon
+                        : undefined
+                    }
+                  />
+                ))}
+              </div>
+            ) : null
+          )}
+        </div>
       )}
-    </button>
+    </div>
   );
 });
 
@@ -501,13 +463,14 @@ export function CalendarGrid({
   return (
     <div className="select-none w-full">
       {/* Weekday headers */}
-      <div className="grid grid-cols-7 mb-1 border-b border-border/40">
+      <div className="grid grid-cols-7 border-b border-border/40">
         {WEEKDAYS.map((label, i) => (
           <div
             key={label}
             className={cn(
               'text-center text-xs font-medium py-2',
               i === 0 ? 'text-red-400' : i === 6 ? 'text-blue-400' : 'text-muted-foreground',
+              i < 6 && 'border-r border-border/30',
             )}
           >
             {label}
