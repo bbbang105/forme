@@ -5,7 +5,7 @@ import {DashboardMemo} from '@/components/features/memo/dashboard-memo';
 import {WeatherWidget} from '@/components/features/dashboard/weather-widget';
 import {DailyMissions} from '@/components/features/dashboard/daily-missions';
 import {AttendanceRecorder} from '@/components/features/dashboard/attendance-recorder';
-import {createClient} from '@/lib/supabase/server';
+import {getAuthUser} from '@/lib/auth';
 import {db, profiles} from '@forme/shared';
 import {eq} from 'drizzle-orm';
 import {getFormattedDate, getGreeting} from '@/lib/greetings';
@@ -39,19 +39,16 @@ function MissionsSkeleton() {
 }
 
 export default async function DashboardPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getAuthUser();
 
   let displayName = '유저';
-  if (user) {
-    const [profile] = await db
-      .select({ displayName: profiles.displayName })
-      .from(profiles)
-      .where(eq(profiles.userId, user.id))
-      .limit(1);
-    if (profile?.displayName) {
-      displayName = profile.displayName;
-    }
+  const [profile] = await db
+    .select({ displayName: profiles.displayName })
+    .from(profiles)
+    .where(eq(profiles.userId, user.id))
+    .limit(1);
+  if (profile?.displayName) {
+    displayName = profile.displayName;
   }
 
   const greeting = getGreeting();

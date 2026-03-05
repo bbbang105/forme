@@ -2,7 +2,7 @@ import Link from 'next/link';
 import {ArrowRight, ExternalLink} from 'lucide-react';
 import {cn} from '@/lib/utils';
 import {formatRelativeDate, getArticleGradient, getCategoryStyle,} from '@/lib/curation-utils';
-import {createClient} from '@/lib/supabase/server';
+import {getAuthUser} from '@/lib/auth';
 import {curationItems, curationSources, db} from '@forme/shared';
 import {and, desc, eq, sql} from 'drizzle-orm';
 import {MiniCardLink} from './mini-card-link';
@@ -36,12 +36,7 @@ interface MiniCardItem {
  * server-rendered HTML.
  */
 export async function DashboardCuration() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return null;
+  const user = await getAuthUser();
 
   // Replicate the /api/curation?status=unread&limit=3 query used previously.
   // COALESCE(publishedAt, collectedAt) matches the sort date expression in the

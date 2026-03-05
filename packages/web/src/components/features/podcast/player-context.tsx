@@ -1,7 +1,7 @@
 'use client';
 
 import {createContext, useCallback, useContext, useEffect, useMemo, useRef, useState,} from 'react';
-import { addListeningTime } from '@/lib/actions/activity';
+import {addListeningTime} from '@/lib/actions/activity';
 
 export interface Episode {
   id: string;
@@ -40,7 +40,18 @@ interface PlayerControls {
 
 const STORAGE_KEY = 'forme-podcast-progress';
 
-const PlayerContext = createContext<(PlayerState & PlayerControls) | null>(null);
+// Stable state context — excludes currentTime/duration so that 4Hz timeupdate
+// events do NOT invalidate this value and cause all consumers to re-render.
+const PlayerContext = createContext<
+  (Omit<PlayerState, 'currentTime' | 'duration'> & PlayerControls) | null
+>(null);
+
+// Time-only context — re-renders at ~4Hz but only components that explicitly
+// subscribe via usePlayerTime() (progress bars, seek sliders) are affected.
+const PlayerTimeContext = createContext<{
+  currentTime: number;
+  duration: number;
+} | null>(null);
 
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -265,15 +276,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem(STORAGE_KEY);
   }, []);
 
-  // Memoize the context value so that consumers only re-render when a piece of
-  // state they actually depend on changes, not on every unrelated update.
-  const value = useMemo(
+  // Stable context value — omits currentTime/duration so that 4Hz timeupdate
+  // events do not invalidate it and cause all consumers to re-render.
+  const stateValue = useMemo(
     () => ({
       episode,
       isPlaying,
       isRestored,
-      currentTime,
-      duration,
       volume,
       playbackRate,
       isLoading,
@@ -292,8 +301,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       episode,
       isPlaying,
       isRestored,
-      currentTime,
-      duration,
       volume,
       playbackRate,
       isLoading,
@@ -310,9 +317,18 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     ],
   );
 
+  // Time value — updates at ~4Hz. Only components that call usePlayerTime()
+  // subscribe to this, so the re-render blast radius is minimised.
+  const timeValue = useMemo(
+    () => ({ currentTime, duration }),
+    [currentTime, duration],
+  );
+
   return (
-    <PlayerContext.Provider value={value}>
-      {children}
+    <PlayerContext.Provider value={stateValue}>
+      <PlayerTimeContext.Provider value={timeValue}>
+        {children}
+      </PlayerTimeContext.Provider>
     </PlayerContext.Provider>
   );
 }
@@ -320,5 +336,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 export function usePlayer() {
   const ctx = useContext(PlayerContext);
   if (!ctx) throw new Error('usePlayer must be used within PlayerProvider');
+  return ctx;
+}
+
+export function usePlayerTime() {
+  const ctx = useContext(PlayerTimeContext);
+  if (!ctx) throw new Error('usePlayerTime must be used within PlayerProvider');
   return ctx;
 }

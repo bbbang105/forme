@@ -18,9 +18,9 @@ pnpm 모노레포: `packages/web` (Next.js 16 PWA) + `packages/shared` (DB 스�
 | 푸시알림 | web-push + Service Worker |
 | RSS | feedsmith |
 | DnD | @dnd-kit (core + sortable) |
-| 에디터 | TipTap + CodeBlockLowlight (lowlight/highlight.js 구문 하이라이팅) |
+| 에디터 | TipTap + CodeBlockLowlight (lowlight 선택적 12언어 등록) |
 | 패키지 관리 | pnpm workspace |
-| 배포 | Vercel |
+| 배포 | Vercel (리전: `icn1` 서울) |
 
 ## 개발 명령어
 
@@ -47,10 +47,13 @@ pnpm db:push          # 스키마 직접 push (dev용)
 - KST 시간대: `Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' })` 사용
 - API 트레이싱: `withTracing()` 래퍼로 모든 API 라우트 자동 타이밍 측정
 - Server Action 트레이싱: `traceAction()` + `traceQuery()` 래퍼로 DB 쿼리 성능 측정
-- 무거운 컴포넌트: `next/dynamic` + `ssr: false`로 지연 로딩 (TipTap, DnD Kit 등)
+- 무거운 컴포넌트: `next/dynamic` + `ssr: false`로 지연 로딩 (TipTap, DnD Kit, EventForm, CategoryManager 등)
 - 캘린더 인터랙션: Optimistic updates 패턴 (로컬 상태 즉시 반영, 서버 백그라운드 동기화), 데스크톱 2컬럼 (`lg:flex-row`), 모바일 단일 컬럼
 - 게이미피케이션: 출석 스트릭, 데일리 미션 (큐레이션 5개/팟캐스트 10분/투두 완료), 하이브리드 데이터 (전용 테이블 + 기존 데이터 계산)
 - 외부 API: Open-Meteo (서울 날씨, 서버 컴포넌트 fetch, revalidate 3600)
+- 팟캐스트 플레이어: `usePlayer()` (상태/컨트롤) + `usePlayerTime()` (currentTime/duration) 컨텍스트 분리
+- DB 커넥션: `max: 1` (Supabase Transaction Pooler가 실제 풀 관리, 서버리스 최적)
+- 성능: `serverExternalPackages`로 서버 전용 패키지 번들 제외, AVIF 이미지 포맷, 병렬 쿼리 (`Promise.all`)
 - 테스트: Vitest + `vi.hoisted()` Proxy 기반 DB 목 패턴 (`packages/web/src/__tests__/`)
 
 ## 핵심 파일
@@ -69,7 +72,7 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/shared/src/schema/calendar-events.ts` | 캘린더 이벤트 스키마 |
 | `packages/shared/src/schema/todos.ts` | 투두 스키마 |
 | `packages/shared/src/schema/` | Drizzle DB 스키마 (전체) |
-| `packages/shared/src/db.ts` | DB 싱글톤 (SSL 강제) |
+| `packages/shared/src/db.ts` | DB 싱글톤 (SSL 강제, max:1 서버리스 최적) |
 | `packages/web/src/lib/crawl-feed.ts` | RSS 크롤 (feedsmith, since 필터, SSRF 방어) |
 | `packages/web/src/lib/url-safety.ts` | SSRF 방어 유틸 |
 | `packages/web/src/lib/auth.ts` | 인증 유틸 (React.cache 기반 getAuthUser) |
@@ -84,7 +87,7 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/app/api/podcast/upload/route.ts` | 팟캐스트 오디오 R2 업로드 |
 | `packages/web/src/app/api/podcast/episodes/route.ts` | 팟캐스트 에피소드 CRUD |
 | `packages/web/src/app/api/push/subscribe/route.ts` | 푸시 구독 등록/해제/조회 |
-| `packages/web/src/components/features/podcast/player-context.tsx` | 팟캐스트 플레이어 (preload auto, canplay 대기, localStorage 이어듣기, 30초 청취시간 DB 동기화) |
+| `packages/web/src/components/features/podcast/player-context.tsx` | 팟캐스트 플레이어 (PlayerContext + PlayerTimeContext 분리, localStorage 이어듣기, 청취시간 DB 동기화) |
 | `packages/web/src/components/features/memo/memo-editor-lazy.tsx` | MemoEditor 지연 로딩 래퍼 (next/dynamic, ssr: false) |
 | `packages/web/src/components/features/curation/mini-card-thumbnail.tsx` | 대시보드 큐레이션 썸네일 (클라이언트 onError 폴백) |
 | `packages/web/public/sw.js` | Service Worker (PWA + 푸시 + 전략별 캐싱 + 오디오 오프라인) |
@@ -108,7 +111,7 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/components/features/memo/memo-toolbar.tsx` | 에디터 서식 툴바 (B/I/U/S, H1-H3, 리스트, 체크리스트, 링크, 이미지, 인라인코드, 코드블록) |
 | `packages/web/src/components/features/memo/image-block.tsx` | 커스텀 이미지 확장 (React NodeView: 리사이즈, 삭제 버튼, 캡션) |
 | `packages/web/src/components/features/memo/image-drop-plugin.ts` | 이미지 드래그앤드롭/붙여넣기 업로드 ProseMirror 플러그인 |
-| `packages/web/src/components/features/memo/code-block-view.tsx` | 코드블록 React NodeView (언어 셀렉터 드롭다운, 30개 언어) |
+| `packages/web/src/components/features/memo/code-block-view.tsx` | 코드블록 React NodeView (언어 셀렉터 드롭다운, 15개 언어) |
 | `packages/web/src/components/features/memo/memo-list.tsx` | 메모 목록 (서버 검색, 하이라이트, 정렬, 태그 필터, 페이지네이션) |
 | `packages/web/src/components/features/memo/memo-card.tsx` | 메모 카드 (제목+날짜+미리보기, React.memo) |
 | `packages/web/src/components/features/memo/dashboard-memo.tsx` | 대시보드 최근 메모 위젯 (에러 폴백) |
@@ -159,3 +162,4 @@ study-admin 스타일: Sky Blue `#0ea5e9` 포인트, Pretendard 폰트, 다크�
 | `docs/plans/26-03-04-memo-design.md` | 메모 기능 설계 문서 |
 | `docs/plans/26-03-04-dashboard-redesign.md` | 대시보드 리디자인 설계 (날씨+게이미피케이션) |
 | `docs/plans/26-03-05-calendar-redesign.md` | 캘린더 리디자인 설계 (카테고리+2컬럼 레이아웃) |
+| `docs/plans/26-03-05-performance-optimization.md` | PWA 성능 최적화 (리전, 번들, 렌더링, 워터폴) |

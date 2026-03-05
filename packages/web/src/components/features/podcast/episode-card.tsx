@@ -4,7 +4,7 @@ import {useState} from 'react';
 import {Clock, HardDrive, MoreHorizontal, Pause, Pencil, Play, Trash2} from 'lucide-react';
 import {cn} from '@/lib/utils';
 import {Button} from '@/components/ui/button';
-import {type Episode, usePlayer} from './player-context';
+import {type Episode, usePlayer, usePlayerTime} from './player-context';
 
 interface EpisodeCardProps {
   episode: Episode;
@@ -36,7 +36,8 @@ function formatDate(iso: string): string {
 }
 
 export function EpisodeCard({ episode, onEdit, onDelete }: EpisodeCardProps) {
-  const { episode: currentEpisode, isPlaying, isRestored, currentTime: playerTime, play, togglePlay } = usePlayer();
+  const { episode: currentEpisode, isPlaying, isRestored, play, togglePlay } = usePlayer();
+  const { currentTime: playerTime } = usePlayerTime();
   const [menuOpen, setMenuOpen] = useState(false);
 
   const isCurrentEpisode = currentEpisode?.id === episode.id;

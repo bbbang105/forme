@@ -1,6 +1,6 @@
 'use client';
 
-import {useMemo, useState} from 'react';
+import {memo, useMemo, useState} from 'react';
 import Image from 'next/image';
 import {Bookmark} from 'lucide-react';
 import {cn} from '@/lib/utils';
@@ -73,7 +73,7 @@ function Thumbnail({
   );
 }
 
-export function CurationCard({
+export const CurationCard = memo(function CurationCard({
   item,
   onToggleBookmark,
   onMarkRead,
@@ -183,10 +183,10 @@ export function CurationCard({
       </div>
     </a>
   );
-}
+});
 
 /** List row variant for desktop */
-export function CurationListRow({
+export const CurationListRow = memo(function CurationListRow({
   item,
   onToggleBookmark,
   onMarkRead,
@@ -296,4 +296,4 @@ export function CurationListRow({
       </div>
     </a>
   );
-}
+});

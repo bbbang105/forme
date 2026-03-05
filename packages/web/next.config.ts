@@ -5,8 +5,11 @@ const nextConfig: NextConfig = {
     proxyClientMaxBodySize: '200mb',
   },
   transpilePackages: ['@forme/shared'],
+  serverExternalPackages: ['@aws-sdk/client-s3', '@aws-sdk/s3-request-presigner', 'web-push'],
   poweredByHeader: false,
   images: {
+    formats: ['image/avif', 'image/webp'],
+    minimumCacheTTL: 86400,
     remotePatterns: [
       { protocol: 'https', hostname: 'dbeegbhgezhnokosrhtk.supabase.co' },
       { protocol: 'https', hostname: 'cdn.discordapp.com' },

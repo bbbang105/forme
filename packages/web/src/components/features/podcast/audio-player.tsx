@@ -3,7 +3,7 @@
 import {useCallback} from 'react';
 import {ChevronDown, Loader2, Pause, Play, SkipBack, SkipForward, Volume2, VolumeX, X,} from 'lucide-react';
 import {cn} from '@/lib/utils';
-import {usePlayer} from './player-context';
+import {usePlayer, usePlayerTime} from './player-context';
 import {Button} from '@/components/ui/button';
 
 const PLAYBACK_RATES = [0.5, 1, 1.25, 1.5, 2] as const;
@@ -23,8 +23,6 @@ export function AudioPlayer({ onCollapse }: AudioPlayerProps) {
   const {
     episode,
     isPlaying,
-    currentTime,
-    duration,
     volume,
     playbackRate,
     isLoading,
@@ -36,6 +34,7 @@ export function AudioPlayer({ onCollapse }: AudioPlayerProps) {
     skipBackward,
     close,
   } = usePlayer();
+  const { currentTime, duration } = usePlayerTime();
 
   const handleSeek = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {

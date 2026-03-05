@@ -70,9 +70,9 @@ export const PUT = withTracing('PUT /api/curation/sources/reorder', async (reque
   const items = body.items;
 
   try {
-    await db.transaction(async (tx) => {
-      for (const item of items) {
-        await tx
+    await Promise.all(
+      items.map((item) =>
+        db
           .update(curationSources)
           .set({ favoriteOrder: item.favoriteOrder })
           .where(
@@ -80,9 +80,9 @@ export const PUT = withTracing('PUT /api/curation/sources/reorder', async (reque
               eq(curationSources.id, item.id),
               eq(curationSources.userId, user.id)
             )
-          );
-      }
-    });
+          )
+      )
+    );
 
     return NextResponse.json({ ok: true });
   } catch (err) {

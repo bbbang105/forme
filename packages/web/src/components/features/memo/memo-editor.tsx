@@ -2,7 +2,7 @@
 
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {useRouter} from 'next/navigation';
-import {EditorContent, useEditor} from '@tiptap/react';
+import {EditorContent, ReactNodeViewRenderer, useEditor} from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import UnderlineExt from '@tiptap/extension-underline';
 import TaskList from '@tiptap/extension-task-list';
@@ -10,13 +10,22 @@ import TaskItem from '@tiptap/extension-task-item';
 import LinkExt from '@tiptap/extension-link';
 import {ImageBlock} from './image-block';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
-import {ReactNodeViewRenderer} from '@tiptap/react';
-import {common, createLowlight} from 'lowlight';
+import {createLowlight} from 'lowlight';
+import javascript from 'highlight.js/lib/languages/javascript';
+import typescript from 'highlight.js/lib/languages/typescript';
+import python from 'highlight.js/lib/languages/python';
+import css from 'highlight.js/lib/languages/css';
+import html from 'highlight.js/lib/languages/xml';
+import json from 'highlight.js/lib/languages/json';
+import bash from 'highlight.js/lib/languages/bash';
+import sql from 'highlight.js/lib/languages/sql';
+import markdown from 'highlight.js/lib/languages/markdown';
+import yaml from 'highlight.js/lib/languages/yaml';
+import java from 'highlight.js/lib/languages/java';
+import go from 'highlight.js/lib/languages/go';
 import Placeholder from '@tiptap/extension-placeholder';
 import CharacterCount from '@tiptap/extension-character-count';
 import {CodeBlockView} from './code-block-view';
-
-const lowlight = createLowlight(common);
 import {TaskListSort} from './task-list-sort';
 import {CollapsibleHeading} from './collapsible-heading';
 import {Extension} from '@tiptap/core';
@@ -36,6 +45,24 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+
+const lowlight = createLowlight();
+lowlight.register('javascript', javascript);
+lowlight.register('js', javascript);
+lowlight.register('typescript', typescript);
+lowlight.register('ts', typescript);
+lowlight.register('python', python);
+lowlight.register('css', css);
+lowlight.register('html', html);
+lowlight.register('xml', html);
+lowlight.register('json', json);
+lowlight.register('bash', bash);
+lowlight.register('shell', bash);
+lowlight.register('sql', sql);
+lowlight.register('markdown', markdown);
+lowlight.register('yaml', yaml);
+lowlight.register('java', java);
+lowlight.register('go', go);
 
 const MAX_TAGS = 5;
 const MAX_TAG_LENGTH = 20;

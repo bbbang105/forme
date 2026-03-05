@@ -11,37 +11,38 @@ export async function DashboardCalendar() {
   // KST today using Intl for reliability
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date());
 
-  // Get today's todos
-  const todayTodos = await db
-    .select()
-    .from(todos)
-    .where(
-      and(
-        eq(todos.userId, user.id),
-        eq(todos.date, today),
-      )
-    )
-    .orderBy(asc(todos.sortOrder), asc(todos.createdAt))
-    .limit(5);
-
   // Get upcoming events (next 7 days)
   const todayDate = new Date(today + 'T00:00:00+09:00');
   const weekLater = new Date(todayDate);
   weekLater.setDate(weekLater.getDate() + 7);
   const weekLaterStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(weekLater);
 
-  const upcomingEvents = await db
-    .select()
-    .from(calendarEvents)
-    .where(
-      and(
-        eq(calendarEvents.userId, user.id),
-        lte(calendarEvents.startDate, weekLaterStr),
-        gte(calendarEvents.endDate, today),
+  // Parallelize independent queries
+  const [todayTodos, upcomingEvents] = await Promise.all([
+    db
+      .select()
+      .from(todos)
+      .where(
+        and(
+          eq(todos.userId, user.id),
+          eq(todos.date, today),
+        )
       )
-    )
-    .orderBy(asc(calendarEvents.startDate))
-    .limit(3);
+      .orderBy(asc(todos.sortOrder), asc(todos.createdAt))
+      .limit(5),
+    db
+      .select()
+      .from(calendarEvents)
+      .where(
+        and(
+          eq(calendarEvents.userId, user.id),
+          lte(calendarEvents.startDate, weekLaterStr),
+          gte(calendarEvents.endDate, today),
+        )
+      )
+      .orderBy(asc(calendarEvents.startDate))
+      .limit(3),
+  ]);
 
   const completedCount = todayTodos.filter((t) => t.isCompleted).length;
   const totalCount = todayTodos.length;
