@@ -1,30 +1,20 @@
 'use client';
 
 import {useState, useTransition} from 'react';
-import {Check, Plus, Trash2} from 'lucide-react';
+import {CheckCircle2, ChevronRight, Circle, Pencil, Plus, Trash2} from 'lucide-react';
 import {cn} from '@/lib/utils';
-import {createTodo, deleteTodo, toggleTodo} from '@/lib/actions/todos';
+import {createTodo, deleteTodo, toggleTodo, updateTodo} from '@/lib/actions/todos';
 import {Input} from '@/components/ui/input';
-
-interface Todo {
-  id: string;
-  date: string;
-  content: string;
-  isCompleted: boolean;
-  sortOrder: number;
-}
+import type {Todo} from './types';
 
 interface TodoListProps {
   todos: Todo[];
   selectedDate: string;
-  /** Called immediately when a todo is toggled so the parent can update its state optimistically. */
   onToggle: (todoId: string, isCompleted: boolean) => void;
-  /** Called immediately with a temp todo so the parent can append it to its list. */
   onCreate: (todo: Todo) => void;
-  /** Called once the server responds so the parent can swap the temp id for the real one. */
   onCreated: (tempId: string, created: Todo) => void;
-  /** Called immediately so the parent can remove the todo from its list. */
   onDelete: (todoId: string) => void;
+  onUpdate: (todoId: string, content: string) => void;
 }
 
 export function TodoList({
@@ -34,15 +24,16 @@ export function TodoList({
   onCreate,
   onCreated,
   onDelete,
+  onUpdate,
 }: TodoListProps) {
   const [newContent, setNewContent] = useState('');
   const [isPending, startTransition] = useTransition();
+  const [showCompleted, setShowCompleted] = useState(false);
 
   const handleAdd = () => {
     const trimmed = newContent.trim();
     if (!trimmed) return;
 
-    // Build an optimistic todo with a temporary id
     const tempId = crypto.randomUUID();
     const tempTodo: Todo = {
       id: tempId,
@@ -52,7 +43,6 @@ export function TodoList({
       sortOrder: todos.length,
     };
 
-    // Update parent state immediately
     onCreate(tempTodo);
     setNewContent('');
 
@@ -60,40 +50,45 @@ export function TodoList({
       try {
         const created = await createTodo({ date: selectedDate, content: trimmed });
         if (created) {
-          // Swap the temp row with the real DB row
           onCreated(tempId, created as Todo);
         }
       } catch {
-        // On failure roll back by removing the temp todo
         onDelete(tempId);
       }
     });
   };
 
   const handleToggle = (id: string, currentIsCompleted: boolean) => {
-    // Flip optimistically before the server responds
     onToggle(id, !currentIsCompleted);
 
     startTransition(async () => {
       try {
         await toggleTodo(id);
       } catch {
-        // Roll back on failure
         onToggle(id, currentIsCompleted);
       }
     });
   };
 
   const handleDelete = (id: string) => {
-    // Remove from parent list immediately
     onDelete(id);
 
     startTransition(async () => {
       try {
         await deleteTodo(id);
       } catch {
-        // Nothing to roll back here — the user already removed it visually.
-        // A full page refresh would reconcile, but keeping it removed is acceptable UX.
+        // Acceptable UX — visually removed
+      }
+    });
+  };
+
+  const handleUpdate = (id: string, content: string) => {
+    onUpdate(id, content);
+    startTransition(async () => {
+      try {
+        await updateTodo(id, { content });
+      } catch {
+        // rollback handled by next fetch
       }
     });
   };
@@ -109,7 +104,7 @@ export function TodoList({
   const completed = todos.filter((t) => t.isCompleted);
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {/* Add todo input */}
       <div className="flex gap-2">
         <Input
@@ -135,40 +130,50 @@ export function TodoList({
 
       {/* Incomplete todos */}
       {incomplete.length > 0 && (
-        <div className="space-y-1">
+        <div className="space-y-0.5">
           {incomplete.map((todo) => (
             <TodoItem
               key={todo.id}
               todo={todo}
               onToggle={handleToggle}
               onDelete={handleDelete}
+              onUpdate={handleUpdate}
               isPending={isPending}
             />
           ))}
         </div>
       )}
 
-      {/* Completed todos */}
+      {/* Completed todos — collapsible */}
       {completed.length > 0 && (
-        <div className="space-y-1">
-          <p className="text-xs text-muted-foreground px-1 pt-2">
-            완료 ({completed.length})
-          </p>
-          {completed.map((todo) => (
-            <TodoItem
-              key={todo.id}
-              todo={todo}
-              onToggle={handleToggle}
-              onDelete={handleDelete}
-              isPending={isPending}
-            />
-          ))}
+        <div>
+          <button
+            onClick={() => setShowCompleted(!showCompleted)}
+            className="text-xs text-muted-foreground flex items-center gap-0.5 px-1 py-1 hover:text-foreground transition-colors"
+          >
+            <ChevronRight className={cn('h-3 w-3 transition-transform', showCompleted && 'rotate-90')} />
+            완료 {completed.length}개
+          </button>
+          {showCompleted && (
+            <div className="space-y-0.5 animate-fade-in">
+              {completed.map((todo) => (
+                <TodoItem
+                  key={todo.id}
+                  todo={todo}
+                  onToggle={handleToggle}
+                  onDelete={handleDelete}
+                  onUpdate={handleUpdate}
+                  isPending={isPending}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
 
       {/* Empty state */}
       {todos.length === 0 && (
-        <p className="text-sm text-muted-foreground text-center py-6">
+        <p className="text-sm text-muted-foreground text-center py-4">
           할 일이 없습니다
         </p>
       )}
@@ -180,49 +185,96 @@ function TodoItem({
   todo,
   onToggle,
   onDelete,
+  onUpdate,
   isPending,
 }: {
   todo: Todo;
   onToggle: (id: string, currentIsCompleted: boolean) => void;
   onDelete: (id: string) => void;
+  onUpdate: (id: string, content: string) => void;
   isPending: boolean;
 }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState(todo.content);
+
+  const handleSave = () => {
+    const trimmed = editContent.trim();
+    if (!trimmed) {
+      setEditContent(todo.content);
+      setIsEditing(false);
+      return;
+    }
+    if (trimmed !== todo.content) {
+      onUpdate(todo.id, trimmed);
+    }
+    setIsEditing(false);
+  };
+
+  const handleEditKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+      e.preventDefault();
+      handleSave();
+    }
+    if (e.key === 'Escape') {
+      setEditContent(todo.content);
+      setIsEditing(false);
+    }
+  };
+
   return (
     <div
       className={cn(
-        'group flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors',
+        'group flex items-center gap-2.5 px-2 py-1.5 rounded-md transition-colors',
         'hover:bg-muted/50',
       )}
     >
       <button
         onClick={() => onToggle(todo.id, todo.isCompleted)}
         disabled={isPending}
-        className={cn(
-          'flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all',
-          todo.isCompleted
-            ? 'bg-primary border-primary text-primary-foreground'
-            : 'border-border hover:border-primary/50',
-        )}
+        className="shrink-0 transition-transform active:scale-95"
       >
-        {todo.isCompleted && <Check className="h-3 w-3" />}
+        {todo.isCompleted
+          ? <CheckCircle2 className="h-[18px] w-[18px] text-primary" />
+          : <Circle className="h-[18px] w-[18px] text-muted-foreground/40 hover:text-muted-foreground/60" />
+        }
       </button>
 
-      <span
-        className={cn(
-          'flex-1 text-sm transition-colors',
-          todo.isCompleted && 'line-through text-muted-foreground',
-        )}
-      >
-        {todo.content}
-      </span>
+      {isEditing ? (
+        <input
+          value={editContent}
+          onChange={(e) => setEditContent(e.target.value)}
+          onBlur={handleSave}
+          onKeyDown={handleEditKeyDown}
+          className="flex-1 text-sm bg-transparent border-b border-primary outline-none py-0"
+          autoFocus
+        />
+      ) : (
+        <span
+          className={cn(
+            'flex-1 text-sm transition-colors',
+            todo.isCompleted && 'line-through text-muted-foreground',
+          )}
+        >
+          {todo.content}
+        </span>
+      )}
 
-      <button
-        onClick={() => onDelete(todo.id)}
-        disabled={isPending}
-        className="opacity-0 group-hover:opacity-100 flex-shrink-0 p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-all"
-      >
-        <Trash2 className="h-3.5 w-3.5" />
-      </button>
+      <div className="flex items-center gap-0.5 shrink-0 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+        <button
+          onClick={() => { setEditContent(todo.content); setIsEditing(true); }}
+          disabled={isPending || isEditing}
+          className="p-1 rounded hover:bg-muted/50 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+        >
+          <Pencil className="h-3.5 w-3.5" />
+        </button>
+        <button
+          onClick={() => onDelete(todo.id)}
+          disabled={isPending}
+          className="p-1 rounded hover:bg-destructive/10 text-destructive/50 hover:text-destructive transition-colors"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      </div>
     </div>
   );
 }

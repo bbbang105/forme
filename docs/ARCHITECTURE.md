@@ -1,6 +1,6 @@
 # forme - 아키텍처 & 기술 선정 이유
 
-> 최종 업데이트: 2026-03-04 (성능 최적화 반영)
+> 최종 업데이트: 2026-03-05 (캘린더 카테고리 + 2컬럼 레이아웃 반영)
 
 개인 올인원 PWA. 큐레이션(RSS), 캘린더, 메모(리치 에디터), 팟캐스트를 하나의 앱에 통합.
 모바일 퍼스트, 오프라인 지원, 푸시 알림까지 네이티브 앱 수준의 경험을 웹으로 제공.
@@ -45,7 +45,7 @@ graph TB
   SW -->|web-push| API
 ```
 
-**핵심 원칙**: Server Components 우선, RLS로 데이터 격리, 서버 측 입력 검증 필수, 최소한의 클라이언트 상태, 무거운 컴포넌트 지연 로딩, 인터랙션 optimistic updates.
+**핵심 원칙**: Server Components 우선, RLS로 데이터 격리, 서버 측 입력 검증 필수, 최소한의 클라이언트 상태, 무거운 컴포넌트 지연 로딩, 인터랙션 optimistic updates, 반응형 레이아웃 (모바일 단일컬럼 ↔ 데스크톱 멀티컬럼).
 
 ---
 
@@ -171,7 +171,7 @@ flowchart LR
 - **업로드**: API Route → FormData → R2 업로드 (Cache-Control 포함) → URL 반환
 - **크롤링**: Cron/SSE → feedsmith 파싱 → SSRF 방어 → DB 적재
 - **인증**: `React.cache` 기반 `getAuthUser()` — 동일 요청 내 중복 인증 제거
-- **캘린더**: Optimistic updates — 로컬 상태 즉시 반영, 서버 백그라운드 동기화
+- **캘린더**: Optimistic updates — 로컬 상태 즉시 반영, 서버 백그라운드 동기화. 데스크톱 2컬럼 (`lg:flex-row` 캘린더 | 상세), 모바일 단일 컬럼. 이벤트 카테고리(아이콘+색상) 지원
 
 ---
 
@@ -206,13 +206,28 @@ erDiagram
     boolean isBookmarked
   }
 
+  event_categories {
+    uuid id PK
+    uuid userId
+    varchar name
+    varchar color
+    varchar icon
+    integer sortOrder
+  }
+
   calendar_events {
     uuid id PK
     uuid userId
-    text title
+    varchar title
     date startDate
     date endDate
-    text color
+    varchar startTime
+    varchar endTime
+    varchar color
+    text description
+    varchar location
+    uuid categoryId FK
+    boolean isCompleted
   }
 
   todos {
@@ -250,9 +265,10 @@ erDiagram
   }
 
   curation_sources ||--o{ curation_items : "1:N sourceId"
+  event_categories ||--o{ calendar_events : "1:N categoryId"
 ```
 
-**9개 테이블**, 모든 테이블에 `userId` + RLS. `memos.content`는 TipTap JSON (JSONB), `contentText`는 검색용 평문 인덱스.
+**10개 테이블**, 모든 테이블에 `userId` + RLS. `memos.content`는 TipTap JSON (JSONB), `contentText`는 검색용 평문 인덱스.
 
 ---
 
@@ -313,6 +329,7 @@ erDiagram
 |--------|--------|-----------|
 | `calendar_events` | `(userId, startDate, endDate)` 복합 | 월간 이벤트 조회 |
 | `todos` | `(userId, date)` 복합 | 날짜별 투두 조회 |
+| `event_categories` | `(userId, sortOrder)` 복합 | 사용자별 카테고리 정렬 조회 |
 | `curation_items` | `(sourceId, url)` unique | 중복 방지 |
 
 ### 트레이싱

@@ -48,7 +48,7 @@ pnpm db:push          # 스키마 직접 push (dev용)
 - API 트레이싱: `withTracing()` 래퍼로 모든 API 라우트 자동 타이밍 측정
 - Server Action 트레이싱: `traceAction()` + `traceQuery()` 래퍼로 DB 쿼리 성능 측정
 - 무거운 컴포넌트: `next/dynamic` + `ssr: false`로 지연 로딩 (TipTap, DnD Kit 등)
-- 캘린더 인터랙션: Optimistic updates 패턴 (로컬 상태 즉시 반영, 서버 백그라운드 동기화)
+- 캘린더 인터랙션: Optimistic updates 패턴 (로컬 상태 즉시 반영, 서버 백그라운드 동기화), 데스크톱 2컬럼 (`lg:flex-row`), 모바일 단일 컬럼
 - 게이미피케이션: 출석 스트릭, 데일리 미션 (큐레이션 5개/팟캐스트 10분/투두 완료), 하이브리드 데이터 (전용 테이블 + 기존 데이터 계산)
 - 외부 API: Open-Meteo (서울 날씨, 서버 컴포넌트 fetch, revalidate 3600)
 - 테스트: Vitest + `vi.hoisted()` Proxy 기반 DB 목 패턴 (`packages/web/src/__tests__/`)
@@ -91,11 +91,15 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/app/manifest.ts` | PWA 매니페스트 (MetadataRoute) |
 | `packages/web/src/lib/actions/calendar.ts` | 캘린더 이벤트 Server Actions (CRUD + 입력 검증) |
 | `packages/web/src/lib/actions/todos.ts` | 투두 Server Actions (CRUD + 토글 + 입력 검증) |
-| `packages/web/src/components/features/calendar/calendar-client.tsx` | 캘린더 메인 클라이언트 (월간뷰, 스와이프, optimistic updates) |
+| `packages/web/src/components/features/calendar/calendar-client.tsx` | 캘린더 메인 클라이언트 (월간뷰, 스와이프, optimistic updates, 데스크톱 2컬럼 레이아웃) |
 | `packages/web/src/components/features/calendar/calendar-grid.tsx` | 캘린더 그리드 (DayCell React.memo, 이벤트/투두 도트) |
 | `packages/web/src/components/features/calendar/todo-list.tsx` | 투두 리스트 (optimistic 추가/토글/삭제, IME 처리) |
 | `packages/web/src/components/features/calendar/event-form.tsx` | 이벤트 폼 (생성/수정/삭제, optimistic 콜백) |
 | `packages/web/src/components/features/calendar/event-list.tsx` | 이벤트 목록 (선택 날짜별 필터링) |
+| `packages/web/src/components/features/calendar/category-manager.tsx` | 이벤트 카테고리 관리 다이얼로그 |
+| `packages/web/src/components/features/calendar/types.ts` | 캘린더 공유 타입 (CalendarEvent, Todo, EventCategory) |
+| `packages/shared/src/schema/event-categories.ts` | 이벤트 카테고리 스키마 |
+| `packages/web/src/lib/actions/categories.ts` | 카테고리 Server Actions (CRUD) |
 | `packages/web/src/components/features/calendar/dashboard-calendar.tsx` | 대시보드 캘린더 위젯 (오늘 할일 + 다가오는 일정) |
 | `packages/web/src/hooks/use-swipe.ts` | 터치 스와이프 훅 (모바일 월 이동) |
 | `packages/shared/src/schema/memos.ts` | 메모 스키마 (JSONB content + contentText + tags) |
@@ -154,3 +158,4 @@ study-admin 스타일: Sky Blue `#0ea5e9` 포인트, Pretendard 폰트, 다크�
 | `docs/26-03-03-patterns.md` | 인증/API/ORM 코드 패턴 |
 | `docs/plans/26-03-04-memo-design.md` | 메모 기능 설계 문서 |
 | `docs/plans/26-03-04-dashboard-redesign.md` | 대시보드 리디자인 설계 (날씨+게이미피케이션) |
+| `docs/plans/26-03-05-calendar-redesign.md` | 캘린더 리디자인 설계 (카테고리+2컬럼 레이아웃) |

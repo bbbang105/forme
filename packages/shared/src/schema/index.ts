@@ -1,6 +1,7 @@
 export * from './profiles';
 export * from './curation-sources';
 export * from './curation-items';
+export * from './event-categories';
 export * from './calendar-events';
 export * from './todos';
 export * from './podcast';

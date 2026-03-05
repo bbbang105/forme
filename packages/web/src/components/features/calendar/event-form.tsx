@@ -5,6 +5,7 @@ import {format} from 'date-fns';
 import {Input} from '@/components/ui/input';
 import {Button} from '@/components/ui/button';
 import {Label} from '@/components/ui/label';
+import {Switch} from '@/components/ui/switch';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -24,37 +25,45 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import {createCalendarEvent, deleteCalendarEvent, updateCalendarEvent} from '@/lib/actions/calendar';
-import {Trash2} from 'lucide-react';
+import {MapPin, Trash2} from 'lucide-react';
+import {cn} from '@/lib/utils';
+import type {CalendarEvent, EventCategory} from './types';
 
 const EVENT_COLORS = [
   { value: '#3b82f6', label: '파랑' },
   { value: '#f43f5e', label: '빨강' },
   { value: '#a855f7', label: '보라' },
-  { value: '#10b981', label: '초록' },
+  { value: '#22c55e', label: '초록' },
   { value: '#f59e0b', label: '노랑' },
   { value: '#6b7280', label: '회색' },
+  { value: '#8b5cf6', label: '바이올렛' },
+  { value: '#ec4899', label: '핑크' },
 ];
 
-interface CalendarEventData {
-  id: string;
-  title: string;
-  startDate: string;
-  endDate: string;
-  color: string;
-  description: string | null;
+/**
+ * Auto-format time input: strips non-digits, inserts colon after 2 digits,
+ * clamps hours to 0-23 and minutes to 0-59.
+ */
+function formatTimeInput(raw: string): string {
+  const digits = raw.replace(/\D/g, '').slice(0, 4);
+  if (digits.length <= 2) return digits;
+  let hh = digits.slice(0, 2);
+  let mm = digits.slice(2);
+  if (Number(hh) > 23) hh = '23';
+  if (mm.length === 2 && Number(mm) > 59) mm = '59';
+  return `${hh}:${mm}`;
 }
 
 interface EventFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  event?: CalendarEventData | null;
+  event?: CalendarEvent | null;
   defaultDate?: string;
-  /** Called with the newly created event returned from the server. */
-  onEventCreate: (event: CalendarEventData) => void;
-  /** Called with the full updated event returned from the server. */
-  onEventUpdate: (event: CalendarEventData) => void;
-  /** Called with the id of the deleted event so the parent can remove it. */
+  categories: EventCategory[];
+  onEventCreate: (event: CalendarEvent) => void;
+  onEventUpdate: (event: CalendarEvent) => void;
   onEventDelete: (eventId: string) => void;
+  onManageCategories?: () => void;
 }
 
 export function EventForm({
@@ -62,9 +71,11 @@ export function EventForm({
   onOpenChange,
   event,
   defaultDate,
+  categories,
   onEventCreate,
   onEventUpdate,
   onEventDelete,
+  onManageCategories,
 }: EventFormProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -72,10 +83,12 @@ export function EventForm({
         <EventFormContent
           event={event}
           defaultDate={defaultDate}
+          categories={categories}
           onOpenChange={onOpenChange}
           onEventCreate={onEventCreate}
           onEventUpdate={onEventUpdate}
           onEventDelete={onEventDelete}
+          onManageCategories={onManageCategories}
         />
       )}
     </Dialog>
@@ -85,17 +98,21 @@ export function EventForm({
 function EventFormContent({
   event,
   defaultDate,
+  categories,
   onOpenChange,
   onEventCreate,
   onEventUpdate,
   onEventDelete,
+  onManageCategories,
 }: {
-  event?: CalendarEventData | null;
+  event?: CalendarEvent | null;
   defaultDate?: string;
+  categories: EventCategory[];
   onOpenChange: (open: boolean) => void;
-  onEventCreate: (event: CalendarEventData) => void;
-  onEventUpdate: (event: CalendarEventData) => void;
+  onEventCreate: (event: CalendarEvent) => void;
+  onEventUpdate: (event: CalendarEvent) => void;
   onEventDelete: (eventId: string) => void;
+  onManageCategories?: () => void;
 }) {
   const isEditing = !!event;
   const [title, setTitle] = useState(event?.title ?? '');
@@ -105,38 +122,48 @@ function EventFormContent({
   const [endDate, setEndDate] = useState(
     event?.endDate ?? defaultDate ?? format(new Date(), 'yyyy-MM-dd')
   );
-  const [color, setColor] = useState(event?.color ?? '#3b82f6');
+  const [isAllDay, setIsAllDay] = useState(!event?.startTime);
+  const [startTime, setStartTime] = useState(event?.startTime ?? '09:00');
+  const [endTime, setEndTime] = useState(event?.endTime ?? '10:00');
+  const [color, setColor] = useState(event?.color ?? categories[0]?.color ?? '#3b82f6');
   const [description, setDescription] = useState(event?.description ?? '');
+  const [location, setLocation] = useState(event?.location ?? '');
+  const [categoryId, setCategoryId] = useState<string | null>(event?.categoryId ?? null);
   const [error, setError] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isPending, startTransition] = useTransition();
+
+  const handleCategorySelect = (cat: EventCategory) => {
+    setCategoryId(cat.id);
+    setColor(cat.color);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     startTransition(async () => {
       try {
+        const eventData = {
+          title,
+          startDate,
+          endDate,
+          startTime: isAllDay ? null : startTime,
+          endTime: isAllDay ? null : endTime,
+          color,
+          description: description || null,
+          location: location || null,
+          categoryId,
+        };
+
         if (isEditing && event) {
-          const updated = await updateCalendarEvent(event.id, {
-            title,
-            startDate,
-            endDate,
-            color,
-            description: description || null,
-          });
+          const updated = await updateCalendarEvent(event.id, eventData);
           if (updated) {
-            onEventUpdate(updated as CalendarEventData);
+            onEventUpdate(updated as CalendarEvent);
           }
         } else {
-          const created = await createCalendarEvent({
-            title,
-            startDate,
-            endDate,
-            color,
-            description: description || undefined,
-          });
+          const created = await createCalendarEvent(eventData);
           if (created) {
-            onEventCreate(created as CalendarEventData);
+            onEventCreate(created as CalendarEvent);
           }
         }
         onOpenChange(false);
@@ -161,7 +188,7 @@ function EventFormContent({
   };
 
   return (
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" onInteractOutside={(e) => e.preventDefault()} onPointerDownOutside={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle>{isEditing ? '일정 수정' : '새 일정'}</DialogTitle>
           <DialogDescription>
@@ -176,24 +203,71 @@ function EventFormContent({
             </p>
           )}
 
+          {/* 제목 */}
           <div className="space-y-2">
-            <Label htmlFor="event-title">제목</Label>
             <Input
-              id="event-title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="일정 제목"
+              placeholder="일정 제목을 입력하세요"
               maxLength={200}
               required
               autoFocus
+              className="text-base font-medium border-0 border-b border-border rounded-none px-0 focus-visible:ring-0 focus-visible:border-primary"
             />
           </div>
 
+          {/* 카테고리 칩 */}
+          {categories.length > 0 && (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs text-muted-foreground">카테고리</Label>
+                {onManageCategories && (
+                  <button
+                    type="button"
+                    onClick={() => { onOpenChange(false); onManageCategories(); }}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    관리
+                  </button>
+                )}
+              </div>
+              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                {categories.map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => handleCategorySelect(cat)}
+                    className={cn(
+                      'flex items-center gap-1 px-3 py-1.5 rounded-full text-xs whitespace-nowrap border transition-all shrink-0',
+                      categoryId === cat.id
+                        ? 'font-medium'
+                        : 'border-border text-muted-foreground hover:bg-muted/50'
+                    )}
+                    style={categoryId === cat.id ? {
+                      borderColor: cat.color,
+                      backgroundColor: `${cat.color}15`,
+                      color: cat.color,
+                    } : undefined}
+                  >
+                    <span>{cat.icon}</span>
+                    <span>{cat.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 종일 토글 */}
+          <div className="flex items-center justify-between">
+            <Label className="text-sm">종일</Label>
+            <Switch checked={isAllDay} onCheckedChange={setIsAllDay} />
+          </div>
+
+          {/* 날짜 */}
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label htmlFor="event-start">시작일</Label>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">시작일</Label>
               <Input
-                id="event-start"
                 type="date"
                 value={startDate}
                 onChange={(e) => {
@@ -203,10 +277,9 @@ function EventFormContent({
                 required
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="event-end">종료일</Label>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">종료일</Label>
               <Input
-                id="event-end"
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
@@ -216,15 +289,58 @@ function EventFormContent({
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label>색상</Label>
+          {/* 시간 (종일이 아닐 때) — 24시간 텍스트 입력 */}
+          {!isAllDay && (
+            <div className="grid grid-cols-2 gap-3 animate-fade-in">
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">시작 시간</Label>
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="09:00"
+                  value={startTime}
+                  onChange={(e) => setStartTime(formatTimeInput(e.target.value))}
+                  maxLength={5}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">종료 시간</Label>
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="10:00"
+                  value={endTime}
+                  onChange={(e) => setEndTime(formatTimeInput(e.target.value))}
+                  maxLength={5}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* 장소 */}
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground flex items-center gap-1">
+              <MapPin className="h-3 w-3" />
+              장소
+            </Label>
+            <Input
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="장소를 입력하세요 (선택)"
+              maxLength={200}
+            />
+          </div>
+
+          {/* 색상 */}
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">색상</Label>
             <div className="flex gap-2">
               {EVENT_COLORS.map((c) => (
                 <button
                   key={c.value}
                   type="button"
                   onClick={() => setColor(c.value)}
-                  className="w-7 h-7 rounded-full transition-all border-2"
+                  className="w-6 h-6 rounded-full transition-all border-2"
                   style={{
                     backgroundColor: c.value,
                     borderColor: color === c.value ? 'var(--foreground)' : 'transparent',
@@ -236,10 +352,10 @@ function EventFormContent({
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="event-desc">메모 (선택)</Label>
+          {/* 메모 */}
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">메모 (선택)</Label>
             <textarea
-              id="event-desc"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="간단한 메모..."
@@ -272,13 +388,12 @@ function EventFormContent({
             >
               취소
             </Button>
-            <Button type="submit" size="sm" disabled={isPending}>
+            <Button type="submit" size="sm" disabled={isPending} className="w-full sm:w-auto">
               {isPending ? '저장 중...' : isEditing ? '수정' : '추가'}
             </Button>
           </DialogFooter>
         </form>
 
-        {/* Delete confirmation dialog */}
         <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
           <AlertDialogContent>
             <AlertDialogHeader>
