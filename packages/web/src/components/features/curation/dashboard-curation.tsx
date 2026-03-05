@@ -5,6 +5,7 @@ import {formatRelativeDate, getArticleGradient, getCategoryStyle,} from '@/lib/c
 import {createClient} from '@/lib/supabase/server';
 import {curationItems, curationSources, db} from '@forme/shared';
 import {and, desc, eq, sql} from 'drizzle-orm';
+import {MiniCardLink} from './mini-card-link';
 import {MiniCardThumbnail} from './mini-card-thumbnail';
 
 /**
@@ -109,10 +110,9 @@ function MiniCard({ item }: { item: MiniCardItem }) {
   const gradient = getArticleGradient(item.title);
 
   return (
-    <a
+    <MiniCardLink
+      itemId={item.id}
       href={item.url}
-      target="_blank"
-      rel="noopener noreferrer"
       className={cn(
         'group flex items-center gap-3 p-3 rounded-lg border border-border/60',
         'hover:border-primary/30 hover:shadow-sm transition-all',
@@ -154,6 +154,6 @@ function MiniCard({ item }: { item: MiniCardItem }) {
       </div>
 
       <ExternalLink className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-primary transition-colors shrink-0" />
-    </a>
+    </MiniCardLink>
   );
 }

@@ -12,6 +12,7 @@ auth.users (Supabase 관리)
   └── memos (1:N)
   └── podcast_episodes (1:N)
   └── push_subscriptions (1:N)
+  └── user_daily_activity (1:N)
 ```
 
 모든 테이블에 `user_id` FK → RLS `auth.uid() = user_id` 적용.
@@ -72,6 +73,18 @@ auth.users (Supabase 관리)
 | is_read | BOOLEAN | NOT NULL | DEFAULT false |
 | is_bookmarked | BOOLEAN | NOT NULL | DEFAULT false |
 | collected_at | TIMESTAMPTZ | NOT NULL | DEFAULT NOW() |
+| read_at | TIMESTAMPTZ | NULL | 읽음 처리 시각 (게이미피케이션 스트릭 계산용) |
+
+### user_daily_activity
+
+| 컬럼 | 타입 | Nullable | 비고 |
+|------|------|----------|------|
+| id | UUID | PK | |
+| user_id | UUID | NOT NULL | |
+| date | DATE | NOT NULL | UNIQUE(user_id, date) |
+| logged_in | BOOLEAN | NOT NULL | DEFAULT true, 출석 기록 |
+| podcast_listen_seconds | INTEGER | NOT NULL | DEFAULT 0, 일일 누적 청취 시간 |
+| created_at | TIMESTAMPTZ | NOT NULL | DEFAULT NOW() |
 
 ### calendar_events
 
@@ -162,3 +175,4 @@ auth.users (Supabase 관리)
 | push_subscriptions | idx_push_subs_endpoint | endpoint (UNIQUE) |
 | push_subscriptions | idx_push_subs_user | user_id |
 | curation_items | idx_items_bookmarked | is_bookmarked (WHERE true) |
+| user_daily_activity | idx_user_daily_activity_user_date | user_id, date (UNIQUE) |

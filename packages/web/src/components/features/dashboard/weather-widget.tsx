@@ -10,7 +10,7 @@ export async function WeatherWidget() {
 
   return (
     <div className="flex items-center gap-2 text-sm text-muted-foreground">
-      <span className="text-lg">{icon}</span>
+      <span className="text-lg" title={label}>{icon}</span>
       <span className="font-medium text-foreground">{weather.temperature}°</span>
       <span className="text-xs">
         체감 {weather.apparentTemperature}° · {weather.dailyMin}° / {weather.dailyMax}°

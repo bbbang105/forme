@@ -400,6 +400,39 @@ forme-audio-v1 (오디오 전용):
   *.mp3/m4a/wav/ogg/webm/aac → cache-first (오프라인 재생)
 ```
 
+## 게이미피케이션 패턴 (데일리 미션 + 스트릭)
+
+```typescript
+// packages/web/src/lib/actions/activity.ts
+// 하이브리드 데이터: user_daily_activity(출석/팟캐스트) + 기존 테이블(큐레이션/투두) 계산
+// 7개 독립 쿼리를 Promise.all로 병렬 실행 (140~350ms 절약)
+export async function getDailyMissionStats() {
+  const [activityRows, curationReadRows, ...rest] = await Promise.all([
+    traceQuery('activity.streak-data', () => db.select(...)),
+    traceQuery('activity.curation-reads', () => db.select(...)),
+    // ... 5개 더
+  ]);
+  return { attendance, curation, podcast, todos }; // 각각 today/target/streak
+}
+
+// 스트릭 계산: DESC 정렬된 날짜 배열에서 오늘부터 연속 일수 카운트
+// 팟캐스트: addListeningTime(delta) → SQL INCREMENT + LEAST(86400) 일일 상한
+// 출석: recordAttendance() → onConflictDoNothing (idempotent)
+```
+
+## 외부 API 패턴 (Open-Meteo 날씨)
+
+```typescript
+// packages/web/src/lib/weather.ts
+// 서버 컴포넌트에서 호출, next: { revalidate: 3600 } (1시간 캐시)
+// 서울 좌표 고정 (37.57, 126.98), API 키 불필요
+// WMO weather code → 한국어 라벨 + 이모지 매핑
+// 실패 시 null 반환 (graceful degradation)
+const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`, {
+  next: { revalidate: 3600 },
+});
+```
+
 ## 컴포넌트 Import 패턴
 
 ```typescript

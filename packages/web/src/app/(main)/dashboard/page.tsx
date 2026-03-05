@@ -1,14 +1,14 @@
-import { Suspense } from 'react';
-import { DashboardCuration } from '@/components/features/curation/dashboard-curation';
-import { DashboardCalendar } from '@/components/features/calendar/dashboard-calendar';
-import { DashboardMemo } from '@/components/features/memo/dashboard-memo';
-import { WeatherWidget } from '@/components/features/dashboard/weather-widget';
-import { DailyMissions } from '@/components/features/dashboard/daily-missions';
-import { AttendanceRecorder } from '@/components/features/dashboard/attendance-recorder';
-import { createClient } from '@/lib/supabase/server';
-import { db, profiles } from '@forme/shared';
-import { eq } from 'drizzle-orm';
-import { getFormattedDate, getGreeting } from '@/lib/greetings';
+import {Suspense} from 'react';
+import {DashboardCuration} from '@/components/features/curation/dashboard-curation';
+import {DashboardCalendar} from '@/components/features/calendar/dashboard-calendar';
+import {DashboardMemo} from '@/components/features/memo/dashboard-memo';
+import {WeatherWidget} from '@/components/features/dashboard/weather-widget';
+import {DailyMissions} from '@/components/features/dashboard/daily-missions';
+import {AttendanceRecorder} from '@/components/features/dashboard/attendance-recorder';
+import {createClient} from '@/lib/supabase/server';
+import {db, profiles} from '@forme/shared';
+import {eq} from 'drizzle-orm';
+import {getFormattedDate, getGreeting} from '@/lib/greetings';
 
 function WidgetSkeleton() {
   return (

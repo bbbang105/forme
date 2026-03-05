@@ -1,9 +1,9 @@
 'use server';
 
-import { getAuthUser } from '@/lib/auth';
-import { traceAction, traceQuery } from '@/lib/logger';
-import { db, userDailyActivity, curationItems, curationSources, todos } from '@forme/shared';
-import { and, eq, sql, desc, count } from 'drizzle-orm';
+import {getAuthUser} from '@/lib/auth';
+import {traceAction, traceQuery} from '@/lib/logger';
+import {curationItems, curationSources, db, todos, userDailyActivity} from '@forme/shared';
+import {and, count, desc, eq, sql} from 'drizzle-orm';
 
 function getKstToday(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date());
@@ -47,7 +47,7 @@ export async function addListeningTime(deltaSeconds: number) {
         .onConflictDoUpdate({
           target: [userDailyActivity.userId, userDailyActivity.date],
           set: {
-            podcastListenSeconds: sql`${userDailyActivity.podcastListenSeconds} + ${rounded}`,
+            podcastListenSeconds: sql`LEAST(${userDailyActivity.podcastListenSeconds} + ${rounded}, 86400)`,
           },
         })
     );
@@ -60,120 +60,126 @@ export async function getDailyMissionStats() {
     const user = await getAuthUser();
     const today = getKstToday();
 
-    // 1. 출석 데이터 (연속 로그인)
-    const activityRows = await traceQuery('activity.streak-data', () =>
-      db
-        .select({ date: userDailyActivity.date })
-        .from(userDailyActivity)
-        .where(eq(userDailyActivity.userId, user.id))
-        .orderBy(desc(userDailyActivity.date))
-        .limit(365)
-    );
+    // 모든 쿼리를 병렬 실행 (독립적, 서로 의존 없음)
+    const [
+      activityRows,
+      curationReadRows,
+      curationDailyReads,
+      podcastTimeRows,
+      podcastDays,
+      todayTodos,
+      todoCompleteDays,
+    ] = await Promise.all([
+      // 1. 출석 데이터 (연속 로그인)
+      traceQuery('activity.streak-data', () =>
+        db
+          .select({ date: userDailyActivity.date })
+          .from(userDailyActivity)
+          .where(eq(userDailyActivity.userId, user.id))
+          .orderBy(desc(userDailyActivity.date))
+          .limit(365)
+      ),
+      // 2. 오늘 큐레이션 읽은 수
+      traceQuery('activity.curation-reads', () =>
+        db
+          .select({ count: count() })
+          .from(curationItems)
+          .innerJoin(curationSources, eq(curationItems.sourceId, curationSources.id))
+          .where(
+            and(
+              eq(curationSources.userId, user.id),
+              eq(curationItems.isRead, true),
+              sql`DATE(${curationItems.readAt} AT TIME ZONE 'Asia/Seoul') = ${today}`,
+            )
+          )
+      ),
+      // 3. 큐레이션 스트릭 (연속 5개 이상 읽은 일수)
+      traceQuery('activity.curation-daily', () =>
+        db
+          .select({
+            date: sql<string>`DATE(${curationItems.readAt} AT TIME ZONE 'Asia/Seoul')`.as('read_date'),
+            count: count(),
+          })
+          .from(curationItems)
+          .innerJoin(curationSources, eq(curationItems.sourceId, curationSources.id))
+          .where(
+            and(
+              eq(curationSources.userId, user.id),
+              eq(curationItems.isRead, true),
+              sql`${curationItems.readAt} IS NOT NULL`,
+            )
+          )
+          .groupBy(sql`DATE(${curationItems.readAt} AT TIME ZONE 'Asia/Seoul')`)
+          .having(sql`COUNT(*) >= 5`)
+          .orderBy(sql`read_date DESC`)
+          .limit(365)
+      ),
+      // 4. 오늘 팟캐스트 청취 시간
+      traceQuery('activity.podcast-time', () =>
+        db
+          .select({ seconds: userDailyActivity.podcastListenSeconds })
+          .from(userDailyActivity)
+          .where(
+            and(
+              eq(userDailyActivity.userId, user.id),
+              eq(userDailyActivity.date, today),
+            )
+          )
+      ),
+      // 5. 팟캐스트 스트릭 (연속 10분 이상)
+      traceQuery('activity.podcast-daily', () =>
+        db
+          .select({ date: userDailyActivity.date })
+          .from(userDailyActivity)
+          .where(
+            and(
+              eq(userDailyActivity.userId, user.id),
+              sql`${userDailyActivity.podcastListenSeconds} >= 600`,
+            )
+          )
+          .orderBy(desc(userDailyActivity.date))
+          .limit(365)
+      ),
+      // 6. 오늘 투두 현황
+      traceQuery('activity.todos-today', () =>
+        db
+          .select({
+            total: count(),
+            completed: sql<number>`COUNT(*) FILTER (WHERE ${todos.isCompleted} = true)`,
+          })
+          .from(todos)
+          .where(
+            and(
+              eq(todos.userId, user.id),
+              eq(todos.date, today),
+            )
+          )
+      ),
+      // 7. 투두 스트릭 (연속 전체 완료)
+      traceQuery('activity.todos-streak', () =>
+        db
+          .select({ date: todos.date })
+          .from(todos)
+          .where(eq(todos.userId, user.id))
+          .groupBy(todos.date)
+          .having(
+            and(
+              sql`COUNT(*) > 0`,
+              sql`COUNT(*) FILTER (WHERE ${todos.isCompleted} = false) = 0`,
+            )
+          )
+          .orderBy(sql`${todos.date} DESC`)
+          .limit(365)
+      ),
+    ]);
+
     const attendanceStreak = calculateStreak(activityRows.map(r => r.date), today);
-
-    // 2. 오늘 큐레이션 읽은 수
-    const [curationResult] = await traceQuery('activity.curation-reads', () =>
-      db
-        .select({ count: count() })
-        .from(curationItems)
-        .innerJoin(curationSources, eq(curationItems.sourceId, curationSources.id))
-        .where(
-          and(
-            eq(curationSources.userId, user.id),
-            eq(curationItems.isRead, true),
-            sql`DATE(${curationItems.readAt} AT TIME ZONE 'Asia/Seoul') = ${today}`,
-          )
-        )
-    );
-    const curationReadsToday = curationResult?.count ?? 0;
-
-    // 3. 큐레이션 스트릭 (연속 5개 이상 읽은 일수)
-    const curationDailyReads = await traceQuery('activity.curation-daily', () =>
-      db
-        .select({
-          date: sql<string>`DATE(${curationItems.readAt} AT TIME ZONE 'Asia/Seoul')`.as('read_date'),
-          count: count(),
-        })
-        .from(curationItems)
-        .innerJoin(curationSources, eq(curationItems.sourceId, curationSources.id))
-        .where(
-          and(
-            eq(curationSources.userId, user.id),
-            eq(curationItems.isRead, true),
-            sql`${curationItems.readAt} IS NOT NULL`,
-          )
-        )
-        .groupBy(sql`DATE(${curationItems.readAt} AT TIME ZONE 'Asia/Seoul')`)
-        .having(sql`COUNT(*) >= 5`)
-        .orderBy(sql`read_date DESC`)
-        .limit(365)
-    );
+    const curationReadsToday = curationReadRows[0]?.count ?? 0;
     const curationStreak = calculateStreak(curationDailyReads.map(r => r.date), today);
-
-    // 4. 오늘 팟캐스트 청취 시간
-    const [podcastResult] = await traceQuery('activity.podcast-time', () =>
-      db
-        .select({ seconds: userDailyActivity.podcastListenSeconds })
-        .from(userDailyActivity)
-        .where(
-          and(
-            eq(userDailyActivity.userId, user.id),
-            eq(userDailyActivity.date, today),
-          )
-        )
-    );
-    const podcastSecondsToday = podcastResult?.seconds ?? 0;
-
-    // 5. 팟캐스트 스트릭 (연속 10분 이상)
-    const podcastDays = await traceQuery('activity.podcast-daily', () =>
-      db
-        .select({ date: userDailyActivity.date })
-        .from(userDailyActivity)
-        .where(
-          and(
-            eq(userDailyActivity.userId, user.id),
-            sql`${userDailyActivity.podcastListenSeconds} >= 600`,
-          )
-        )
-        .orderBy(desc(userDailyActivity.date))
-        .limit(365)
-    );
+    const podcastSecondsToday = podcastTimeRows[0]?.seconds ?? 0;
     const podcastStreak = calculateStreak(podcastDays.map(r => r.date), today);
-
-    // 6. 오늘 투두 현황
-    const todayTodos = await traceQuery('activity.todos-today', () =>
-      db
-        .select({
-          total: count(),
-          completed: sql<number>`COUNT(*) FILTER (WHERE ${todos.isCompleted} = true)`,
-        })
-        .from(todos)
-        .where(
-          and(
-            eq(todos.userId, user.id),
-            eq(todos.date, today),
-          )
-        )
-    );
     const todosTotal = todayTodos[0]?.total ?? 0;
     const todosCompleted = todayTodos[0]?.completed ?? 0;
-
-    // 7. 투두 스트릭 (연속 전체 완료)
-    const todoCompleteDays = await traceQuery('activity.todos-streak', () =>
-      db
-        .select({ date: todos.date })
-        .from(todos)
-        .where(eq(todos.userId, user.id))
-        .groupBy(todos.date)
-        .having(
-          and(
-            sql`COUNT(*) > 0`,
-            sql`COUNT(*) FILTER (WHERE ${todos.isCompleted} = false) = 0`,
-          )
-        )
-        .orderBy(sql`${todos.date} DESC`)
-        .limit(365)
-    );
     const todoStreak = calculateStreak(todoCompleteDays.map(r => r.date), today);
 
     return {
