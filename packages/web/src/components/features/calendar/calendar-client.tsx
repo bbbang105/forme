@@ -1,6 +1,6 @@
 'use client';
 
-import {useCallback, useEffect, useMemo, useState, useTransition} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState, useTransition} from 'react';
 import {addMonths, endOfMonth, format, startOfMonth, subMonths} from 'date-fns';
 import {ko} from 'date-fns/locale';
 import {CalendarDays, ChevronLeft, ChevronRight, Plus} from 'lucide-react';
@@ -10,26 +10,12 @@ import {CalendarGrid} from './calendar-grid';
 import {TodoList} from './todo-list';
 import {EventList} from './event-list';
 import {EventForm} from './event-form';
-import {getCalendarEvents} from '@/lib/actions/calendar';
+import {CategoryManager} from './category-manager';
+import type {CalendarEvent, EventCategory, Todo} from './types';
+import {deleteCalendarEvent, getCalendarEvents, toggleCalendarEvent} from '@/lib/actions/calendar';
+import {getCategories} from '@/lib/actions/categories';
 import {getTodosByDateRange} from '@/lib/actions/todos';
 import {useSwipe} from '@/hooks/use-swipe';
-
-interface CalendarEvent {
-  id: string;
-  title: string;
-  startDate: string;
-  endDate: string;
-  color: string;
-  description: string | null;
-}
-
-interface Todo {
-  id: string;
-  date: string;
-  content: string;
-  isCompleted: boolean;
-  sortOrder: number;
-}
 
 export function CalendarClient() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -38,6 +24,8 @@ export function CalendarClient() {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [showEventForm, setShowEventForm] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
+  const [categories, setCategories] = useState<EventCategory[]>([]);
+  const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
   const [, startTransition] = useTransition();
 
@@ -54,16 +42,18 @@ export function CalendarClient() {
     const paddedEnd = new Date(end);
     paddedEnd.setDate(paddedEnd.getDate() + 7);
 
-    const [eventsData, todosData] = await Promise.all([
+    const [eventsData, todosData, categoriesData] = await Promise.all([
       getCalendarEvents(month),
       getTodosByDateRange(
         format(paddedStart, 'yyyy-MM-dd'),
         format(paddedEnd, 'yyyy-MM-dd')
       ),
+      getCategories(),
     ]);
 
     setEvents(eventsData as CalendarEvent[]);
     setTodos(todosData as Todo[]);
+    setCategories(categoriesData as EventCategory[]);
   }, [currentMonth]);
 
   useEffect(() => {
@@ -72,23 +62,29 @@ export function CalendarClient() {
     });
   }, [fetchData]);
 
+  const slideTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
   const handlePrevMonth = useCallback(() => {
     setSlideDirection('right');
     setCurrentMonth((m) => subMonths(m, 1));
-    setTimeout(() => setSlideDirection(null), 200);
+    clearTimeout(slideTimerRef.current);
+    slideTimerRef.current = setTimeout(() => setSlideDirection(null), 200);
   }, []);
 
   const handleNextMonth = useCallback(() => {
     setSlideDirection('left');
     setCurrentMonth((m) => addMonths(m, 1));
-    setTimeout(() => setSlideDirection(null), 200);
+    clearTimeout(slideTimerRef.current);
+    slideTimerRef.current = setTimeout(() => setSlideDirection(null), 200);
   }, []);
 
-  const handleToday = () => {
+  useEffect(() => () => clearTimeout(slideTimerRef.current), []);
+
+  const handleToday = useCallback(() => {
     const today = new Date();
     setCurrentMonth(today);
     setSelectedDate(today);
-  };
+  }, []);
 
   const handleSelectDate = (date: Date) => {
     setSelectedDate(date);
@@ -131,6 +127,12 @@ export function CalendarClient() {
     setTodos((prev) => prev.filter((t) => t.id !== todoId));
   }, []);
 
+  const handleTodoUpdate = useCallback((todoId: string, content: string) => {
+    setTodos((prev) =>
+      prev.map((t) => (t.id === todoId ? { ...t, content } : t))
+    );
+  }, []);
+
   // ─── Optimistic event callbacks ───────────────────────────────────────────
 
   const handleEventCreate = useCallback((event: CalendarEvent) => {
@@ -145,6 +147,25 @@ export function CalendarClient() {
 
   const handleEventDelete = useCallback((eventId: string) => {
     setEvents((prev) => prev.filter((e) => e.id !== eventId));
+  }, []);
+
+  const handleEventDeleteDirect = useCallback((eventId: string) => {
+    setEvents((prev) => prev.filter((e) => e.id !== eventId));
+    deleteCalendarEvent(eventId).catch(() => {
+      // Refetch on failure to restore
+      fetchData();
+    });
+  }, [fetchData]);
+
+  const handleEventToggle = useCallback((eventId: string, isCompleted: boolean) => {
+    setEvents((prev) =>
+      prev.map((e) => (e.id === eventId ? { ...e, isCompleted } : e))
+    );
+    toggleCalendarEvent(eventId).catch(() => {
+      setEvents((prev) =>
+        prev.map((e) => (e.id === eventId ? { ...e, isCompleted: !isCompleted } : e))
+      );
+    });
   }, []);
 
   // ─── Touch swipe for month navigation ────────────────────────────────────
@@ -219,9 +240,16 @@ export function CalendarClient() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentMonth]);
+  }, [currentMonth, handleToday]);
 
   // ─── Derived state ────────────────────────────────────────────────────────
+
+  const emptyMessages = ['오늘은 여유로운 하루!', '한가한 하루네요', '일정이 없는 날이에요', '자유로운 하루를 보내세요', '쉬어가는 하루'];
+
+  const dayEvents = useMemo(
+    () => events.filter((e) => e.startDate <= selectedDateStr && e.endDate >= selectedDateStr),
+    [events, selectedDateStr]
+  );
 
   const selectedDateTodos = useMemo(
     () => todos.filter((t) => t.date === selectedDateStr),
@@ -234,53 +262,57 @@ export function CalendarClient() {
   const totalCount = selectedDateTodos.length;
 
   return (
-    <div className="space-y-4">
-      {/* Month navigation */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <h2 className="text-lg font-bold tracking-tight">
-            {format(currentMonth, 'yyyy년 M월', { locale: ko })}
-          </h2>
-          <button
-            onClick={handleToday}
-            className="text-xs text-primary font-medium px-2 py-0.5 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors"
+    <div className="flex flex-col lg:flex-row lg:gap-6">
+      {/* Left: Month navigation + Calendar grid */}
+      <div className="lg:flex-1 lg:min-w-0 space-y-4">
+        {/* Month navigation */}
+        <div className="flex items-center justify-between px-4 sm:px-0">
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-bold tracking-tight">
+              {format(currentMonth, 'yyyy년 M월', { locale: ko })}
+            </h2>
+            <button
+              onClick={handleToday}
+              className="text-xs text-primary font-medium px-2 py-0.5 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors"
+            >
+              오늘
+            </button>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handlePrevMonth}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleNextMonth}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Calendar grid with swipe support */}
+        <Card className="p-1 sm:p-3 rounded-none sm:rounded-xl border-x-0 sm:border-x overflow-hidden" {...swipeHandlers}>
+          <div
+            className={
+              slideDirection === 'left'
+                ? 'animate-slide-left'
+                : slideDirection === 'right'
+                  ? 'animate-slide-right'
+                  : ''
+            }
           >
-            오늘
-          </button>
-        </div>
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handlePrevMonth}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleNextMonth}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
+            <CalendarGrid
+              currentMonth={currentMonth}
+              selectedDate={selectedDate}
+              onSelectDate={handleSelectDate}
+              events={events}
+              todos={todos}
+              categories={categories}
+            />
+          </div>
+        </Card>
       </div>
 
-      {/* Calendar grid with swipe support */}
-      <Card className="p-3 overflow-hidden" {...swipeHandlers}>
-        <div
-          className={
-            slideDirection === 'left'
-              ? 'animate-slide-left'
-              : slideDirection === 'right'
-                ? 'animate-slide-right'
-                : ''
-          }
-        >
-          <CalendarGrid
-            currentMonth={currentMonth}
-            selectedDate={selectedDate}
-            onSelectDate={handleSelectDate}
-            events={events}
-            todos={todos}
-          />
-        </div>
-      </Card>
-
-      {/* Selected date detail */}
-      <div className="space-y-3">
+      {/* Right: Selected date detail */}
+      <div className="lg:w-[380px] lg:shrink-0 space-y-3 px-4 sm:px-0 mt-4 lg:mt-0">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold flex items-center gap-1.5">
             <CalendarDays className="h-4 w-4 text-primary" />
@@ -296,8 +328,25 @@ export function CalendarClient() {
         <EventList
           events={events}
           selectedDate={selectedDate}
+          categories={categories}
           onEdit={handleEditEvent}
+          onDelete={handleEventDeleteDirect}
+          onToggle={handleEventToggle}
         />
+
+        {/* Empty state */}
+        {dayEvents.length === 0 && totalCount === 0 && (
+          <Card className="p-6 text-center animate-fade-in">
+            <p className="text-2xl mb-1">(&#x25D5;&#x203F;&#x25D5;)</p>
+            <p className="text-sm text-muted-foreground">
+              {emptyMessages[selectedDate.getDate() % emptyMessages.length]}
+            </p>
+            <Button variant="outline" size="sm" className="mt-3" onClick={handleAddEvent}>
+              <Plus className="h-3.5 w-3.5 mr-1" />
+              일정 추가
+            </Button>
+          </Card>
+        )}
 
         {/* Todos for selected date */}
         <Card className="p-3">
@@ -331,6 +380,7 @@ export function CalendarClient() {
             onCreate={handleTodoCreate}
             onCreated={handleTodoCreated}
             onDelete={handleTodoDelete}
+            onUpdate={handleTodoUpdate}
           />
         </Card>
       </div>
@@ -344,9 +394,19 @@ export function CalendarClient() {
         }}
         event={editingEvent}
         defaultDate={selectedDateStr}
+        categories={categories}
         onEventCreate={handleEventCreate}
         onEventUpdate={handleEventUpdate}
         onEventDelete={handleEventDelete}
+        onManageCategories={() => setShowCategoryManager(true)}
+      />
+
+      {/* Category manager dialog */}
+      <CategoryManager
+        open={showCategoryManager}
+        onOpenChange={setShowCategoryManager}
+        categories={categories}
+        onCategoriesChange={setCategories}
       />
     </div>
   );

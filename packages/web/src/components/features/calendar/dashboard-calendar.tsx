@@ -1,14 +1,12 @@
 import Link from 'next/link';
-import {createClient} from '@/lib/supabase/server';
+import {getAuthUser} from '@/lib/auth';
 import {calendarEvents, db, todos} from '@forme/shared';
 import {and, asc, eq, gte, lte} from 'drizzle-orm';
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
 import {ArrowRight, CalendarDays, CheckCircle2, Circle} from 'lucide-react';
 
 export async function DashboardCalendar() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+  const user = await getAuthUser();
 
   // KST today using Intl for reliability
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date());
@@ -94,12 +92,15 @@ export async function DashboardCalendar() {
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">다가오는 일정</p>
             {upcomingEvents.map((event) => (
-              <div key={event.id} className="flex items-center gap-2 text-sm">
+              <div key={event.id} className={`flex items-center gap-2 text-sm ${event.isCompleted ? 'opacity-50' : ''}`}>
                 <span
-                  className="w-2 h-2 rounded-full flex-shrink-0"
+                  className="w-0.5 h-4 rounded-full flex-shrink-0"
                   style={{ backgroundColor: event.color }}
                 />
-                <span className="truncate">{event.title}</span>
+                <span className={`truncate ${event.isCompleted ? 'line-through text-muted-foreground' : ''}`}>
+                  {event.startTime && <span className="text-xs text-muted-foreground mr-1">{event.startTime}</span>}
+                  {event.title}
+                </span>
                 <span className="text-xs text-muted-foreground flex-shrink-0 ml-auto">
                   {event.startDate === today
                     ? '오늘'
