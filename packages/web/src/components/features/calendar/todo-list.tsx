@@ -5,6 +5,16 @@ import {CheckCircle2, ChevronRight, Circle, Pencil, Plus, Trash2} from 'lucide-r
 import {cn} from '@/lib/utils';
 import {createTodo, deleteTodo, toggleTodo, updateTodo} from '@/lib/actions/todos';
 import {Input} from '@/components/ui/input';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import type {Todo} from './types';
 
 interface TodoListProps {
@@ -196,6 +206,7 @@ function TodoItem({
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(todo.content);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const handleSave = () => {
     const trimmed = editContent.trim();
@@ -268,13 +279,33 @@ function TodoItem({
           <Pencil className="h-3.5 w-3.5" />
         </button>
         <button
-          onClick={() => onDelete(todo.id)}
+          onClick={() => setShowDeleteConfirm(true)}
           disabled={isPending}
           className="p-1 rounded hover:bg-destructive/10 text-destructive/50 hover:text-destructive transition-colors"
         >
           <Trash2 className="h-3.5 w-3.5" />
         </button>
       </div>
+
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>할 일을 삭제하시겠습니까?</AlertDialogTitle>
+            <AlertDialogDescription>
+              &ldquo;{todo.content}&rdquo; 항목이 삭제됩니다. 이 작업은 되돌릴 수 없습니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => onDelete(todo.id)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              삭제
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
