@@ -6,16 +6,18 @@ import {ko} from 'date-fns/locale';
 import {CalendarDays, ChevronLeft, ChevronRight, Plus} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {Card} from '@/components/ui/card';
+import dynamic from 'next/dynamic';
 import {CalendarGrid} from './calendar-grid';
 import {TodoList} from './todo-list';
 import {EventList} from './event-list';
-import {EventForm} from './event-form';
-import {CategoryManager} from './category-manager';
 import type {CalendarEvent, EventCategory, Todo} from './types';
 import {deleteCalendarEvent, getCalendarEvents, toggleCalendarEvent} from '@/lib/actions/calendar';
 import {getCategories} from '@/lib/actions/categories';
 import {getTodosByDateRange} from '@/lib/actions/todos';
 import {useSwipe} from '@/hooks/use-swipe';
+
+const EventForm = dynamic(() => import('./event-form').then(m => m.EventForm), {ssr: false});
+const CategoryManager = dynamic(() => import('./category-manager').then(m => m.CategoryManager), {ssr: false});
 
 export function CalendarClient() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -86,22 +88,22 @@ export function CalendarClient() {
     setSelectedDate(today);
   }, []);
 
-  const handleSelectDate = (date: Date) => {
+  const handleSelectDate = useCallback((date: Date) => {
     setSelectedDate(date);
     if (format(date, 'yyyy-MM') !== format(currentMonth, 'yyyy-MM')) {
       setCurrentMonth(date);
     }
-  };
+  }, [currentMonth]);
 
-  const handleEditEvent = (event: CalendarEvent) => {
+  const handleEditEvent = useCallback((event: CalendarEvent) => {
     setEditingEvent(event);
     setShowEventForm(true);
-  };
+  }, []);
 
-  const handleAddEvent = () => {
+  const handleAddEvent = useCallback(() => {
     setEditingEvent(null);
     setShowEventForm(true);
-  };
+  }, []);
 
   // ─── Optimistic todo callbacks ────────────────────────────────────────────
 

@@ -1,6 +1,6 @@
 # forme - 아키텍처 & 기술 선정 이유
 
-> 최종 업데이트: 2026-03-05 (캘린더 카테고리 + 2컬럼 레이아웃 반영)
+> 최종 업데이트: 2026-03-05 (PWA 성능 최적화 — 리전, 번들, 렌더링, 워터폴)
 
 개인 올인원 PWA. 큐레이션(RSS), 캘린더, 메모(리치 에디터), 팟캐스트를 하나의 앱에 통합.
 모바일 퍼스트, 오프라인 지원, 푸시 알림까지 네이티브 앱 수준의 경험을 웹으로 제공.
@@ -18,7 +18,7 @@ graph TB
     DK[@dnd-kit<br/>드래그 정렬]
   end
 
-  subgraph Vercel["Vercel Edge"]
+  subgraph Vercel["Vercel Edge (icn1 서울)"]
     NJ[Next.js 16<br/>App Router + Proxy]
     SA[Server Actions<br/>CRUD + 검증 + traceAction]
     API[API Routes<br/>withTracing 래퍼]
@@ -45,7 +45,7 @@ graph TB
   SW -->|web-push| API
 ```
 
-**핵심 원칙**: Server Components 우선, RLS로 데이터 격리, 서버 측 입력 검증 필수, 최소한의 클라이언트 상태, 무거운 컴포넌트 지연 로딩, 인터랙션 optimistic updates, 반응형 레이아웃 (모바일 단일컬럼 ↔ 데스크톱 멀티컬럼).
+**핵심 원칙**: Server Components 우선, RLS로 데이터 격리, 서버 측 입력 검증 필수, 최소한의 클라이언트 상태, 무거운 컴포넌트 지연 로딩, 인터랙션 optimistic updates, 반응형 레이아웃 (모바일 단일컬럼 ↔ 데스크톱 멀티컬럼), Vercel 리전과 DB 리전 코로케이션 (서울).
 
 ---
 
@@ -303,14 +303,35 @@ erDiagram
 
 ## 성능 최적화
 
+### 인프라 최적화
+
+| 전략 | 설정 | 효과 |
+|------|------|------|
+| Vercel 리전 코로케이션 | `vercel.json` → `"regions": ["icn1"]` | DB 왕복 180ms → ~5ms |
+| DB 커넥션 풀 최적화 | `max: 1` (Supabase Transaction Pooler 위임) | 서버리스 커넥션 고갈 방지 |
+| 서버 전용 패키지 분리 | `serverExternalPackages: ['@aws-sdk/*', 'web-push']` | 클라이언트 번들에서 ~2MB 제외 |
+| 이미지 최적화 | `formats: ['image/avif', 'image/webp']`, `minimumCacheTTL: 86400` | 이미지 30-50% 압축 + 24h 캐시 |
+
 ### 번들 최적화
 
 | 전략 | 대상 | 효과 |
 |------|------|------|
-| `next/dynamic` + `ssr: false` | TipTap 에디터, DnD Kit, 다이얼로그 | 초기 번들 -1.5MB+ |
+| `next/dynamic` + `ssr: false` | TipTap 에디터, DnD Kit, EventForm, CategoryManager | 초기 번들 -1.5MB+ |
+| lowlight 선택적 등록 | 170+언어 → 12언어 (js/ts/py/css/html/json/bash/sql/md/yaml/java/go) | TipTap 청크 ~360KB 절감 |
 | LayoutShell 분리 | PlayerProvider → MiniPlayer만 래핑 | 서버 컴포넌트 활용 극대화 |
 | Dashboard Suspense | 위젯 3개 병렬 스트리밍 | 순차 → 병렬 로딩 |
 | DashboardCuration 서버화 | 클라이언트 → 서버 컴포넌트 전환 | 클라이언트 JS 제거 |
+
+### 렌더링 최적화
+
+| 전략 | 대상 | 효과 |
+|------|------|------|
+| PlayerContext 분리 | `usePlayer()` (상태) + `usePlayerTime()` (시간) | 4Hz 전체 리렌더 → 시간 UI만 |
+| `React.memo` | CurationCard, CurationListRow | 필터 변경 시 무관한 카드 리렌더 방지 |
+| `useCallback` | CalendarClient 핸들러 (handleSelectDate 등) | WeekRow React.memo 정상 작동 |
+| 중복 Auth 제거 | Dashboard 컴포넌트 → `getAuthUser()` 통일 | 요청당 auth 3회 → 1회 |
+| 쿼리 병렬화 | DashboardCalendar todos + events → `Promise.all` | 순차 → 동시 실행 |
+| Reorder API 병렬화 | N개 순차 UPDATE → `Promise.all` | 50개 기준 10초 → ~5ms |
 
 ### 캐싱 전략
 

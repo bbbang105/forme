@@ -3,7 +3,7 @@
 import {useState} from 'react';
 import {Loader2, Pause, Play, RotateCcw, X} from 'lucide-react';
 import {cn} from '@/lib/utils';
-import {usePlayer} from './player-context';
+import {usePlayer, usePlayerTime} from './player-context';
 import {AudioPlayer} from './audio-player';
 
 function formatTime(seconds: number): string {
@@ -14,7 +14,8 @@ function formatTime(seconds: number): string {
 }
 
 export function MiniPlayer() {
-  const { episode, isPlaying, isRestored, isLoading, currentTime, duration, togglePlay, close } = usePlayer();
+  const { episode, isPlaying, isRestored, isLoading, togglePlay, close } = usePlayer();
+  const { currentTime, duration } = usePlayerTime();
   const [isExpanded, setIsExpanded] = useState(false);
 
   if (!episode) return null;

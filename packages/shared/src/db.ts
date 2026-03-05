@@ -1,4 +1,4 @@
-import { drizzle, type PostgresJsDatabase } from 'drizzle-orm/postgres-js';
+import {drizzle, type PostgresJsDatabase} from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from './schema';
 
@@ -16,7 +16,7 @@ export const db = new Proxy({} as PostgresJsDatabase<typeof schema>, {
         throw new Error('DATABASE_URL environment variable is not set');
       }
       const client = postgres(connStr, {
-        max: 10,
+        max: 1,
         idle_timeout: 20,
         connect_timeout: 10,
         prepare: false,
