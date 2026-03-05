@@ -109,9 +109,13 @@ export const PATCH = withTracing('PATCH /api/curation/[id]', async (request, ctx
     const updateValues: Partial<{
       isRead: boolean;
       isBookmarked: boolean;
+      readAt: Date | null;
     }> = {};
 
-    if (isRead !== undefined) updateValues.isRead = isRead;
+    if (isRead !== undefined) {
+      updateValues.isRead = isRead;
+      updateValues.readAt = isRead ? new Date() : null;
+    }
     if (isBookmarked !== undefined) updateValues.isBookmarked = isBookmarked;
 
     // ── Update ──
