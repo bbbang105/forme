@@ -6,3 +6,4 @@ export * from './todos';
 export * from './podcast';
 export * from './push-subscriptions';
 export * from './memos';
+export * from './user-daily-activity';
