@@ -52,7 +52,7 @@ pnpm db:push          # 스키마 직접 push (dev용)
 - Server Action 트레이싱: `traceAction()` + `traceQuery()` 래퍼로 DB 쿼리 성능 측정
 - 무거운 컴포넌트: `next/dynamic` + `ssr: false`로 지연 로딩 (TipTap, DnD Kit, EventForm, CategoryManager 등)
 - 캘린더 인터랙션: Optimistic updates 패턴, 데스크톱 2컬럼 (`lg:flex-row`), lane 기반 이벤트 배치 (hazel-admin 스타일, greedy lane 할당 + 멀티데이 바 연결), 삭제 시 AlertDialog 확인 모달, 반복 일정 (매주/격주 + 요일 선택, excludedDates로 개별 삭제, recurrenceEndDate로 이후 삭제)
-- 모바일 PWA: viewport `maximumScale: 1, userScalable: false`, 모든 input/textarea/select `text-base`(16px) 이상 (iOS 자동 줌 방지), 커스텀 pull-to-refresh (`overscroll-behavior-y: contain` + touch 제스처)
+- 모바일 PWA: viewport `maximumScale: 1, userScalable: false`, 모든 input/textarea/select `text-base`(16px) 이상 (iOS 자동 줌 방지), 크롬 스타일 pull-to-refresh (`overscroll-behavior-y: contain` + DOM 직접 조작 + 컨텐츠 translateY + ArrowDown 인디케이터)
 - 큐레이션 정렬: status=read 탭에서 readAt DESC 정렬 (최근 읽은 순)
 - 메모 캐싱: 에디터 뒤로가기 시 `router.refresh()` + MemoList initialMemos props 동기화
 - 게이미피케이션: 출석 스트릭, 데일리 미션 (큐레이션 5개/팟캐스트 10분/투두 완료), 하이브리드 데이터 (전용 테이블 + 기존 데이터 계산)
@@ -69,7 +69,7 @@ pnpm db:push          # 스키마 직접 push (dev용)
 
 | 파일 | 설명 |
 |------|------|
-| `packages/web/src/proxy.ts` | Next.js 16 proxy (인증 리다이렉트) |
+| `packages/web/src/proxy.ts` | Next.js 16 proxy (인증 리다이렉트, `/api/cron/` 우회 허용) |
 | `packages/web/src/app/(main)/layout.tsx` | 인증 레이아웃 (LayoutShell + 탭바) |
 | `packages/web/src/app/(auth)/login/page.tsx` | Discord 로그인 |
 | `packages/web/src/app/auth/callback/route.ts` | OAuth 콜백 (open redirect 방어) |
@@ -89,8 +89,8 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/lib/logger.ts` | 구조화 로거 (withTracing, traceAction, traceQuery) |
 | `packages/web/src/lib/r2.ts` | Cloudflare R2 업로드/삭제 유틸 (Cache-Control 포함) |
 | `packages/web/src/components/layout/layout-shell.tsx` | 클라이언트 레이아웃 셸 (PlayerProvider + MiniPlayer + PullToRefresh) |
-| `packages/web/src/components/layout/pull-to-refresh.tsx` | 커스텀 Pull-to-Refresh 인디케이터 (Safari PWA) |
-| `packages/web/src/hooks/use-pull-to-refresh.ts` | Pull-to-Refresh 터치 제스처 훅 (러버밴드 + router.refresh) |
+| `packages/web/src/components/layout/pull-to-refresh.tsx` | 크롬 스타일 Pull-to-Refresh (컨텐츠 translateY + ArrowDown 인디케이터) |
+| `packages/web/src/hooks/use-pull-to-refresh.ts` | Pull-to-Refresh 훅 (DOM 직접 조작, 스크롤 컨테이너 감지, router.refresh) |
 | `packages/web/src/lib/push.ts` | 푸시 알림 발송 (sendPushToUser) |
 | `packages/web/src/lib/greetings.ts` | 대시보드 인사 문구 (100개 랜덤) |
 | `packages/web/src/app/api/curation/crawl/route.ts` | SSE 수동 크롤 API |
@@ -156,7 +156,7 @@ study-admin 스타일: Sky Blue `#0ea5e9` 포인트, Pretendard 폰트, 다크�
 
 ## 환경 변수
 
-`.env.local` 참조. Supabase(URL, Anon Key, Service Key), R2(Access Key, Secret, Bucket), VAPID 키, Discord OAuth(Client ID/Secret).
+`.env.local` 참조. Supabase(URL, Anon Key, Service Key), R2(Access Key, Secret, Bucket), VAPID 키, Discord OAuth(Client ID/Secret), Cron(CRON_SECRET, CRON_USER_ID).
 
 ## 브랜치 전략
 

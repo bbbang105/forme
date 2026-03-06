@@ -1,103 +1,203 @@
 'use client';
 
-import {useCallback, useEffect, useRef, useState} from 'react';
+import {useCallback, useEffect, useRef} from 'react';
 import {useRouter} from 'next/navigation';
 
-interface UsePullToRefreshOptions {
-  threshold?: number;
-  maxPull?: number;
-}
+const THRESHOLD = 70;
+const MAX_PULL = 120;
+const RESISTANCE = 0.45;
 
 type PullState = 'idle' | 'pulling' | 'ready' | 'refreshing';
 
-export function usePullToRefresh({
-  threshold = 80,
-  maxPull = 130,
-}: UsePullToRefreshOptions = {}) {
+export function usePullToRefresh(containerRef: React.RefObject<HTMLDivElement | null>) {
   const router = useRouter();
-  const [pullState, setPullState] = useState<PullState>('idle');
-  const [pullDistance, setPullDistance] = useState(0);
-
   const startY = useRef(0);
-  const currentY = useRef(0);
-  const pulling = useRef(false);
+  const pullDistance = useRef(0);
+  const state = useRef<PullState>('idle');
+  const indicatorRef = useRef<HTMLDivElement | null>(null);
+  const iconRef = useRef<HTMLDivElement | null>(null);
+  const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleTouchStart = useCallback(
-    (e: TouchEvent) => {
-      // Only activate when scrolled to very top
-      if (window.scrollY > 0) return;
-      if (pullState === 'refreshing') return;
+  const setIndicatorRef = useCallback((el: HTMLDivElement | null) => {
+    indicatorRef.current = el;
+  }, []);
 
-      startY.current = e.touches[0].clientY;
-      currentY.current = e.touches[0].clientY;
-      pulling.current = true;
-    },
-    [pullState],
-  );
+  const setIconRef = useCallback((el: HTMLDivElement | null) => {
+    iconRef.current = el;
+  }, []);
 
-  const handleTouchMove = useCallback(
-    (e: TouchEvent) => {
-      if (!pulling.current) return;
-      if (pullState === 'refreshing') return;
+  // Fully clear all inline styles to pristine state
+  const clearAllStyles = useCallback(() => {
+    const container = containerRef.current;
+    const indicator = indicatorRef.current;
+    const icon = iconRef.current;
 
-      currentY.current = e.touches[0].clientY;
-      const diff = currentY.current - startY.current;
+    if (container) {
+      container.style.transition = '';
+      container.style.transform = '';
+    }
+    if (indicator) {
+      indicator.style.transition = '';
+      indicator.style.transform = '';
+      indicator.style.opacity = '0';
+    }
+    if (icon) {
+      icon.style.transform = '';
+      icon.classList.remove('animate-spin');
+    }
 
-      // Only pull down, not up
+    const circle = indicator?.querySelector('[data-circle]') as HTMLElement | null;
+    circle?.classList.remove('border-primary');
+  }, [containerRef]);
+
+  // Direct DOM updates (no re-renders during gesture)
+  const applyTransform = useCallback((distance: number, animated: boolean) => {
+    const container = containerRef.current;
+    const indicator = indicatorRef.current;
+    const icon = iconRef.current;
+    if (!container) return;
+
+    const transition = animated ? 'transform 0.3s cubic-bezier(0.2, 0, 0, 1)' : 'none';
+    container.style.transition = transition;
+    container.style.transform = distance > 0 ? `translateY(${distance}px)` : '';
+
+    if (indicator) {
+      indicator.style.transition = transition;
+      indicator.style.transform = distance > 0 ? `translateY(${distance}px)` : '';
+      indicator.style.opacity = distance > 10 ? '1' : '0';
+    }
+
+    if (icon && state.current !== 'refreshing') {
+      const progress = Math.min(distance / THRESHOLD, 1);
+      icon.style.transform = `rotate(${progress * 180}deg)`;
+    }
+  }, [containerRef]);
+
+  const updateIconState = useCallback((newState: PullState) => {
+    const icon = iconRef.current;
+    const indicator = indicatorRef.current;
+    if (!icon || !indicator) return;
+
+    const circle = indicator.querySelector('[data-circle]') as HTMLElement | null;
+
+    if (newState === 'refreshing') {
+      icon.classList.add('animate-spin');
+      icon.style.transform = '';
+      circle?.classList.add('border-primary');
+    } else {
+      icon.classList.remove('animate-spin');
+      if (newState === 'ready') {
+        circle?.classList.add('border-primary');
+      } else {
+        circle?.classList.remove('border-primary');
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    let isTouching = false;
+
+    function findScrollableParent(el: HTMLElement | null): HTMLElement | null {
+      while (el && el !== document.body) {
+        const style = window.getComputedStyle(el);
+        const overflowY = style.overflowY;
+        if ((overflowY === 'auto' || overflowY === 'scroll') && el.scrollTop > 0) {
+          return el;
+        }
+        el = el.parentElement;
+      }
+      return null;
+    }
+
+    function onTouchStart(e: TouchEvent) {
+      if (state.current === 'refreshing') return;
+      // Tolerance of 5px for sub-pixel scroll after router.refresh()
+      if (window.scrollY > 5) return;
+
+      const target = e.target as HTMLElement;
+      if (findScrollableParent(target)) return;
+
+      startY.current = e.touches[0]!.clientY;
+      pullDistance.current = 0;
+      isTouching = true;
+    }
+
+    function onTouchMove(e: TouchEvent) {
+      if (!isTouching || state.current === 'refreshing') return;
+
+      const diff = e.touches[0]!.clientY - startY.current;
+
       if (diff <= 0) {
-        setPullDistance(0);
-        setPullState('idle');
+        if (pullDistance.current > 0) {
+          pullDistance.current = 0;
+          state.current = 'idle';
+          applyTransform(0, false);
+          updateIconState('idle');
+        }
         return;
       }
 
-      // Prevent native scroll while pulling
-      if (window.scrollY === 0 && diff > 0) {
+      if (window.scrollY <= 0) {
         e.preventDefault();
       }
 
-      // Diminishing returns for distance (rubber band feel)
-      const distance = Math.min(diff * 0.5, maxPull);
-      setPullDistance(distance);
-      setPullState(distance >= threshold ? 'ready' : 'pulling');
-    },
-    [pullState, threshold, maxPull],
-  );
+      const distance = Math.min(diff * RESISTANCE, MAX_PULL);
+      pullDistance.current = distance;
 
-  const handleTouchEnd = useCallback(() => {
-    if (!pulling.current) return;
-    pulling.current = false;
+      const newState = distance >= THRESHOLD ? 'ready' : 'pulling';
+      if (state.current !== newState) {
+        state.current = newState;
+        updateIconState(newState);
+      }
 
-    if (pullState === 'ready') {
-      setPullState('refreshing');
-      setPullDistance(threshold * 0.6);
-
-      // Refresh and reset after a short delay
-      router.refresh();
-      setTimeout(() => {
-        setPullState('idle');
-        setPullDistance(0);
-      }, 800);
-    } else {
-      setPullState('idle');
-      setPullDistance(0);
+      applyTransform(distance, false);
     }
-  }, [pullState, threshold, router]);
 
-  useEffect(() => {
-    document.addEventListener('touchstart', handleTouchStart, {
-      passive: true,
-    });
-    document.addEventListener('touchmove', handleTouchMove, {
-      passive: false,
-    });
-    document.addEventListener('touchend', handleTouchEnd);
+    function resetToIdle() {
+      state.current = 'idle';
+      pullDistance.current = 0;
+      clearAllStyles();
+    }
+
+    function onTouchEnd() {
+      if (!isTouching) return;
+      isTouching = false;
+
+      if (state.current === 'ready') {
+        state.current = 'refreshing';
+        updateIconState('refreshing');
+        applyTransform(THRESHOLD * 0.6, true);
+
+        router.refresh();
+
+        // Animate back then fully clear styles
+        resetTimer.current = setTimeout(() => {
+          applyTransform(0, true);
+          // Wait for animation to finish, then clear all inline styles
+          setTimeout(() => {
+            resetToIdle();
+          }, 350);
+        }, 800);
+      } else {
+        // Animate back then clear
+        applyTransform(0, true);
+        setTimeout(() => {
+          resetToIdle();
+        }, 350);
+      }
+    }
+
+    document.addEventListener('touchstart', onTouchStart, { passive: true });
+    document.addEventListener('touchmove', onTouchMove, { passive: false });
+    document.addEventListener('touchend', onTouchEnd);
 
     return () => {
-      document.removeEventListener('touchstart', handleTouchStart);
-      document.removeEventListener('touchmove', handleTouchMove);
-      document.removeEventListener('touchend', handleTouchEnd);
+      document.removeEventListener('touchstart', onTouchStart);
+      document.removeEventListener('touchmove', onTouchMove);
+      document.removeEventListener('touchend', onTouchEnd);
+      if (resetTimer.current) clearTimeout(resetTimer.current);
     };
-  }, [handleTouchStart, handleTouchMove, handleTouchEnd]);
+  }, [applyTransform, updateIconState, clearAllStyles, router]);
 
-  return { pullState, pullDistance };
+  return { setIndicatorRef, setIconRef };
 }

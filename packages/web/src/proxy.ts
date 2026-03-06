@@ -1,5 +1,5 @@
-import { type NextRequest, NextResponse } from 'next/server';
-import { updateSession } from '@/lib/supabase/middleware';
+import {type NextRequest, NextResponse} from 'next/server';
+import {updateSession} from '@/lib/supabase/middleware';
 
 export async function proxy(request: NextRequest) {
   const { user, supabaseResponse } = await updateSession(request);
@@ -7,7 +7,7 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // 인증 불필요 경로
-  const publicPaths = ['/login', '/auth/callback'];
+  const publicPaths = ['/login', '/auth/callback', '/api/cron/'];
   const isPublicPath = publicPaths.some((path) => pathname.startsWith(path));
 
   if (!user && !isPublicPath) {
