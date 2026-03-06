@@ -2,7 +2,7 @@
 
 import {useRef} from 'react';
 import {usePullToRefresh} from '@/hooks/use-pull-to-refresh';
-import {ArrowDown} from 'lucide-react';
+import {RefreshCw} from 'lucide-react';
 
 export function PullToRefresh({children}: {children: React.ReactNode}) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -24,7 +24,7 @@ export function PullToRefresh({children}: {children: React.ReactNode}) {
           className="flex items-center justify-center h-9 w-9 rounded-full bg-background shadow-md border border-border"
         >
           <div ref={setIconRef} className="h-4 w-4 text-muted-foreground">
-            <ArrowDown className="h-4 w-4" />
+            <RefreshCw className="h-4 w-4" />
           </div>
         </div>
       </div>

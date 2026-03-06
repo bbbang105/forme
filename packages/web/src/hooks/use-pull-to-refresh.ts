@@ -16,6 +16,7 @@ export function usePullToRefresh(containerRef: React.RefObject<HTMLDivElement | 
   const state = useRef<PullState>('idle');
   const indicatorRef = useRef<HTMLDivElement | null>(null);
   const iconRef = useRef<HTMLDivElement | null>(null);
+  const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const setIndicatorRef = useCallback((el: HTMLDivElement | null) => {
     indicatorRef.current = el;
@@ -24,6 +25,30 @@ export function usePullToRefresh(containerRef: React.RefObject<HTMLDivElement | 
   const setIconRef = useCallback((el: HTMLDivElement | null) => {
     iconRef.current = el;
   }, []);
+
+  // Fully clear all inline styles to pristine state
+  const clearAllStyles = useCallback(() => {
+    const container = containerRef.current;
+    const indicator = indicatorRef.current;
+    const icon = iconRef.current;
+
+    if (container) {
+      container.style.transition = '';
+      container.style.transform = '';
+    }
+    if (indicator) {
+      indicator.style.transition = '';
+      indicator.style.transform = '';
+      indicator.style.opacity = '0';
+    }
+    if (icon) {
+      icon.style.transform = '';
+      icon.classList.remove('animate-spin');
+    }
+
+    const circle = indicator?.querySelector('[data-circle]') as HTMLElement | null;
+    circle?.classList.remove('border-primary');
+  }, [containerRef]);
 
   // Direct DOM updates (no re-renders during gesture)
   const applyTransform = useCallback((distance: number, animated: boolean) => {
@@ -38,14 +63,13 @@ export function usePullToRefresh(containerRef: React.RefObject<HTMLDivElement | 
 
     if (indicator) {
       indicator.style.transition = transition;
-      indicator.style.transform = `translateY(${distance > 0 ? distance : 0}px)`;
+      indicator.style.transform = distance > 0 ? `translateY(${distance}px)` : '';
       indicator.style.opacity = distance > 10 ? '1' : '0';
     }
 
-    if (icon) {
+    if (icon && state.current !== 'refreshing') {
       const progress = Math.min(distance / THRESHOLD, 1);
-      const rotation = state.current === 'refreshing' ? 0 : progress * 180;
-      icon.style.transform = `rotate(${rotation}deg)`;
+      icon.style.transform = `rotate(${progress * 180}deg)`;
     }
   }, [containerRef]);
 
@@ -54,7 +78,6 @@ export function usePullToRefresh(containerRef: React.RefObject<HTMLDivElement | 
     const indicator = indicatorRef.current;
     if (!icon || !indicator) return;
 
-    // Toggle CSS classes for icon
     const circle = indicator.querySelector('[data-circle]') as HTMLElement | null;
 
     if (newState === 'refreshing') {
@@ -74,13 +97,6 @@ export function usePullToRefresh(containerRef: React.RefObject<HTMLDivElement | 
   useEffect(() => {
     let isTouching = false;
 
-    function isScrolledToTop(): boolean {
-      // Check both window and potential scroll containers
-      if (window.scrollY > 1) return false;
-      // Check if the touch started on a scrollable child that isn't at top
-      return true;
-    }
-
     function findScrollableParent(el: HTMLElement | null): HTMLElement | null {
       while (el && el !== document.body) {
         const style = window.getComputedStyle(el);
@@ -95,9 +111,9 @@ export function usePullToRefresh(containerRef: React.RefObject<HTMLDivElement | 
 
     function onTouchStart(e: TouchEvent) {
       if (state.current === 'refreshing') return;
-      if (!isScrolledToTop()) return;
+      // Tolerance of 5px for sub-pixel scroll after router.refresh()
+      if (window.scrollY > 5) return;
 
-      // Check if touch target is inside a scrolled container
       const target = e.target as HTMLElement;
       if (findScrollableParent(target)) return;
 
@@ -121,7 +137,6 @@ export function usePullToRefresh(containerRef: React.RefObject<HTMLDivElement | 
         return;
       }
 
-      // Prevent native scroll/bounce while pulling
       if (window.scrollY <= 0) {
         e.preventDefault();
       }
@@ -138,6 +153,12 @@ export function usePullToRefresh(containerRef: React.RefObject<HTMLDivElement | 
       applyTransform(distance, false);
     }
 
+    function resetToIdle() {
+      state.current = 'idle';
+      pullDistance.current = 0;
+      clearAllStyles();
+    }
+
     function onTouchEnd() {
       if (!isTouching) return;
       isTouching = false;
@@ -145,21 +166,24 @@ export function usePullToRefresh(containerRef: React.RefObject<HTMLDivElement | 
       if (state.current === 'ready') {
         state.current = 'refreshing';
         updateIconState('refreshing');
-        // Snap to a smaller position while refreshing
         applyTransform(THRESHOLD * 0.6, true);
 
         router.refresh();
-        setTimeout(() => {
-          state.current = 'idle';
-          pullDistance.current = 0;
-          updateIconState('idle');
+
+        // Animate back then fully clear styles
+        resetTimer.current = setTimeout(() => {
           applyTransform(0, true);
-        }, 1000);
+          // Wait for animation to finish, then clear all inline styles
+          setTimeout(() => {
+            resetToIdle();
+          }, 350);
+        }, 800);
       } else {
-        state.current = 'idle';
-        pullDistance.current = 0;
-        updateIconState('idle');
+        // Animate back then clear
         applyTransform(0, true);
+        setTimeout(() => {
+          resetToIdle();
+        }, 350);
       }
     }
 
@@ -171,8 +195,9 @@ export function usePullToRefresh(containerRef: React.RefObject<HTMLDivElement | 
       document.removeEventListener('touchstart', onTouchStart);
       document.removeEventListener('touchmove', onTouchMove);
       document.removeEventListener('touchend', onTouchEnd);
+      if (resetTimer.current) clearTimeout(resetTimer.current);
     };
-  }, [applyTransform, updateIconState, router]);
+  }, [applyTransform, updateIconState, clearAllStyles, router]);
 
   return { setIndicatorRef, setIconRef };
 }
