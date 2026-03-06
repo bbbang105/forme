@@ -8,6 +8,16 @@ import {revalidatePath} from 'next/cache';
 
 const MONTH_REGEX = /^\d{4}-\d{2}$/;
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
+/** 반복 종료일 미지정 시 시작일 + 1년 기본값 */
+function defaultEndDate(startDate: string): string {
+  const d = new Date(startDate + 'T12:00:00');
+  d.setFullYear(d.getFullYear() + 1);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
 const HEX_COLOR_REGEX = /^#[0-9a-fA-F]{6}$/;
 const TIME_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -179,7 +189,9 @@ export async function createCalendarEvent(data: {
           isCompleted: data.isCompleted ?? false,
           recurrenceType: data.recurrenceType || null,
           recurrenceDays: data.recurrenceDays || null,
-          recurrenceEndDate: data.recurrenceEndDate || null,
+          recurrenceEndDate: data.recurrenceType
+            ? (data.recurrenceEndDate || defaultEndDate(data.startDate))
+            : null,
           excludedDates: null,
         })
         .returning()
@@ -254,7 +266,12 @@ export async function updateCalendarEvent(
     if (data.isCompleted !== undefined) updates.isCompleted = data.isCompleted;
     if (data.recurrenceType !== undefined) updates.recurrenceType = data.recurrenceType || null;
     if (data.recurrenceDays !== undefined) updates.recurrenceDays = data.recurrenceDays || null;
-    if (data.recurrenceEndDate !== undefined) updates.recurrenceEndDate = data.recurrenceEndDate || null;
+    if (data.recurrenceEndDate !== undefined) {
+      const recType = data.recurrenceType ?? updates.recurrenceType;
+      updates.recurrenceEndDate = recType
+        ? (data.recurrenceEndDate || defaultEndDate(data.startDate ?? updates.startDate as string))
+        : null;
+    }
 
     const [row] = await traceQuery('calendar.events.update', () =>
       db
