@@ -326,7 +326,7 @@ export function CurationFeed() {
           active={sort === 'latest'}
           onClick={() => updateFilters({ sort: 'latest' })}
           icon={<Clock className="h-3.5 w-3.5" />}
-          label="최신순"
+          label={status === 'read' ? '최근 읽은 순' : '최신순'}
         />
         <SortButton
           active={sort === 'recommended'}

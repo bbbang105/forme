@@ -223,7 +223,7 @@ export const GET = withTracing('GET /api/curation', async (request) => {
   // collectedAt is NOT NULL, so sortDate is always non-null → no NULLS LAST needed.
   const isReadStatus = status === 'read';
   const sortDateExpr = isReadStatus
-    ? sql`${curationItems.readAt}`
+    ? sql`COALESCE(${curationItems.readAt}, ${curationItems.collectedAt})`
     : sql`COALESCE(${curationItems.publishedAt}, ${curationItems.collectedAt})`;
 
   // ── Parse and apply cursor ──
