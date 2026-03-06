@@ -102,6 +102,8 @@ export async function getCalendarEvents(month: string) {
     const rangeStart = fmt(paddedStart);
     const rangeEnd = fmt(paddedEnd);
 
+    // 일반 이벤트: startDate ≤ rangeEnd AND endDate ≥ rangeStart
+    // 반복 이벤트: startDate ≤ rangeEnd AND (recurrenceEndDate ≥ rangeStart OR recurrenceEndDate IS NULL)
     const rows = await traceQuery('calendar.events.list', () =>
       db
         .select()
@@ -110,7 +112,13 @@ export async function getCalendarEvents(month: string) {
           and(
             eq(calendarEvents.userId, user.id),
             lte(calendarEvents.startDate, rangeEnd),
-            gte(calendarEvents.endDate, rangeStart),
+            sql`(
+              CASE
+                WHEN ${calendarEvents.recurrenceType} IS NOT NULL
+                THEN COALESCE(${calendarEvents.recurrenceEndDate}, '9999-12-31') >= ${rangeStart}
+                ELSE ${calendarEvents.endDate} >= ${rangeStart}
+              END
+            )`,
           )
         )
         .orderBy(calendarEvents.startDate, desc(calendarEvents.id))
