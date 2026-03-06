@@ -2,6 +2,7 @@
 
 import {PlayerProvider} from '@/components/features/podcast/player-context';
 import {MiniPlayer} from '@/components/features/podcast/mini-player';
+import {PullToRefresh} from '@/components/layout/pull-to-refresh';
 
 interface LayoutShellProps {
   children: React.ReactNode;
@@ -13,6 +14,7 @@ interface LayoutShellProps {
  * This component is intentionally 'use client' and owns:
  * - PlayerProvider: global audio context (episode state, playback controls)
  * - MiniPlayer: the persistent fixed-position bottom player bar
+ * - PullToRefresh: custom pull-to-refresh for Safari PWA
  *
  * Why a dedicated component instead of marking layout.tsx as 'use client'?
  * Next.js App Router allows server components to pass RSC children into a
@@ -31,6 +33,7 @@ interface LayoutShellProps {
 export function LayoutShell({ children }: LayoutShellProps) {
   return (
     <PlayerProvider>
+      <PullToRefresh />
       {children}
       <MiniPlayer />
     </PlayerProvider>
