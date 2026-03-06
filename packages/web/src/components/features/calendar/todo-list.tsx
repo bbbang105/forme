@@ -122,7 +122,7 @@ export function TodoList({
           onChange={(e) => setNewContent(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="할 일 추가..."
-          className="flex-1 h-9 text-sm"
+          className="flex-1 h-9 text-base"
           disabled={isPending}
         />
         <button
@@ -256,7 +256,7 @@ function TodoItem({
           onChange={(e) => setEditContent(e.target.value)}
           onBlur={handleSave}
           onKeyDown={handleEditKeyDown}
-          className="flex-1 text-sm bg-transparent border-b border-primary outline-none py-0"
+          className="flex-1 text-base bg-transparent border-b border-primary outline-none py-0"
           autoFocus
         />
       ) : (

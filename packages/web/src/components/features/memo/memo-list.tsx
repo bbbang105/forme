@@ -55,6 +55,13 @@ export function MemoList({ initialMemos, initialHasMore, initialNextOffset }: Me
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
   const sortRef = useRef<HTMLDivElement>(null);
 
+  // initialMemos가 변경되면 (서버에서 새 데이터 전달 시) state 동기화
+  useEffect(() => {
+    setMemos(initialMemos);
+    setHasMore(initialHasMore);
+    setNextOffset(initialNextOffset);
+  }, [initialMemos, initialHasMore, initialNextOffset]);
+
   // Close sort menu on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -188,7 +195,7 @@ export function MemoList({ initialMemos, initialHasMore, initialNextOffset }: Me
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="메모 검색..."
-            className="w-full pl-9 pr-4 py-2.5 text-sm bg-accent/50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-primary/20 placeholder:text-muted-foreground/60 transition-shadow"
+            className="w-full pl-9 pr-4 py-2.5 text-base bg-accent/50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-primary/20 placeholder:text-muted-foreground/60 transition-shadow"
           />
           {isSearching && (
             <div className="absolute right-3 top-1/2 -translate-y-1/2">

@@ -625,7 +625,7 @@ export function SourceManager({ onCrawlComplete, onFavoritesChange }: SourceMana
                     value={customDate}
                     onChange={(e) => setCustomDate(e.target.value)}
                     max={new Date().toISOString().split('T')[0]}
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-base"
                   />
                 )}
               </div>

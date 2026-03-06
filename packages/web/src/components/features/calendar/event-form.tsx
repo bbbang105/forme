@@ -8,11 +8,9 @@ import {Label} from '@/components/ui/label';
 import {Switch} from '@/components/ui/switch';
 import {
     AlertDialog,
-    AlertDialogAction,
     AlertDialogCancel,
     AlertDialogContent,
     AlertDialogDescription,
-    AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
@@ -64,6 +62,8 @@ interface EventFormProps {
   onEventUpdate: (event: CalendarEvent) => void;
   onEventDelete: (eventId: string) => void;
   onManageCategories?: () => void;
+  onExcludeDate?: (eventId: string, dateStr: string) => void;
+  onDeleteAfter?: (eventId: string, dateStr: string) => void;
 }
 
 export function EventForm({
@@ -76,6 +76,8 @@ export function EventForm({
   onEventUpdate,
   onEventDelete,
   onManageCategories,
+  onExcludeDate,
+  onDeleteAfter,
 }: EventFormProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -89,6 +91,8 @@ export function EventForm({
           onEventUpdate={onEventUpdate}
           onEventDelete={onEventDelete}
           onManageCategories={onManageCategories}
+          onExcludeDate={onExcludeDate}
+          onDeleteAfter={onDeleteAfter}
         />
       )}
     </Dialog>
@@ -104,6 +108,8 @@ function EventFormContent({
   onEventUpdate,
   onEventDelete,
   onManageCategories,
+  onExcludeDate,
+  onDeleteAfter,
 }: {
   event?: CalendarEvent | null;
   defaultDate?: string;
@@ -113,6 +119,8 @@ function EventFormContent({
   onEventUpdate: (event: CalendarEvent) => void;
   onEventDelete: (eventId: string) => void;
   onManageCategories?: () => void;
+  onExcludeDate?: (eventId: string, dateStr: string) => void;
+  onDeleteAfter?: (eventId: string, dateStr: string) => void;
 }) {
   const isEditing = !!event;
   const [title, setTitle] = useState(event?.title ?? '');
@@ -129,6 +137,12 @@ function EventFormContent({
   const [description, setDescription] = useState(event?.description ?? '');
   const [location, setLocation] = useState(event?.location ?? '');
   const [categoryId, setCategoryId] = useState<string | null>(event?.categoryId ?? null);
+  const [isRecurring, setIsRecurring] = useState(!!event?.recurrenceType);
+  const [recurrenceType, setRecurrenceType] = useState<'weekly' | 'biweekly'>(
+    (event?.recurrenceType as 'weekly' | 'biweekly') ?? 'weekly'
+  );
+  const [recurrenceDays, setRecurrenceDays] = useState<number[]>(event?.recurrenceDays ?? []);
+  const [recurrenceEndDate, setRecurrenceEndDate] = useState(event?.recurrenceEndDate ?? '');
   const [error, setError] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -136,6 +150,12 @@ function EventFormContent({
   const handleCategorySelect = (cat: EventCategory) => {
     setCategoryId(cat.id);
     setColor(cat.color);
+  };
+
+  const toggleDay = (day: number) => {
+    setRecurrenceDays(prev =>
+      prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day].sort()
+    );
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -146,17 +166,23 @@ function EventFormContent({
         const eventData = {
           title,
           startDate,
-          endDate,
+          endDate: isRecurring ? startDate : endDate,
           startTime: isAllDay ? null : startTime,
           endTime: isAllDay ? null : endTime,
           color,
           description: description || null,
           location: location || null,
           categoryId,
+          recurrenceType: isRecurring ? recurrenceType : null,
+          recurrenceDays: isRecurring ? recurrenceDays : null,
+          recurrenceEndDate: isRecurring && recurrenceEndDate ? recurrenceEndDate : null,
         };
 
-        if (isEditing && event) {
-          const updated = await updateCalendarEvent(event.id, eventData);
+        // When editing a recurring instance, use the original event id for the update
+        const editId = event?._originalId ?? event?.id;
+
+        if (isEditing && event && editId) {
+          const updated = await updateCalendarEvent(editId, eventData);
           if (updated) {
             onEventUpdate(updated as CalendarEvent);
           }
@@ -173,19 +199,36 @@ function EventFormContent({
     });
   };
 
-  const handleDelete = () => {
+  const handleDeleteAll = () => {
     if (!event) return;
     setError('');
+    const targetId = event._originalId ?? event.id;
     startTransition(async () => {
       try {
-        await deleteCalendarEvent(event.id);
-        onEventDelete(event.id);
+        await deleteCalendarEvent(targetId);
+        onEventDelete(targetId);
         onOpenChange(false);
       } catch (err) {
         setError(err instanceof Error ? err.message : '삭제에 실패했습니다');
       }
     });
   };
+
+  const handleExcludeDate = () => {
+    if (!event?._originalId || !event?._instanceDate) return;
+    onExcludeDate?.(event._originalId, event._instanceDate);
+    setShowDeleteConfirm(false);
+    onOpenChange(false);
+  };
+
+  const handleDeleteAfterDate = () => {
+    if (!event?._originalId || !event?._instanceDate) return;
+    onDeleteAfter?.(event._originalId, event._instanceDate);
+    setShowDeleteConfirm(false);
+    onOpenChange(false);
+  };
+
+  const isRecurringInstance = !!event?.recurrenceType;
 
   return (
       <DialogContent className="sm:max-w-md" onInteractOutside={(e) => e.preventDefault()} onPointerDownOutside={(e) => e.preventDefault()}>
@@ -263,30 +306,95 @@ function EventFormContent({
             <Switch checked={isAllDay} onCheckedChange={setIsAllDay} />
           </div>
 
+          {/* 반복 설정 */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm">반복</Label>
+              <Switch checked={isRecurring} onCheckedChange={setIsRecurring} />
+            </div>
+
+            {isRecurring && (
+              <div className="space-y-3 animate-fade-in">
+                {/* 매주/격주 */}
+                <div className="flex gap-2">
+                  {(['weekly', 'biweekly'] as const).map((type) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => setRecurrenceType(type)}
+                      className={cn(
+                        'px-3 py-1.5 rounded-full text-xs font-medium border transition-colors',
+                        recurrenceType === type
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'border-border text-muted-foreground hover:bg-muted/50'
+                      )}
+                    >
+                      {type === 'weekly' ? '매주' : '격주'}
+                    </button>
+                  ))}
+                </div>
+
+                {/* 요일 선택 */}
+                <div className="flex gap-1.5">
+                  {['일', '월', '화', '수', '목', '금', '토'].map((label, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => toggleDay(i)}
+                      className={cn(
+                        'w-8 h-8 rounded-full text-xs font-medium transition-colors',
+                        recurrenceDays.includes(i)
+                          ? 'bg-primary text-primary-foreground'
+                          : 'border border-border text-muted-foreground hover:bg-muted/50'
+                      )}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* 반복 종료일 */}
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">반복 종료일 (선택)</Label>
+                  <Input
+                    type="date"
+                    value={recurrenceEndDate}
+                    onChange={(e) => setRecurrenceEndDate(e.target.value)}
+                    min={startDate}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* 날짜 */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className={cn('gap-3', isRecurring ? 'grid grid-cols-1' : 'grid grid-cols-2')}>
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">시작일</Label>
+              <Label className="text-xs text-muted-foreground">
+                {isRecurring ? '시작일 (반복 기준일)' : '시작일'}
+              </Label>
               <Input
                 type="date"
                 value={startDate}
                 onChange={(e) => {
                   setStartDate(e.target.value);
-                  if (e.target.value > endDate) setEndDate(e.target.value);
+                  if (!isRecurring && e.target.value > endDate) setEndDate(e.target.value);
                 }}
                 required
               />
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">종료일</Label>
-              <Input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                min={startDate}
-                required
-              />
-            </div>
+            {!isRecurring && (
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">종료일</Label>
+                <Input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  min={startDate}
+                  required
+                />
+              </div>
+            )}
           </div>
 
           {/* 시간 (종일이 아닐 때) — 24시간 텍스트 입력 */}
@@ -361,7 +469,7 @@ function EventFormContent({
               placeholder="간단한 메모..."
               rows={2}
               maxLength={2000}
-              className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
+              className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
             />
           </div>
 
@@ -397,20 +505,60 @@ function EventFormContent({
         <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>일정을 삭제하시겠습니까?</AlertDialogTitle>
+              <AlertDialogTitle>
+                {isRecurringInstance ? '반복 일정 삭제' : '일정을 삭제하시겠습니까?'}
+              </AlertDialogTitle>
               <AlertDialogDescription>
-                &ldquo;{event?.title}&rdquo; 일정이 삭제됩니다. 이 작업은 되돌릴 수 없습니다.
+                {isRecurringInstance
+                  ? `"${event?.title}" 반복 일정을 어떻게 삭제하시겠습니까?`
+                  : `"${event?.title}" 일정이 삭제됩니다. 이 작업은 되돌릴 수 없습니다.`}
               </AlertDialogDescription>
             </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>취소</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={handleDelete}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
-                삭제
-              </AlertDialogAction>
-            </AlertDialogFooter>
+            {isRecurringInstance ? (
+              <>
+                <div className="flex flex-col gap-2 py-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleExcludeDate}
+                    disabled={isPending}
+                  >
+                    이 일정만 삭제
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleDeleteAfterDate}
+                    disabled={isPending}
+                  >
+                    이후 모든 일정 삭제
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={handleDeleteAll}
+                    disabled={isPending}
+                  >
+                    모든 반복 일정 삭제
+                  </Button>
+                </div>
+                <div className="flex justify-end">
+                  <AlertDialogCancel>취소</AlertDialogCancel>
+                </div>
+              </>
+            ) : (
+              <div className="flex justify-end gap-2 mt-2">
+                <AlertDialogCancel>취소</AlertDialogCancel>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleDeleteAll}
+                  disabled={isPending}
+                >
+                  삭제
+                </Button>
+              </div>
+            )}
           </AlertDialogContent>
         </AlertDialog>
       </DialogContent>

@@ -6,14 +6,13 @@ import {CheckCircle2, Circle, MapPin, Pencil, Trash2} from 'lucide-react';
 import {cn} from '@/lib/utils';
 import {
     AlertDialog,
-    AlertDialogAction,
     AlertDialogCancel,
     AlertDialogContent,
     AlertDialogDescription,
-    AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {Button} from '@/components/ui/button';
 import type {CalendarEvent, EventCategory} from './types';
 
 interface EventListProps {
@@ -23,9 +22,11 @@ interface EventListProps {
   onEdit: (event: CalendarEvent) => void;
   onDelete: (eventId: string) => void;
   onToggle: (eventId: string, isCompleted: boolean) => void;
+  onExcludeDate?: (eventId: string, dateStr: string) => void;
+  onDeleteAfter?: (eventId: string, dateStr: string) => void;
 }
 
-export function EventList({ events, selectedDate, categories, onEdit, onDelete, onToggle }: EventListProps) {
+export function EventList({ events, selectedDate, categories, onEdit, onDelete, onToggle, onExcludeDate, onDeleteAfter }: EventListProps) {
   const [deleteTarget, setDeleteTarget] = useState<CalendarEvent | null>(null);
   const dateStr = format(selectedDate, 'yyyy-MM-dd');
 
@@ -49,6 +50,8 @@ export function EventList({ events, selectedDate, categories, onEdit, onDelete, 
   }, [categories]);
 
   if (dayEvents.length === 0) return null;
+
+  const isRecurringInstance = !!deleteTarget?.recurrenceType;
 
   return (
     <div className="space-y-1.5">
@@ -91,6 +94,11 @@ export function EventList({ events, selectedDate, categories, onEdit, onDelete, 
                 {isMultiDay && (
                   <span className="ml-1.5">
                     ({format(new Date(event.startDate + 'T00:00:00'), 'M.d')} - {format(new Date(event.endDate + 'T00:00:00'), 'M.d')})
+                  </span>
+                )}
+                {event.recurrenceType && (
+                  <span className="ml-1.5 text-primary/70">
+                    {event.recurrenceType === 'weekly' ? '매주' : '격주'}
                   </span>
                 )}
               </p>
@@ -139,23 +147,74 @@ export function EventList({ events, selectedDate, categories, onEdit, onDelete, 
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>일정을 삭제하시겠습니까?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {isRecurringInstance ? '반복 일정 삭제' : '일정을 삭제하시겠습니까?'}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              &ldquo;{deleteTarget?.title}&rdquo; 일정이 삭제됩니다. 이 작업은 되돌릴 수 없습니다.
+              {isRecurringInstance
+                ? `"${deleteTarget?.title}" 반복 일정을 어떻게 삭제하시겠습니까?`
+                : `"${deleteTarget?.title}" 일정이 삭제됩니다. 이 작업은 되돌릴 수 없습니다.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>취소</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                if (deleteTarget) onDelete(deleteTarget.id);
-                setDeleteTarget(null);
-              }}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              삭제
-            </AlertDialogAction>
-          </AlertDialogFooter>
+          {isRecurringInstance ? (
+            <>
+              <div className="flex flex-col gap-2 py-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (deleteTarget?._originalId && deleteTarget?._instanceDate) {
+                      onExcludeDate?.(deleteTarget._originalId, deleteTarget._instanceDate);
+                    }
+                    setDeleteTarget(null);
+                  }}
+                >
+                  이 일정만 삭제
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (deleteTarget?._originalId && deleteTarget?._instanceDate) {
+                      onDeleteAfter?.(deleteTarget._originalId, deleteTarget._instanceDate);
+                    }
+                    setDeleteTarget(null);
+                  }}
+                >
+                  이후 모든 일정 삭제
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => {
+                    if (deleteTarget?._originalId) {
+                      onDelete(deleteTarget._originalId);
+                    }
+                    setDeleteTarget(null);
+                  }}
+                >
+                  모든 반복 일정 삭제
+                </Button>
+              </div>
+              <div className="flex justify-end">
+                <AlertDialogCancel>취소</AlertDialogCancel>
+              </div>
+            </>
+          ) : (
+            <div className="flex justify-end gap-2 mt-2">
+              <AlertDialogCancel>취소</AlertDialogCancel>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => {
+                  if (deleteTarget) onDelete(deleteTarget.id);
+                  setDeleteTarget(null);
+                }}
+              >
+                삭제
+              </Button>
+            </div>
+          )}
         </AlertDialogContent>
       </AlertDialog>
     </div>

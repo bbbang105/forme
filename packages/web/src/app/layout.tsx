@@ -1,7 +1,14 @@
-import type {Metadata} from 'next';
+import type {Metadata, Viewport} from 'next';
 import {ThemeProvider} from 'next-themes';
 import {ServiceWorkerRegister} from '@/components/sw-register';
 import './globals.css';
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
 
 export const metadata: Metadata = {
   title: {

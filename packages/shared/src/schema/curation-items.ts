@@ -1,5 +1,5 @@
-import { pgTable, uuid, varchar, text, boolean, timestamp, index, uniqueIndex } from 'drizzle-orm/pg-core';
-import { curationSources } from './curation-sources';
+import {boolean, index, pgTable, text, timestamp, uniqueIndex, uuid, varchar} from 'drizzle-orm/pg-core';
+import {curationSources} from './curation-sources';
 
 export const curationItems = pgTable('curation_items', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -20,4 +20,5 @@ export const curationItems = pgTable('curation_items', {
   publishedIdx: index('idx_items_published').on(table.publishedAt),
   categoryIdx: index('idx_items_category').on(table.category),
   sourceIdx: index('idx_items_source').on(table.sourceId),
+  readAtIdx: index('idx_items_read_at').on(table.readAt),
 }));

@@ -6,12 +6,19 @@ import {ko} from 'date-fns/locale';
 import {CalendarDays, ChevronLeft, ChevronRight, Plus} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {Card} from '@/components/ui/card';
+import {Skeleton} from '@/components/ui/skeleton';
 import dynamic from 'next/dynamic';
 import {CalendarGrid} from './calendar-grid';
 import {TodoList} from './todo-list';
 import {EventList} from './event-list';
 import type {CalendarEvent, EventCategory, Todo} from './types';
-import {deleteCalendarEvent, getCalendarEvents, toggleCalendarEvent} from '@/lib/actions/calendar';
+import {
+    deleteCalendarEvent,
+    deleteRecurringAfter,
+    excludeRecurringDate,
+    getCalendarEvents,
+    toggleCalendarEvent
+} from '@/lib/actions/calendar';
 import {getCategories} from '@/lib/actions/categories';
 import {getTodosByDateRange} from '@/lib/actions/todos';
 import {useSwipe} from '@/hooks/use-swipe';
@@ -29,11 +36,12 @@ export function CalendarClient() {
   const [categories, setCategories] = useState<EventCategory[]>([]);
   const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
-  const [, startTransition] = useTransition();
+  const [isLoading, setIsLoading] = useState(true);
+  const [isFetching, startFetching] = useTransition();
 
   const selectedDateStr = format(selectedDate, 'yyyy-MM-dd');
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(() => {
     const month = format(currentMonth, 'yyyy-MM');
     const start = startOfMonth(currentMonth);
     const end = endOfMonth(currentMonth);
@@ -44,22 +52,23 @@ export function CalendarClient() {
     const paddedEnd = new Date(end);
     paddedEnd.setDate(paddedEnd.getDate() + 7);
 
-    const [eventsData, todosData, categoriesData] = await Promise.all([
+    return Promise.all([
       getCalendarEvents(month),
       getTodosByDateRange(
         format(paddedStart, 'yyyy-MM-dd'),
         format(paddedEnd, 'yyyy-MM-dd')
       ),
       getCategories(),
-    ]);
-
-    setEvents(eventsData as CalendarEvent[]);
-    setTodos(todosData as Todo[]);
-    setCategories(categoriesData as EventCategory[]);
+    ]).then(([eventsData, todosData, categoriesData]) => {
+      setEvents(eventsData as CalendarEvent[]);
+      setTodos(todosData as Todo[]);
+      setCategories(categoriesData as EventCategory[]);
+      setIsLoading(false);
+    });
   }, [currentMonth]);
 
   useEffect(() => {
-    startTransition(() => {
+    startFetching(() => {
       fetchData();
     });
   }, [fetchData]);
@@ -170,6 +179,26 @@ export function CalendarClient() {
     });
   }, []);
 
+  const handleExcludeDate = useCallback(async (eventId: string, dateStr: string) => {
+    // Optimistic: remove only that instance
+    setEvents((prev) => prev.filter((e) => !(e._originalId === eventId && e._instanceDate === dateStr)));
+    try {
+      await excludeRecurringDate(eventId, dateStr);
+    } catch {
+      fetchData();
+    }
+  }, [fetchData]);
+
+  const handleDeleteAfter = useCallback(async (eventId: string, dateStr: string) => {
+    // Optimistic: remove all instances on or after that date
+    setEvents((prev) => prev.filter((e) => !(e._originalId === eventId && e._instanceDate && e._instanceDate >= dateStr)));
+    try {
+      await deleteRecurringAfter(eventId, dateStr);
+    } catch {
+      fetchData();
+    }
+  }, [fetchData]);
+
   // ─── Touch swipe for month navigation ────────────────────────────────────
 
   const swipeHandlers = useSwipe({
@@ -263,6 +292,63 @@ export function CalendarClient() {
   );
   const totalCount = selectedDateTodos.length;
 
+  if (isLoading) {
+    return (
+      <div className="flex flex-col lg:flex-row lg:gap-6">
+        {/* Left: Skeleton calendar */}
+        <div className="lg:flex-1 lg:min-w-0 space-y-4">
+          <div className="flex items-center justify-between px-4 sm:px-0">
+            <Skeleton className="h-7 w-32" />
+            <div className="flex items-center gap-1">
+              <Skeleton className="h-8 w-8 rounded-md" />
+              <Skeleton className="h-8 w-8 rounded-md" />
+            </div>
+          </div>
+          <Card className="p-1 sm:p-3 rounded-none sm:rounded-xl border-x-0 sm:border-x">
+            {/* Day headers */}
+            <div className="grid grid-cols-7 gap-0 mb-1">
+              {Array.from({ length: 7 }).map((_, i) => (
+                <div key={i} className="flex justify-center py-1">
+                  <Skeleton className="h-4 w-6" />
+                </div>
+              ))}
+            </div>
+            {/* Calendar cells (6 rows x 7 cols) */}
+            {Array.from({ length: 6 }).map((_, row) => (
+              <div key={row} className="grid grid-cols-7 gap-0">
+                {Array.from({ length: 7 }).map((_, col) => (
+                  <div key={col} className="aspect-square p-1">
+                    <Skeleton className="h-4 w-4 mx-auto mb-1" />
+                    {row < 3 && col % 3 === 0 && <Skeleton className="h-1.5 w-full rounded-full" />}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </Card>
+        </div>
+        {/* Right: Skeleton detail */}
+        <div className="lg:w-[380px] lg:shrink-0 space-y-3 px-4 sm:px-0 mt-4 lg:mt-0">
+          <div className="flex items-center justify-between">
+            <Skeleton className="h-5 w-36" />
+            <Skeleton className="h-7 w-16 rounded-md" />
+          </div>
+          <Card className="p-3 space-y-2">
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-10 w-full rounded-md" />
+            <Skeleton className="h-10 w-full rounded-md" />
+          </Card>
+          <Card className="p-3 space-y-2">
+            <Skeleton className="h-4 w-16" />
+            <Skeleton className="h-1.5 w-full rounded-full" />
+            <Skeleton className="h-8 w-full rounded-md" />
+            <Skeleton className="h-8 w-full rounded-md" />
+            <Skeleton className="h-8 w-full rounded-md" />
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col lg:flex-row lg:gap-6">
       {/* Left: Month navigation + Calendar grid */}
@@ -281,10 +367,10 @@ export function CalendarClient() {
             </button>
           </div>
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handlePrevMonth}>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handlePrevMonth} disabled={isFetching}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleNextMonth}>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleNextMonth} disabled={isFetching}>
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
@@ -293,13 +379,14 @@ export function CalendarClient() {
         {/* Calendar grid with swipe support */}
         <Card className="p-1 sm:p-3 rounded-none sm:rounded-xl border-x-0 sm:border-x overflow-hidden" {...swipeHandlers}>
           <div
-            className={
+            className={[
               slideDirection === 'left'
                 ? 'animate-slide-left'
                 : slideDirection === 'right'
                   ? 'animate-slide-right'
-                  : ''
-            }
+                  : '',
+              isFetching ? 'opacity-60 transition-opacity' : '',
+            ].filter(Boolean).join(' ')}
           >
             <CalendarGrid
               currentMonth={currentMonth}
@@ -334,6 +421,8 @@ export function CalendarClient() {
           onEdit={handleEditEvent}
           onDelete={handleEventDeleteDirect}
           onToggle={handleEventToggle}
+          onExcludeDate={handleExcludeDate}
+          onDeleteAfter={handleDeleteAfter}
         />
 
         {/* Empty state */}
@@ -401,6 +490,8 @@ export function CalendarClient() {
         onEventUpdate={handleEventUpdate}
         onEventDelete={handleEventDelete}
         onManageCategories={() => setShowCategoryManager(true)}
+        onExcludeDate={handleExcludeDate}
+        onDeleteAfter={handleDeleteAfter}
       />
 
       {/* Category manager dialog */}

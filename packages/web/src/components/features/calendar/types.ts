@@ -10,6 +10,13 @@ export interface CalendarEvent {
   location: string | null;
   categoryId: string | null;
   isCompleted: boolean;
+  recurrenceType: string | null;
+  recurrenceDays: number[] | null;
+  recurrenceEndDate: string | null;
+  excludedDates: string[] | null;
+  // 가상 인스턴스용 (UI에서만 사용)
+  _originalId?: string;
+  _instanceDate?: string;
 }
 
 export interface Todo {
