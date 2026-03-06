@@ -11,7 +11,13 @@ import {CalendarGrid} from './calendar-grid';
 import {TodoList} from './todo-list';
 import {EventList} from './event-list';
 import type {CalendarEvent, EventCategory, Todo} from './types';
-import {deleteCalendarEvent, getCalendarEvents, toggleCalendarEvent} from '@/lib/actions/calendar';
+import {
+    deleteCalendarEvent,
+    deleteRecurringAfter,
+    excludeRecurringDate,
+    getCalendarEvents,
+    toggleCalendarEvent
+} from '@/lib/actions/calendar';
 import {getCategories} from '@/lib/actions/categories';
 import {getTodosByDateRange} from '@/lib/actions/todos';
 import {useSwipe} from '@/hooks/use-swipe';
@@ -169,6 +175,26 @@ export function CalendarClient() {
       );
     });
   }, []);
+
+  const handleExcludeDate = useCallback(async (eventId: string, dateStr: string) => {
+    // Optimistic: remove only that instance
+    setEvents((prev) => prev.filter((e) => !(e._originalId === eventId && e._instanceDate === dateStr)));
+    try {
+      await excludeRecurringDate(eventId, dateStr);
+    } catch {
+      fetchData();
+    }
+  }, [fetchData]);
+
+  const handleDeleteAfter = useCallback(async (eventId: string, dateStr: string) => {
+    // Optimistic: remove all instances on or after that date
+    setEvents((prev) => prev.filter((e) => !(e._originalId === eventId && e._instanceDate && e._instanceDate >= dateStr)));
+    try {
+      await deleteRecurringAfter(eventId, dateStr);
+    } catch {
+      fetchData();
+    }
+  }, [fetchData]);
 
   // ─── Touch swipe for month navigation ────────────────────────────────────
 
@@ -334,6 +360,8 @@ export function CalendarClient() {
           onEdit={handleEditEvent}
           onDelete={handleEventDeleteDirect}
           onToggle={handleEventToggle}
+          onExcludeDate={handleExcludeDate}
+          onDeleteAfter={handleDeleteAfter}
         />
 
         {/* Empty state */}
@@ -401,6 +429,8 @@ export function CalendarClient() {
         onEventUpdate={handleEventUpdate}
         onEventDelete={handleEventDelete}
         onManageCategories={() => setShowCategoryManager(true)}
+        onExcludeDate={handleExcludeDate}
+        onDeleteAfter={handleDeleteAfter}
       />
 
       {/* Category manager dialog */}

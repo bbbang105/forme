@@ -355,11 +355,13 @@ export function MemoEditor({ memo }: MemoEditorProps) {
       if (!ok) return; // Stay on page so user can retry
     }
 
+    router.refresh();
     router.push('/memo');
   }, [editor, memo.id, title, save, router]);
 
   const handleDelete = useCallback(async () => {
     await deleteMemo(memo.id);
+    router.refresh();
     router.push('/memo');
   }, [memo.id, router]);
 

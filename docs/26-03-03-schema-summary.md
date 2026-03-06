@@ -8,6 +8,8 @@ auth.users (Supabase 관리)
   └── curation_sources (1:N)
         └── curation_items (1:N)
   └── calendar_events (1:N)
+  └── event_categories (1:N)
+        └── calendar_events.category_id (FK, nullable)
   └── todos (1:N)
   └── memos (1:N)
   └── podcast_episodes (1:N)
@@ -95,8 +97,17 @@ auth.users (Supabase 관리)
 | title | VARCHAR | NOT NULL | |
 | start_date | DATE | NOT NULL | |
 | end_date | DATE | NOT NULL | |
-| color | VARCHAR | NOT NULL | DEFAULT '#f43f5e' |
+| start_time | VARCHAR(5) | NULL | HH:MM |
+| end_time | VARCHAR(5) | NULL | HH:MM |
+| color | VARCHAR(20) | NOT NULL | DEFAULT '#3b82f6' |
 | description | TEXT | NULL | |
+| location | VARCHAR(200) | NULL | |
+| category_id | UUID | NULL | FK → event_categories |
+| is_completed | BOOLEAN | NOT NULL | DEFAULT false |
+| recurrence_type | VARCHAR(10) | NULL | 'weekly' \| 'biweekly' |
+| recurrence_days | INTEGER[] | NULL | [0=일, 1=월, ..., 6=토] |
+| recurrence_end_date | DATE | NULL | 반복 종료일 |
+| excluded_dates | DATE[] | NULL | 삭제된 날짜 목록 |
 | created_at | TIMESTAMPTZ | NOT NULL | DEFAULT NOW() |
 | updated_at | TIMESTAMPTZ | NOT NULL | DEFAULT NOW() |
 
@@ -168,7 +179,8 @@ auth.users (Supabase 관리)
 | curation_items | idx_items_source | source_id |
 | todos | idx_todos_date | user_id, date |
 | todos | idx_todos_reminder | reminder_at (WHERE reminder_sent = false) |
-| calendar_events | idx_calendar_events_dates | start_date, end_date |
+| calendar_events | idx_calendar_events_user_dates | user_id, start_date, end_date |
+| curation_items | idx_items_read_at | read_at |
 | memos | idx_memos_list | user_id, is_pinned, updated_at |
 | memos | idx_memos_search | user_id, content_text |
 | podcast_episodes | idx_podcast_episodes_user_published | user_id, published_at |

@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { Search, X } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import {useEffect, useRef, useState} from 'react';
+import {Search, X} from 'lucide-react';
+import {cn} from '@/lib/utils';
 
 interface CurationSearchProps {
   value: string;
@@ -42,7 +42,7 @@ export function CurationSearch({ value, onChange }: CurationSearchProps) {
         placeholder="제목이나 내용으로 검색..."
         className={cn(
           'w-full h-10 pl-9 pr-9 rounded-lg border border-border bg-background',
-          'text-sm placeholder:text-muted-foreground',
+          'text-base placeholder:text-muted-foreground',
           'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1',
           'transition-colors'
         )}

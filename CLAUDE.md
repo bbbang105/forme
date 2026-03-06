@@ -48,7 +48,10 @@ pnpm db:push          # 스키마 직접 push (dev용)
 - API 트레이싱: `withTracing()` 래퍼로 모든 API 라우트 자동 타이밍 측정
 - Server Action 트레이싱: `traceAction()` + `traceQuery()` 래퍼로 DB 쿼리 성능 측정
 - 무거운 컴포넌트: `next/dynamic` + `ssr: false`로 지연 로딩 (TipTap, DnD Kit, EventForm, CategoryManager 등)
-- 캘린더 인터랙션: Optimistic updates 패턴, 데스크톱 2컬럼 (`lg:flex-row`), lane 기반 이벤트 배치 (hazel-admin 스타일, greedy lane 할당 + 멀티데이 바 연결), 삭제 시 AlertDialog 확인 모달
+- 캘린더 인터랙션: Optimistic updates 패턴, 데스크톱 2컬럼 (`lg:flex-row`), lane 기반 이벤트 배치 (hazel-admin 스타일, greedy lane 할당 + 멀티데이 바 연결), 삭제 시 AlertDialog 확인 모달, 반복 일정 (매주/격주 + 요일 선택, excludedDates로 개별 삭제, recurrenceEndDate로 이후 삭제)
+- 모바일 PWA: viewport `maximumScale: 1, userScalable: false`, 모든 input/textarea/select `text-base`(16px) 이상 (iOS 자동 줌 방지)
+- 큐레이션 정렬: status=read 탭에서 readAt DESC 정렬 (최근 읽은 순)
+- 메모 캐싱: 에디터 뒤로가기 시 `router.refresh()` + MemoList initialMemos props 동기화
 - 게이미피케이션: 출석 스트릭, 데일리 미션 (큐레이션 5개/팟캐스트 10분/투두 완료), 하이브리드 데이터 (전용 테이블 + 기존 데이터 계산)
 - 외부 API: Open-Meteo (서울 날씨, 서버 컴포넌트 fetch, revalidate 3600)
 - 팟캐스트 플레이어: `usePlayer()` (상태/컨트롤) + `usePlayerTime()` (currentTime/duration) 컨텍스트 분리
@@ -69,7 +72,7 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/components/layout/tab-bar.tsx` | 하단 탭바 (5탭) |
 | `packages/web/src/components/layout/header.tsx` | 헤더 (forme 로고 + 다크모드 토글) |
 | `packages/web/src/components/ui/logo.tsx` | forme 워드마크 로고 (showMark 제거, 워드마크 전용) |
-| `packages/shared/src/schema/calendar-events.ts` | 캘린더 이벤트 스키마 |
+| `packages/shared/src/schema/calendar-events.ts` | 캘린더 이벤트 스키마 (반복: recurrenceType/Days/EndDate, excludedDates) |
 | `packages/shared/src/schema/todos.ts` | 투두 스키마 |
 | `packages/shared/src/schema/` | Drizzle DB 스키마 (전체) |
 | `packages/shared/src/db.ts` | DB 싱글톤 (SSL 강제, max:1 서버리스 최적) |
@@ -92,13 +95,13 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/components/features/curation/mini-card-thumbnail.tsx` | 대시보드 큐레이션 썸네일 (클라이언트 onError 폴백) |
 | `packages/web/public/sw.js` | Service Worker (PWA + 푸시 + 전략별 캐싱 + 오디오 오프라인) |
 | `packages/web/src/app/manifest.ts` | PWA 매니페스트 (MetadataRoute) |
-| `packages/web/src/lib/actions/calendar.ts` | 캘린더 이벤트 Server Actions (CRUD + 입력 검증) |
+| `packages/web/src/lib/actions/calendar.ts` | 캘린더 이벤트 Server Actions (CRUD + 반복 확장 + excludeRecurringDate/deleteRecurringAfter) |
 | `packages/web/src/lib/actions/todos.ts` | 투두 Server Actions (CRUD + 토글 + 입력 검증) |
 | `packages/web/src/components/features/calendar/calendar-client.tsx` | 캘린더 메인 클라이언트 (월간뷰, 스와이프, optimistic updates, 데스크톱 2컬럼 레이아웃) |
 | `packages/web/src/components/features/calendar/calendar-grid.tsx` | 캘린더 그리드 (lane 기반 이벤트 배치, 세로 격자, 멀티데이 바 연결) |
 | `packages/web/src/components/features/calendar/todo-list.tsx` | 투두 리스트 (optimistic 추가/토글/삭제, IME 처리) |
-| `packages/web/src/components/features/calendar/event-form.tsx` | 이벤트 폼 (생성/수정/삭제, optimistic 콜백) |
-| `packages/web/src/components/features/calendar/event-list.tsx` | 이벤트 목록 (선택 날짜별 필터링) |
+| `packages/web/src/components/features/calendar/event-form.tsx` | 이벤트 폼 (생성/수정/삭제, 반복 설정 UI, optimistic 콜백) |
+| `packages/web/src/components/features/calendar/event-list.tsx` | 이벤트 목록 (선택 날짜별 필터링, 반복 삭제 3옵션 다이얼로그) |
 | `packages/web/src/components/features/calendar/category-manager.tsx` | 이벤트 카테고리 관리 다이얼로그 |
 | `packages/web/src/components/features/calendar/types.ts` | 캘린더 공유 타입 (CalendarEvent, Todo, EventCategory) |
 | `packages/shared/src/schema/event-categories.ts` | 이벤트 카테고리 스키마 |
@@ -163,3 +166,10 @@ study-admin 스타일: Sky Blue `#0ea5e9` 포인트, Pretendard 폰트, 다크�
 | `docs/plans/26-03-04-dashboard-redesign.md` | 대시보드 리디자인 설계 (날씨+게이미피케이션) |
 | `docs/plans/26-03-05-calendar-redesign.md` | 캘린더 리디자인 설계 (카테고리+2컬럼 레이아웃) |
 | `docs/plans/26-03-05-performance-optimization.md` | PWA 성능 최적화 (리전, 번들, 렌더링, 워터폴) |
+
+## docs 파일명 컨벤션
+
+`yy-mm-dd-{설명}.md` — 예: `26-03-03-system-architecture.md`
+- 설명은 다른 문서와 구분될 정도로 구체적으로 작명
+- `docs/plans/` 하위도 동일 컨벤션 적용
+- 단, `docs/ARCHITECTURE.md`는 제외하며 업데이트 시에도 네이밍을 그대로 유지

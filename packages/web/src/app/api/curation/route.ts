@@ -218,9 +218,13 @@ export const GET = withTracing('GET /api/curation', async (request) => {
   }
 
   // ── Sort date expression ──
-  // Use COALESCE so items without publishedAt fall back to collectedAt.
+  // For read status, sort by readAt DESC so the most recently read items appear first.
+  // Otherwise, use COALESCE so items without publishedAt fall back to collectedAt.
   // collectedAt is NOT NULL, so sortDate is always non-null → no NULLS LAST needed.
-  const sortDateExpr = sql`COALESCE(${curationItems.publishedAt}, ${curationItems.collectedAt})`;
+  const isReadStatus = status === 'read';
+  const sortDateExpr = isReadStatus
+    ? sql`${curationItems.readAt}`
+    : sql`COALESCE(${curationItems.publishedAt}, ${curationItems.collectedAt})`;
 
   // ── Parse and apply cursor ──
   if (cursor) {

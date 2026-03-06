@@ -1,4 +1,4 @@
-import {boolean, date, index, pgTable, text, timestamp, uuid, varchar} from 'drizzle-orm/pg-core';
+import {boolean, date, index, integer, pgTable, text, timestamp, uuid, varchar} from 'drizzle-orm/pg-core';
 
 export const calendarEvents = pgTable('calendar_events', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -13,6 +13,10 @@ export const calendarEvents = pgTable('calendar_events', {
   location: varchar('location', { length: 200 }),
   categoryId: uuid('category_id'),
   isCompleted: boolean('is_completed').notNull().default(false),
+  recurrenceType: varchar('recurrence_type', { length: 10 }),
+  recurrenceDays: integer('recurrence_days').array(),
+  recurrenceEndDate: date('recurrence_end_date'),
+  excludedDates: date('excluded_dates').array(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
