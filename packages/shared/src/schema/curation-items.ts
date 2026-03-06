@@ -21,4 +21,5 @@ export const curationItems = pgTable('curation_items', {
   categoryIdx: index('idx_items_category').on(table.category),
   sourceIdx: index('idx_items_source').on(table.sourceId),
   readAtIdx: index('idx_items_read_at').on(table.readAt),
+  filtersIdx: index('idx_items_filters').on(table.sourceId, table.isRead, table.isBookmarked, table.category),
 }));

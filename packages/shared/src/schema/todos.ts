@@ -14,4 +14,5 @@ export const todos = pgTable('todos', {
 }, (table) => ({
   dateIdx: index('idx_todos_date').on(table.userId, table.date),
   reminderIdx: index('idx_todos_reminder').on(table.reminderAt),
+  completedDateIdx: index('idx_todos_completed_date').on(table.userId, table.isCompleted, table.date),
 }));

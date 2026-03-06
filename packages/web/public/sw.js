@@ -9,6 +9,19 @@ const STATIC_ASSETS = [
   '/icons/icon-512x512.png',
 ];
 
+const MAX_AUDIO_CACHE_ITEMS = 50;
+const MAX_STATIC_CACHE_ITEMS = 100;
+
+/** LRU 캐시 정리: 오래된 항목부터 삭제 */
+async function trimCache(cacheName, maxItems) {
+  const cache = await caches.open(cacheName);
+  const keys = await cache.keys();
+  const excess = keys.length - maxItems;
+  for (let i = 0; i < excess; i++) {
+    await cache.delete(keys[i]);
+  }
+}
+
 // Install: 정적 에셋 프리캐시
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -49,7 +62,9 @@ self.addEventListener('fetch', (event) => {
           if (cached) return cached;
           return fetch(request).then((response) => {
             if (response.ok) {
-              cache.put(request, response.clone());
+              cache.put(request, response.clone()).then(() =>
+                trimCache(AUDIO_CACHE_NAME, MAX_AUDIO_CACHE_ITEMS)
+              );
             }
             return response;
           });
@@ -72,7 +87,11 @@ self.addEventListener('fetch', (event) => {
         return fetch(request).then((response) => {
           if (response.ok) {
             const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+            caches.open(CACHE_NAME).then((cache) =>
+              cache.put(request, clone).then(() =>
+                trimCache(CACHE_NAME, MAX_STATIC_CACHE_ITEMS)
+              )
+            );
           }
           return response;
         });
@@ -89,7 +108,11 @@ self.addEventListener('fetch', (event) => {
         return fetch(request).then((response) => {
           if (response.ok) {
             const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+            caches.open(CACHE_NAME).then((cache) =>
+              cache.put(request, clone).then(() =>
+                trimCache(CACHE_NAME, MAX_STATIC_CACHE_ITEMS)
+              )
+            );
           }
           return response;
         });
@@ -106,7 +129,11 @@ self.addEventListener('fetch', (event) => {
         return fetch(request).then((response) => {
           if (response.ok) {
             const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+            caches.open(CACHE_NAME).then((cache) =>
+              cache.put(request, clone).then(() =>
+                trimCache(CACHE_NAME, MAX_STATIC_CACHE_ITEMS)
+              )
+            );
           }
           return response;
         });

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import {beforeEach, describe, expect, it, vi} from 'vitest';
 
 // --- Mocks ---
 
@@ -88,7 +88,7 @@ describe('Memo Actions', () => {
     it('should throw if id is not valid UUID', async () => {
       setMockUser('user-123');
       const { getMemo } = await import('@/lib/actions/memos');
-      await expect(getMemo('invalid-id')).rejects.toThrow('Invalid ID');
+      await expect(getMemo('invalid-id')).rejects.toThrow('잘못된 ID입니다');
     });
 
     it('should return null if memo not found', async () => {
@@ -134,7 +134,7 @@ describe('Memo Actions', () => {
         updateMemo('550e8400-e29b-41d4-a716-446655440000', {
           content: { type: 'invalid' },
         })
-      ).rejects.toThrow('Invalid content format');
+      ).rejects.toThrow('잘못된 콘텐츠 형식입니다');
     });
 
     it('should sanitize javascript: links in content', async () => {
@@ -172,7 +172,7 @@ describe('Memo Actions', () => {
       const { updateMemo } = await import('@/lib/actions/memos');
       await expect(
         updateMemo('bad-id', { title: 'Test' })
-      ).rejects.toThrow('Invalid ID');
+      ).rejects.toThrow('잘못된 ID입니다');
     });
   });
 
@@ -194,7 +194,7 @@ describe('Memo Actions', () => {
     it('should throw if id is not valid UUID', async () => {
       setMockUser('user-123');
       const { deleteMemo } = await import('@/lib/actions/memos');
-      await expect(deleteMemo('bad-id')).rejects.toThrow('Invalid ID');
+      await expect(deleteMemo('bad-id')).rejects.toThrow('잘못된 ID입니다');
     });
   });
 

@@ -1,6 +1,6 @@
 # forme - 아키텍처 & 기술 선정 이유
 
-> 최종 업데이트: 2026-03-05 (PWA 성능 최적화 — 리전, 번들, 렌더링, 워터폴)
+> 최종 업데이트: 2026-03-06 (코드 리팩터링 + DB 인덱스 + 성능/보안 개선)
 
 개인 올인원 PWA. 큐레이션(RSS), 캘린더, 메모(리치 에디터), 팟캐스트를 하나의 앱에 통합.
 모바일 퍼스트, 오프라인 지원, 푸시 알림까지 네이티브 앱 수준의 경험을 웹으로 제공.
@@ -45,7 +45,7 @@ graph TB
   SW -->|web-push| API
 ```
 
-**핵심 원칙**: Server Components 우선, RLS로 데이터 격리, 서버 측 입력 검증 필수, 최소한의 클라이언트 상태, 무거운 컴포넌트 지연 로딩, 인터랙션 optimistic updates, 반응형 레이아웃 (모바일 단일컬럼 ↔ 데스크톱 멀티컬럼), Vercel 리전과 DB 리전 코로케이션 (서울).
+**핵심 원칙**: Server Components 우선, RLS로 데이터 격리, 서버 측 입력 검증 필수 (`lib/validators.ts` 공유 정규식), 최소한의 클라이언트 상태, 무거운 컴포넌트 지연 로딩, 인터랙션 optimistic updates, 반응형 레이아웃 (모바일 단일컬럼 ↔ 데스크톱 멀티컬럼), Vercel 리전과 DB 리전 코로케이션 (서울).
 
 ---
 
@@ -292,8 +292,9 @@ erDiagram
 |--------|------|
 | 인증 | Discord OAuth + Supabase Auth |
 | 인가 | PostgreSQL RLS (`auth.uid() = user_id`) |
-| 입력 검증 | Server Action/API에서 날짜, 색상, URL, 길이, UUID 형식 검증 |
-| 네트워크 | SSRF 방어 (`isSafeUrl`), HTTPS 강제 |
+| 입력 검증 | `lib/validators.ts` 공유 정규식 + Server Action/API에서 날짜, 색상, URL, 길이, UUID 형식 검증 |
+| UUID 검증 | 모든 CRUD 함수의 id 파라미터에 UUID_REGEX 적용 (calendar, todos, memos, categories) |
+| 네트워크 | SSRF 방어 (`isSafeUrl` — IPv4/IPv6 사설, IPv4-mapped IPv6, ULA, Link-Local 차단), HTTPS 강제 |
 | 헤더 | CSP, HSTS, X-Frame-Options, Permissions-Policy |
 | 리다이렉트 | `ALLOWED_PATHS` 화이트리스트 |
 | 업로드 | MIME 검증, 크기 제한, 안전한 키 생성 |
@@ -321,6 +322,9 @@ erDiagram
 | LayoutShell 분리 | PlayerProvider → MiniPlayer만 래핑 | 서버 컴포넌트 활용 극대화 |
 | Dashboard Suspense | 위젯 3개 병렬 스트리밍 | 순차 → 병렬 로딩 |
 | DashboardCuration 서버화 | 클라이언트 → 서버 컴포넌트 전환 | 클라이언트 JS 제거 |
+| 대형 컴포넌트 분리 | source-manager(696→451), memo-editor(536→398), event-form(566→527), curation-feed(490→419) | 유지보수성 + 번들 tree-shaking 개선 |
+| `useAutoSave` 훅 추출 | 자동저장 로직 → saveFnRef 패턴, Promise 동시저장 방어 | 이벤트 리스너 재등록 최소화 |
+| `@next/bundle-analyzer` | `ANALYZE=true pnpm build`로 번들 프로파일링 | 번들 사이즈 분석 가능 |
 
 ### 렌더링 최적화
 
@@ -337,7 +341,7 @@ erDiagram
 
 | 계층 | 전략 | 세부 |
 |------|------|------|
-| Service Worker | cache-first | `/_next/static/`, 폰트, 아이콘, 오디오 |
+| Service Worker | cache-first + LRU | `/_next/static/` (max 100), 폰트, 아이콘, 오디오 (max 50) |
 | Service Worker | stale-while-revalidate | HTML 페이지 |
 | Service Worker | network-first | `/api/curation`, `/api/push` |
 | R2 업로드 | `Cache-Control` 헤더 | 오디오 30일 immutable, 이미지 7일 |
@@ -350,8 +354,12 @@ erDiagram
 |--------|--------|-----------|
 | `calendar_events` | `(userId, startDate, endDate)` 복합 | 월간 이벤트 조회 |
 | `todos` | `(userId, date)` 복합 | 날짜별 투두 조회 |
+| `todos` | `(userId, isCompleted, date)` 복합 | 투두 스트릭 계산 (GROUP BY + HAVING) |
 | `event_categories` | `(userId, sortOrder)` 복합 | 사용자별 카테고리 정렬 조회 |
 | `curation_items` | `(sourceId, url)` unique | 중복 방지 |
+| `curation_items` | `(sourceId, isRead, isBookmarked, category)` 복합 | 다중 필터 쿼리 최적화 |
+| `user_daily_activity` | `(userId, date)` 복합 | 스트릭 계산 날짜 정렬 |
+| `memos` | `tags` GIN | 태그 배열 검색 |
 
 ### 트레이싱
 
@@ -384,6 +392,7 @@ erDiagram
 | web-push | 3.6.7 | 푸시 알림 |
 | feedsmith | 2.9.0 | RSS 파싱 |
 | @dnd-kit/core | 6.3.1 | 드래그앤드롭 |
+| @next/bundle-analyzer | 16.1.6 | 번들 분석 |
 | typescript | 5.9.3 | 타입 체크 |
 | node | >=22.0.0 | 런타임 |
 | pnpm | >=9.0.0 | 패키지 매니저 |

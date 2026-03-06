@@ -2,12 +2,12 @@
 
 import {getAuthUser} from '@/lib/auth';
 import {traceAction, traceQuery} from '@/lib/logger';
+import {DATE_REGEX, HEX_COLOR_REGEX, TIME_REGEX, UUID_REGEX} from '@/lib/validators';
 import {calendarEvents, db} from '@forme/shared';
 import {and, desc, eq, lte, sql} from 'drizzle-orm';
 import {revalidatePath} from 'next/cache';
 
 const MONTH_REGEX = /^\d{4}-\d{2}$/;
-const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
 /** 반복 종료일 미지정 시 시작일 + 1년 기본값 */
 function defaultEndDate(startDate: string): string {
@@ -18,8 +18,6 @@ function defaultEndDate(startDate: string): string {
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 }
-const HEX_COLOR_REGEX = /^#[0-9a-fA-F]{6}$/;
-const TIME_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 function expandRecurringEvents(
   events: (typeof calendarEvents.$inferSelect)[],
@@ -108,9 +106,14 @@ export async function getCalendarEvents(month: string) {
     const paddedEnd = new Date(endDate);
     paddedEnd.setDate(paddedEnd.getDate() + 7);
 
-    const fmt = (d: Date) => d.toISOString().split('T')[0];
-    const rangeStart = fmt(paddedStart);
-    const rangeEnd = fmt(paddedEnd);
+    const fmtLocal = (d: Date) => {
+      const y = d.getFullYear();
+      const mo = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${mo}-${day}`;
+    };
+    const rangeStart = fmtLocal(paddedStart);
+    const rangeEnd = fmtLocal(paddedEnd);
 
     // 일반 이벤트: startDate ≤ rangeEnd AND endDate ≥ rangeStart
     // 반복 이벤트: startDate ≤ rangeEnd AND (recurrenceEndDate ≥ rangeStart OR recurrenceEndDate IS NULL)
@@ -223,6 +226,7 @@ export async function updateCalendarEvent(
   }
 ) {
   return traceAction('updateCalendarEvent', async () => {
+    if (!UUID_REGEX.test(id)) throw new Error('잘못된 ID입니다');
     const user = await getAuthUser();
 
     if (data.title !== undefined && !data.title.trim()) throw new Error('제목을 입력해주세요');
@@ -294,6 +298,7 @@ export async function updateCalendarEvent(
 
 export async function deleteCalendarEvent(id: string) {
   return traceAction('deleteCalendarEvent', async () => {
+    if (!UUID_REGEX.test(id)) throw new Error('잘못된 ID입니다');
     const user = await getAuthUser();
 
     await traceQuery('calendar.events.delete', () =>
@@ -315,6 +320,7 @@ export async function deleteCalendarEvent(id: string) {
 
 export async function toggleCalendarEvent(id: string) {
   return traceAction('toggleCalendarEvent', async () => {
+    if (!UUID_REGEX.test(id)) throw new Error('잘못된 ID입니다');
     const user = await getAuthUser();
     const [toggled] = await traceQuery('toggle_calendar_event', () =>
       db.update(calendarEvents)
@@ -330,6 +336,7 @@ export async function toggleCalendarEvent(id: string) {
 
 export async function excludeRecurringDate(eventId: string, dateStr: string) {
   return traceAction('excludeRecurringDate', async () => {
+    if (!UUID_REGEX.test(eventId)) throw new Error('잘못된 ID입니다');
     const user = await getAuthUser();
     if (!DATE_REGEX.test(dateStr)) throw new Error('날짜 형식이 올바르지 않습니다');
 
@@ -355,6 +362,7 @@ export async function excludeRecurringDate(eventId: string, dateStr: string) {
 
 export async function deleteRecurringAfter(eventId: string, dateStr: string) {
   return traceAction('deleteRecurringAfter', async () => {
+    if (!UUID_REGEX.test(eventId)) throw new Error('잘못된 ID입니다');
     const user = await getAuthUser();
     if (!DATE_REGEX.test(dateStr)) throw new Error('날짜 형식이 올바르지 않습니다');
 

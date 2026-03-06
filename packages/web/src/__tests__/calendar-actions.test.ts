@@ -118,13 +118,13 @@ describe('Calendar Actions', () => {
     it('should throw if not authenticated', async () => {
       setMockUser(null);
       const { deleteCalendarEvent } = await import('@/lib/actions/calendar');
-      await expect(deleteCalendarEvent('event-id')).rejects.toThrow('Unauthorized');
+      await expect(deleteCalendarEvent('550e8400-e29b-41d4-a716-446655440000')).rejects.toThrow('Unauthorized');
     });
 
     it('should succeed when authenticated', async () => {
       setMockUser('user-123');
       const { deleteCalendarEvent } = await import('@/lib/actions/calendar');
-      await expect(deleteCalendarEvent('event-id')).resolves.not.toThrow();
+      await expect(deleteCalendarEvent('550e8400-e29b-41d4-a716-446655440000')).resolves.not.toThrow();
     });
   });
 });
@@ -164,13 +164,13 @@ describe('Todo Actions', () => {
     it('should throw if not authenticated', async () => {
       setMockUser(null);
       const { toggleTodo } = await import('@/lib/actions/todos');
-      await expect(toggleTodo('todo-id')).rejects.toThrow('Unauthorized');
+      await expect(toggleTodo('550e8400-e29b-41d4-a716-446655440001')).rejects.toThrow('Unauthorized');
     });
 
     it('should toggle todo when authenticated', async () => {
       setMockUser('user-123');
       const { toggleTodo } = await import('@/lib/actions/todos');
-      const result = await toggleTodo('todo-id');
+      const result = await toggleTodo('550e8400-e29b-41d4-a716-446655440001');
       expect(result).toBeDefined();
     });
   });
@@ -179,13 +179,13 @@ describe('Todo Actions', () => {
     it('should throw if not authenticated', async () => {
       setMockUser(null);
       const { deleteTodo } = await import('@/lib/actions/todos');
-      await expect(deleteTodo('todo-id')).rejects.toThrow('Unauthorized');
+      await expect(deleteTodo('550e8400-e29b-41d4-a716-446655440001')).rejects.toThrow('Unauthorized');
     });
 
     it('should succeed when authenticated', async () => {
       setMockUser('user-123');
       const { deleteTodo } = await import('@/lib/actions/todos');
-      await expect(deleteTodo('todo-id')).resolves.not.toThrow();
+      await expect(deleteTodo('550e8400-e29b-41d4-a716-446655440001')).resolves.not.toThrow();
     });
   });
 });

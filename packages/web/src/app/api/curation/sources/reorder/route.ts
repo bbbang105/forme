@@ -1,11 +1,9 @@
 import {NextResponse} from 'next/server';
 import {createClient} from '@/lib/supabase/server';
+import {UUID_REGEX} from '@/lib/validators';
 import {curationSources, db} from '@forme/shared';
 import {and, eq} from 'drizzle-orm';
 import {withTracing} from '@/lib/logger';
-
-const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const PUT = withTracing('PUT /api/curation/sources/reorder', async (request) => {
   const supabase = await createClient();

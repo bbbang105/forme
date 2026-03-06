@@ -1,5 +1,6 @@
 import {NextResponse} from 'next/server';
 import {createClient} from '@/lib/supabase/server';
+import {UUID_REGEX} from '@/lib/validators';
 import {db, podcastEpisodes} from '@forme/shared';
 import {and, desc, eq, lt, or, sql} from 'drizzle-orm';
 import {extractR2Key} from '@/lib/r2';
@@ -7,7 +8,6 @@ import {withTracing} from '@/lib/logger';
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 50;
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function serializeEpisode(ep: typeof podcastEpisodes.$inferSelect) {
   return {
@@ -50,7 +50,7 @@ export const GET = withTracing('GET /api/podcast/episodes', async (request) => {
       }
       const cursorDateStr = cursor.slice(0, sepIdx);
       const cursorId = cursor.slice(sepIdx + 1);
-      if (!UUID_RE.test(cursorId)) {
+      if (!UUID_REGEX.test(cursorId)) {
         return NextResponse.json({ error: 'Invalid cursor' }, { status: 400 });
       }
       const cursorDate = new Date(cursorDateStr);

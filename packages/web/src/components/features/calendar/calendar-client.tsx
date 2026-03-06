@@ -3,7 +3,7 @@
 import {useCallback, useEffect, useMemo, useRef, useState, useTransition} from 'react';
 import {addMonths, endOfMonth, format, startOfMonth, subMonths} from 'date-fns';
 import {ko} from 'date-fns/locale';
-import {CalendarDays, ChevronLeft, ChevronRight, Plus} from 'lucide-react';
+import {CalendarDays, Plus} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {Card} from '@/components/ui/card';
 import {Skeleton} from '@/components/ui/skeleton';
@@ -22,6 +22,7 @@ import {
 import {getCategories} from '@/lib/actions/categories';
 import {getTodosByDateRange} from '@/lib/actions/todos';
 import {useSwipe} from '@/hooks/use-swipe';
+import {CalendarHeader} from './calendar-header';
 
 const EventForm = dynamic(() => import('./event-form').then(m => m.EventForm), {ssr: false});
 const CategoryManager = dynamic(() => import('./category-manager').then(m => m.CategoryManager), {ssr: false});
@@ -354,27 +355,13 @@ export function CalendarClient() {
       {/* Left: Month navigation + Calendar grid */}
       <div className="lg:flex-1 lg:min-w-0 space-y-4">
         {/* Month navigation */}
-        <div className="flex items-center justify-between px-4 sm:px-0">
-          <div className="flex items-center gap-2">
-            <h2 className="text-lg font-bold tracking-tight">
-              {format(currentMonth, 'yyyy년 M월', { locale: ko })}
-            </h2>
-            <button
-              onClick={handleToday}
-              className="text-xs text-primary font-medium px-2 py-0.5 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors"
-            >
-              오늘
-            </button>
-          </div>
-          <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handlePrevMonth} disabled={isFetching}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleNextMonth} disabled={isFetching}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+        <CalendarHeader
+          currentMonth={currentMonth}
+          isFetching={isFetching}
+          onPrevMonth={handlePrevMonth}
+          onNextMonth={handleNextMonth}
+          onToday={handleToday}
+        />
 
         {/* Calendar grid with swipe support */}
         <Card className="p-1 sm:p-3 rounded-none sm:rounded-xl border-x-0 sm:border-x overflow-hidden" {...swipeHandlers}>
