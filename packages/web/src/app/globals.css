@@ -167,6 +167,7 @@
       system-ui, Roboto, "Helvetica Neue", "Segoe UI", sans-serif;
     font-feature-settings: "ss01", "ss02", "cv01";
     letter-spacing: -0.014em;
+    overscroll-behavior-y: contain;
   }
 
   h1, h2, h3, h4, h5, h6 {
