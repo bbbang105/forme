@@ -33,8 +33,9 @@ interface LayoutShellProps {
 export function LayoutShell({ children }: LayoutShellProps) {
   return (
     <PlayerProvider>
-      <PullToRefresh />
-      {children}
+      <PullToRefresh>
+        {children}
+      </PullToRefresh>
       <MiniPlayer />
     </PlayerProvider>
   );
