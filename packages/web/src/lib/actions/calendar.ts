@@ -3,7 +3,7 @@
 import {getAuthUser} from '@/lib/auth';
 import {traceAction, traceQuery} from '@/lib/logger';
 import {calendarEvents, db} from '@forme/shared';
-import {and, desc, eq, gte, lte, sql} from 'drizzle-orm';
+import {and, desc, eq, lte, sql} from 'drizzle-orm';
 import {revalidatePath} from 'next/cache';
 
 const MONTH_REGEX = /^\d{4}-\d{2}$/;

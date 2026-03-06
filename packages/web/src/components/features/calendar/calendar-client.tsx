@@ -1,6 +1,6 @@
 'use client';
 
-import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState, useTransition} from 'react';
 import {addMonths, endOfMonth, format, startOfMonth, subMonths} from 'date-fns';
 import {ko} from 'date-fns/locale';
 import {CalendarDays, ChevronLeft, ChevronRight, Plus} from 'lucide-react';
@@ -37,12 +37,11 @@ export function CalendarClient() {
   const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isFetching, setIsFetching] = useState(false);
+  const [isFetching, startFetching] = useTransition();
 
   const selectedDateStr = format(selectedDate, 'yyyy-MM-dd');
 
-  const fetchData = useCallback(async () => {
-    setIsFetching(true);
+  const fetchData = useCallback(() => {
     const month = format(currentMonth, 'yyyy-MM');
     const start = startOfMonth(currentMonth);
     const end = endOfMonth(currentMonth);
@@ -53,24 +52,25 @@ export function CalendarClient() {
     const paddedEnd = new Date(end);
     paddedEnd.setDate(paddedEnd.getDate() + 7);
 
-    const [eventsData, todosData, categoriesData] = await Promise.all([
+    return Promise.all([
       getCalendarEvents(month),
       getTodosByDateRange(
         format(paddedStart, 'yyyy-MM-dd'),
         format(paddedEnd, 'yyyy-MM-dd')
       ),
       getCategories(),
-    ]);
-
-    setEvents(eventsData as CalendarEvent[]);
-    setTodos(todosData as Todo[]);
-    setCategories(categoriesData as EventCategory[]);
-    setIsLoading(false);
-    setIsFetching(false);
+    ]).then(([eventsData, todosData, categoriesData]) => {
+      setEvents(eventsData as CalendarEvent[]);
+      setTodos(todosData as Todo[]);
+      setCategories(categoriesData as EventCategory[]);
+      setIsLoading(false);
+    });
   }, [currentMonth]);
 
   useEffect(() => {
-    fetchData();
+    startFetching(() => {
+      fetchData();
+    });
   }, [fetchData]);
 
   const slideTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
