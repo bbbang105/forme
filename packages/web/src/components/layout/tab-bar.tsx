@@ -22,7 +22,7 @@ export function TabBar() {
         'fixed bottom-0 left-0 right-0 z-50',
         'border-t border-border/60 dark:border-border',
         'bg-background/95 backdrop-blur-md supports-[backdrop-filter]:bg-background/75',
-        'pb-[env(safe-area-inset-bottom)]'
+        'pb-[max(env(safe-area-inset-bottom),0.5rem)]'
       )}
     >
       <div className="flex h-16 max-w-7xl mx-auto">

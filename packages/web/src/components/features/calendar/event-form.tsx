@@ -233,7 +233,7 @@ function EventFormContent({
   const isRecurringInstance = !!event?.recurrenceType;
 
   return (
-      <DialogContent className="sm:max-w-md" onInteractOutside={(e) => e.preventDefault()} onPointerDownOutside={(e) => e.preventDefault()}>
+      <DialogContent className="sm:max-w-md max-h-[calc(100dvh-2rem)]" onInteractOutside={(e) => e.preventDefault()} onPointerDownOutside={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle>{isEditing ? '일정 수정' : '새 일정'}</DialogTitle>
           <DialogDescription>
@@ -241,7 +241,7 @@ function EventFormContent({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 px-2">
           {error && (
             <p className="text-sm text-destructive bg-destructive/10 px-3 py-2 rounded-md">
               {error}
@@ -302,18 +302,20 @@ function EventFormContent({
             </div>
           )}
 
-          {/* 종일 토글 */}
-          <div className="flex items-center justify-between">
-            <Label className="text-sm">종일</Label>
-            <Switch checked={isAllDay} onCheckedChange={setIsAllDay} />
+          {/* 종일 + 반복 토글 (한 줄) */}
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Label className="text-sm">종일</Label>
+              <Switch checked={isAllDay} onCheckedChange={setIsAllDay} />
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="text-sm">반복</Label>
+              <Switch checked={isRecurring} onCheckedChange={setIsRecurring} />
+            </div>
           </div>
 
           {/* 반복 설정 */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <Label className="text-sm">반복</Label>
-              <Switch checked={isRecurring} onCheckedChange={setIsRecurring} />
-            </div>
 
             {isRecurring && (
               <RecurrenceForm
@@ -409,7 +411,7 @@ function EventFormContent({
                   key={c.value}
                   type="button"
                   onClick={() => setColor(c.value)}
-                  className="w-6 h-6 rounded-full transition-all border-2"
+                  className="w-5 h-5 sm:w-6 sm:h-6 rounded-full transition-all border-2"
                   style={{
                     backgroundColor: c.value,
                     borderColor: color === c.value ? 'var(--foreground)' : 'transparent',
@@ -428,7 +430,7 @@ function EventFormContent({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="간단한 메모..."
-              rows={2}
+              rows={1}
               maxLength={2000}
               className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
             />
