@@ -2,16 +2,15 @@
 
 import {getAuthUser} from '@/lib/auth';
 import {traceAction, traceQuery} from '@/lib/logger';
+import {DATE_REGEX, UUID_REGEX} from '@/lib/validators';
 import {db, todos} from '@forme/shared';
 import {and, asc, eq, gte, lte, sql} from 'drizzle-orm';
 import {revalidatePath} from 'next/cache';
 
-const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
-
 export async function getTodosByDate(date: string) {
   return traceAction('getTodosByDate', async () => {
     const user = await getAuthUser();
-    if (!DATE_REGEX.test(date)) throw new Error('Invalid date format');
+    if (!DATE_REGEX.test(date)) throw new Error('잘못된 날짜 형식입니다');
 
     const rows = await traceQuery('todos.list', () =>
       db
@@ -33,7 +32,7 @@ export async function getTodosByDate(date: string) {
 export async function getTodosByDateRange(startDate: string, endDate: string) {
   return traceAction('getTodosByDateRange', async () => {
     const user = await getAuthUser();
-    if (!DATE_REGEX.test(startDate) || !DATE_REGEX.test(endDate)) throw new Error('Invalid date format');
+    if (!DATE_REGEX.test(startDate) || !DATE_REGEX.test(endDate)) throw new Error('잘못된 날짜 형식입니다');
 
     const rows = await traceQuery('todos.list.range', () =>
       db
@@ -60,7 +59,7 @@ export async function createTodo(data: {
   return traceAction('createTodo', async () => {
     const user = await getAuthUser();
 
-    if (!DATE_REGEX.test(data.date)) throw new Error('Invalid date format');
+    if (!DATE_REGEX.test(data.date)) throw new Error('잘못된 날짜 형식입니다');
     if (!data.content.trim()) throw new Error('내용을 입력해주세요');
     if (data.content.trim().length > 1000) throw new Error('내용은 1000자 이내여야 합니다');
 
@@ -105,6 +104,7 @@ export async function updateTodo(
   }
 ) {
   return traceAction('updateTodo', async () => {
+    if (!UUID_REGEX.test(id)) throw new Error('잘못된 ID입니다');
     const user = await getAuthUser();
 
     if (data.content !== undefined && !data.content.trim()) throw new Error('내용을 입력해주세요');
@@ -136,6 +136,7 @@ export async function updateTodo(
 
 export async function deleteTodo(id: string) {
   return traceAction('deleteTodo', async () => {
+    if (!UUID_REGEX.test(id)) throw new Error('잘못된 ID입니다');
     const user = await getAuthUser();
 
     await traceQuery('todos.delete', () =>
@@ -157,6 +158,7 @@ export async function deleteTodo(id: string) {
 
 export async function toggleTodo(id: string) {
   return traceAction('toggleTodo', async () => {
+    if (!UUID_REGEX.test(id)) throw new Error('잘못된 ID입니다');
     const user = await getAuthUser();
 
     const [row] = await traceQuery('todos.toggle', () =>
@@ -175,7 +177,7 @@ export async function toggleTodo(id: string) {
         .returning()
     );
 
-    if (!row) throw new Error('Todo not found');
+    if (!row) throw new Error('할 일을 찾을 수 없습니다');
 
     // Toggle is a completion state change — only the calendar view needs refreshing
     revalidatePath('/calendar');

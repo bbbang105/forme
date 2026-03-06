@@ -2,11 +2,11 @@
 
 import {getAuthUser} from '@/lib/auth';
 import {traceAction, traceQuery} from '@/lib/logger';
+import {UUID_REGEX} from '@/lib/validators';
 import {db, memos} from '@forme/shared';
 import {and, desc, eq, ilike, ne, or, sql} from 'drizzle-orm';
 import {revalidatePath} from 'next/cache';
 
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_CONTENT_TEXT_LENGTH = 50000;
 const MAX_CONTENT_JSON_SIZE = 500000;
 const MAX_SEARCH_QUERY_LENGTH = 200;
@@ -14,13 +14,13 @@ const ALLOWED_LINK_PROTOCOLS = ['http:', 'https:', 'mailto:'];
 const ALLOWED_IMAGE_PROTOCOLS = ['http:', 'https:'];
 
 function validateUUID(id: string) {
-  if (!UUID_REGEX.test(id)) throw new Error('Invalid ID');
+  if (!UUID_REGEX.test(id)) throw new Error('잘못된 ID입니다');
 }
 
 /** Sanitize TipTap JSON: validate structure and strip dangerous link protocols */
 function sanitizeTipTapContent(content: Record<string, unknown>): Record<string, unknown> {
   if (content.type !== 'doc') {
-    throw new Error('Invalid content format');
+    throw new Error('잘못된 콘텐츠 형식입니다');
   }
   const json = JSON.stringify(content);
   if (json.length > MAX_CONTENT_JSON_SIZE) {
@@ -270,7 +270,7 @@ export async function toggleMemoPin(id: string) {
         .returning()
     );
 
-    if (!row) throw new Error('Memo not found');
+    if (!row) throw new Error('메모를 찾을 수 없습니다');
 
     // Pin toggling only reorders the memo list — dashboard widget is unaffected
     revalidatePath('/memo');

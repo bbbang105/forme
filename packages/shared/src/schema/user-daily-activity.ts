@@ -1,4 +1,4 @@
-import { boolean, date, integer, pgTable, timestamp, uuid, uniqueIndex } from 'drizzle-orm/pg-core';
+import {boolean, date, index, integer, pgTable, timestamp, uniqueIndex, uuid} from 'drizzle-orm/pg-core';
 
 export const userDailyActivity = pgTable('user_daily_activity', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -9,4 +9,5 @@ export const userDailyActivity = pgTable('user_daily_activity', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   userDateUniq: uniqueIndex('idx_user_daily_activity_user_date').on(table.userId, table.date),
+  dateDescIdx: index('idx_activity_date_desc').on(table.userId, table.date),
 }));

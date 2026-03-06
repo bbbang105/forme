@@ -30,10 +30,12 @@ import {TaskListSort} from './task-list-sort';
 import {CollapsibleHeading} from './collapsible-heading';
 import {Extension} from '@tiptap/core';
 import {createImageDropPlugin} from './image-drop-plugin';
-import {ArrowLeft, Check, Pin, Plus, RotateCcw, Trash2, X} from 'lucide-react';
+import {ArrowLeft, Check, Pin, RotateCcw, Trash2} from 'lucide-react';
 import {deleteMemo, toggleMemoPin, updateMemo} from '@/lib/actions/memos';
 import {MemoToolbar} from './memo-toolbar';
+import {TagInput} from './tag-input';
 import {cn} from '@/lib/utils';
+import {useAutoSave} from '@/hooks/use-auto-save';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -64,9 +66,6 @@ lowlight.register('yaml', yaml);
 lowlight.register('java', java);
 lowlight.register('go', go);
 
-const MAX_TAGS = 5;
-const MAX_TAG_LENGTH = 20;
-
 interface MemoEditorProps {
   memo: {
     id: string;
@@ -82,23 +81,7 @@ export function MemoEditor({ memo }: MemoEditorProps) {
   const [title, setTitle] = useState(memo.title ?? '');
   const [isPinned, setIsPinned] = useState(memo.isPinned);
   const [tags, setTags] = useState<string[]>(memo.tags ?? []);
-  const [tagInput, setTagInput] = useState('');
-  const [showTagInput, setShowTagInput] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [saveError, setSaveError] = useState(false);
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
-  const savedTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
-  const composingRef = useRef(false);
-  const isSavingRef = useRef(false);
-  const tagInputRef = useRef<HTMLInputElement>(null);
-
-  // Focus the tag input whenever it becomes visible
-  useEffect(() => {
-    if (showTagInput) {
-      tagInputRef.current?.focus();
-    }
-  }, [showTagInput]);
+  const editorRef = useRef<ReturnType<typeof useEditor>>(null);
 
   const editor = useEditor({
     extensions: [
@@ -127,7 +110,7 @@ export function MemoEditor({ memo }: MemoEditorProps) {
               }
               return false;
             },
-            // Enter on empty last line or Mod+Enter → exit code block
+            // Enter on empty last line or Mod+Enter -> exit code block
             Enter: ({editor}) => {
               const {$from} = editor.state.selection;
               if ($from.parent.type.name !== 'codeBlock') return false;
@@ -155,7 +138,7 @@ export function MemoEditor({ memo }: MemoEditorProps) {
               if ($from.parent.type.name !== 'codeBlock') return false;
               return editor.commands.exitCode();
             },
-            // ArrowDown at last line → exit
+            // ArrowDown at last line -> exit
             ArrowDown: ({editor}) => {
               const {$from, empty} = editor.state.selection;
               if (!empty || $from.parent.type.name !== 'codeBlock') return false;
@@ -230,39 +213,32 @@ export function MemoEditor({ memo }: MemoEditorProps) {
     immediatelyRender: false,
   });
 
-  const save = useCallback(async (): Promise<boolean> => {
-    if (!editor) return true;
-    if (isSavingRef.current) return true;
-    isSavingRef.current = true;
-    setSaving(true);
-    setSaveError(false);
-    try {
-      // Deep clone to convert ProseMirror's null-prototype attrs to plain objects
-      // (prevents Next.js RSC "temporary client reference" serialization issues)
-      const json = JSON.parse(JSON.stringify(editor.getJSON())) as Record<string, unknown>;
-      await updateMemo(memo.id, {
-        title: title.trim(),
-        content: json,
-        contentText: editor.getText(),
-        tags,
-      });
-      setSaved(true);
-      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
-      savedTimerRef.current = setTimeout(() => setSaved(false), 1500);
-      return true;
-    } catch {
-      setSaveError(true);
-      return false;
-    } finally {
-      isSavingRef.current = false;
-      setSaving(false);
-    }
-  }, [editor, memo.id, title, tags]);
+  // Keep a ref to editor for use in saveFn callback
+  editorRef.current = editor;
 
-  const scheduleSave = useCallback(() => {
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => save(), 1000);
-  }, [save]);
+  const saveFn = useCallback(async (): Promise<boolean> => {
+    const ed = editorRef.current;
+    if (!ed) return true;
+    // Deep clone to convert ProseMirror's null-prototype attrs to plain objects
+    const json = JSON.parse(JSON.stringify(ed.getJSON())) as Record<string, unknown>;
+    await updateMemo(memo.id, {
+      title: title.trim(),
+      content: json,
+      contentText: ed.getText(),
+      tags,
+    });
+    return true;
+  }, [memo.id, title, tags]);
+
+  const {
+    saving,
+    saved,
+    saveError,
+    scheduleSave,
+    save,
+    composingRef,
+    detach,
+  } = useAutoSave({ saveFn });
 
   // Track IME composition to prevent save during Korean input
   useEffect(() => {
@@ -279,7 +255,7 @@ export function MemoEditor({ memo }: MemoEditorProps) {
       dom.removeEventListener('compositionstart', onStart);
       dom.removeEventListener('compositionend', onEnd);
     };
-  }, [editor, scheduleSave]);
+  }, [editor, scheduleSave, composingRef]);
 
   // Save on any document change (checkbox toggles, text input, etc.)
   useEffect(() => {
@@ -289,63 +265,21 @@ export function MemoEditor({ memo }: MemoEditorProps) {
     };
     editor.on('update', onDocChange);
     return () => { editor.off('update', onDocChange); };
-  }, [editor, scheduleSave]);
+  }, [editor, scheduleSave, composingRef]);
 
   // Save on title change with debounce
   useEffect(() => {
     scheduleSave();
-    return () => {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    };
   }, [title, scheduleSave]);
 
   // Save when tags change
   useEffect(() => {
     scheduleSave();
-    return () => {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    };
   }, [tags, scheduleSave]);
 
-  // Flush pending save on blur / page hide / beforeunload
-  const blurHandlerRef = useRef<(() => void) | null>(null);
-  useEffect(() => {
-    const flushSave = () => {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-      save();
-    };
-    blurHandlerRef.current = flushSave;
-    const handleVisibilityChange = () => {
-      if (document.hidden) flushSave();
-    };
-    window.addEventListener('blur', flushSave);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('beforeunload', flushSave);
-    return () => {
-      window.removeEventListener('blur', flushSave);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('beforeunload', flushSave);
-      blurHandlerRef.current = null;
-    };
-  }, [save]);
-
-  // Cleanup all timers on unmount
-  useEffect(() => {
-    return () => {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
-    };
-  }, []);
-
   const handleBack = useCallback(async () => {
-    // Flush pending save
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-
-    // Remove blur listener to prevent duplicate save during navigation
-    if (blurHandlerRef.current) {
-      window.removeEventListener('blur', blurHandlerRef.current);
-      blurHandlerRef.current = null;
-    }
+    // Detach listeners to prevent duplicate save during navigation
+    detach();
 
     // Delete empty memo
     if (!title.trim() && (!editor || editor.isEmpty)) {
@@ -357,7 +291,7 @@ export function MemoEditor({ memo }: MemoEditorProps) {
 
     router.refresh();
     router.push('/memo');
-  }, [editor, memo.id, title, save, router]);
+  }, [editor, memo.id, title, save, router, detach]);
 
   const handleDelete = useCallback(async () => {
     await deleteMemo(memo.id);
@@ -369,29 +303,6 @@ export function MemoEditor({ memo }: MemoEditorProps) {
     const result = await toggleMemoPin(memo.id);
     if (result) setIsPinned(result.isPinned);
   }, [memo.id]);
-
-  const addTag = useCallback(() => {
-    const trimmed = tagInput.trim();
-    if (!trimmed) {
-      setShowTagInput(false);
-      setTagInput('');
-      return;
-    }
-    if (trimmed.length > MAX_TAG_LENGTH) return;
-    if (tags.includes(trimmed)) {
-      setTagInput('');
-      setShowTagInput(false);
-      return;
-    }
-    if (tags.length >= MAX_TAGS) return;
-    setTags((prev) => [...prev, trimmed]);
-    setTagInput('');
-    setShowTagInput(false);
-  }, [tagInput, tags]);
-
-  const removeTag = useCallback((tag: string) => {
-    setTags((prev) => prev.filter((t) => t !== tag));
-  }, []);
 
   return (
     <div className="fixed inset-0 z-50 bg-background flex flex-col pt-[env(safe-area-inset-top)]">
@@ -450,7 +361,7 @@ export function MemoEditor({ memo }: MemoEditorProps) {
         </div>
       </div>
 
-      {/* Toolbar - 상단 고정 */}
+      {/* Toolbar */}
       <MemoToolbar editor={editor} />
 
       {/* Editor area */}
@@ -465,59 +376,7 @@ export function MemoEditor({ memo }: MemoEditorProps) {
         />
 
         {/* Tag input area */}
-        <div className="flex flex-wrap items-center gap-1.5 mb-4 min-h-[28px]">
-          {tags.map((tag) => (
-            <span
-              key={tag}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent text-xs text-accent-foreground"
-            >
-              {tag}
-              <button
-                type="button"
-                onClick={() => removeTag(tag)}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-                aria-label={`태그 '${tag}' 제거`}
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </span>
-          ))}
-
-          {showTagInput ? (
-            <input
-              ref={tagInputRef}
-              type="text"
-              value={tagInput}
-              onChange={(e) => setTagInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  addTag();
-                }
-                if (e.key === 'Escape') {
-                  setTagInput('');
-                  setShowTagInput(false);
-                }
-              }}
-              onBlur={() => {
-                addTag();
-              }}
-              placeholder="태그 입력..."
-              maxLength={MAX_TAG_LENGTH}
-              className="text-xs bg-accent/60 rounded-full px-2.5 py-0.5 outline-none w-24 placeholder:text-muted-foreground/60"
-            />
-          ) : tags.length < MAX_TAGS ? (
-            <button
-              type="button"
-              onClick={() => setShowTagInput(true)}
-              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-              aria-label="태그 추가"
-            >
-              <Plus className="h-3 w-3" />
-              <span>태그</span>
-            </button>
-          ) : null}
-        </div>
+        <TagInput tags={tags} onTagsChange={setTags} />
 
         <EditorContent
           editor={editor}

@@ -1,5 +1,6 @@
 import {NextResponse} from 'next/server';
 import {createClient} from '@/lib/supabase/server';
+import {UUID_REGEX} from '@/lib/validators';
 import {curationItems, curationSources, db, profiles} from '@forme/shared';
 import {and, desc, eq, inArray, sql, type SQL} from 'drizzle-orm';
 import {escapeIlike} from '@/lib/curation-utils';
@@ -17,8 +18,6 @@ function sqlTextArray(arr: string[]) {
 
 // ── Constants ──
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_SEARCH_LENGTH = 100;
 const DEFAULT_LIMIT = 12;
 const MAX_LIMIT = 50;
@@ -121,7 +120,7 @@ export const GET = withTracing('GET /api/curation', async (request) => {
     );
   }
 
-  if (sourceId && !UUID_RE.test(sourceId)) {
+  if (sourceId && !UUID_REGEX.test(sourceId)) {
     return NextResponse.json(
       { error: 'sourceId must be a valid UUID' },
       { status: 400 }
@@ -238,7 +237,7 @@ export const GET = withTracing('GET /api/curation', async (request) => {
       const cursorDateStr = parts.slice(1, -1).join('|');
       const cursorId = parts[parts.length - 1];
 
-      if (isNaN(cursorScore) || !cursorDateStr || !UUID_RE.test(cursorId)) {
+      if (isNaN(cursorScore) || !cursorDateStr || !UUID_REGEX.test(cursorId)) {
         return NextResponse.json({ error: 'Invalid cursor format' }, { status: 400 });
       }
 
@@ -268,7 +267,7 @@ export const GET = withTracing('GET /api/curation', async (request) => {
       const cursorDateStr = cursor.slice(0, separatorIdx);
       const cursorId = cursor.slice(separatorIdx + 1);
 
-      if (!UUID_RE.test(cursorId)) {
+      if (!UUID_REGEX.test(cursorId)) {
         return NextResponse.json({ error: 'Invalid cursor format: id is not a valid UUID' }, { status: 400 });
       }
 

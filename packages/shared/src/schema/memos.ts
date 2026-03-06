@@ -13,4 +13,5 @@ export const memos = pgTable('memos', {
 }, (table) => ({
   listIdx: index('idx_memos_list').on(table.userId, table.isPinned, table.updatedAt),
   searchIdx: index('idx_memos_search').on(table.userId, table.contentText),
+  tagsIdx: index('idx_memos_tags').using('gin', table.tags),
 }));

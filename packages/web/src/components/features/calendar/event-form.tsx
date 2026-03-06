@@ -26,8 +26,9 @@ import {createCalendarEvent, deleteCalendarEvent, updateCalendarEvent} from '@/l
 import {MapPin, Trash2} from 'lucide-react';
 import {cn} from '@/lib/utils';
 import type {CalendarEvent, EventCategory} from './types';
+import {RecurrenceForm} from './recurrence-form';
 
-const EVENT_COLORS = [
+export const EVENT_COLORS = [
   { value: '#3b82f6', label: '파랑' },
   { value: '#f43f5e', label: '빨강' },
   { value: '#a855f7', label: '보라' },
@@ -42,7 +43,7 @@ const EVENT_COLORS = [
  * Auto-format time input: strips non-digits, inserts colon after 2 digits,
  * clamps hours to 0-23 and minutes to 0-59.
  */
-function formatTimeInput(raw: string): string {
+export function formatTimeInput(raw: string): string {
   const digits = raw.replace(/\D/g, '').slice(0, 4);
   if (digits.length <= 2) return digits;
   let hh = digits.slice(0, 2);
@@ -157,6 +158,7 @@ function EventFormContent({
       prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day].sort()
     );
   };
+
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -314,56 +316,15 @@ function EventFormContent({
             </div>
 
             {isRecurring && (
-              <div className="space-y-3 animate-fade-in">
-                {/* 매주/격주 */}
-                <div className="flex gap-2">
-                  {(['weekly', 'biweekly'] as const).map((type) => (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => setRecurrenceType(type)}
-                      className={cn(
-                        'px-3 py-1.5 rounded-full text-xs font-medium border transition-colors',
-                        recurrenceType === type
-                          ? 'bg-primary text-primary-foreground border-primary'
-                          : 'border-border text-muted-foreground hover:bg-muted/50'
-                      )}
-                    >
-                      {type === 'weekly' ? '매주' : '격주'}
-                    </button>
-                  ))}
-                </div>
-
-                {/* 요일 선택 */}
-                <div className="flex gap-1.5">
-                  {['일', '월', '화', '수', '목', '금', '토'].map((label, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() => toggleDay(i)}
-                      className={cn(
-                        'w-8 h-8 rounded-full text-xs font-medium transition-colors',
-                        recurrenceDays.includes(i)
-                          ? 'bg-primary text-primary-foreground'
-                          : 'border border-border text-muted-foreground hover:bg-muted/50'
-                      )}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-
-                {/* 반복 종료일 */}
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">반복 종료일 (선택)</Label>
-                  <Input
-                    type="date"
-                    value={recurrenceEndDate}
-                    onChange={(e) => setRecurrenceEndDate(e.target.value)}
-                    min={startDate}
-                  />
-                </div>
-              </div>
+              <RecurrenceForm
+                recurrenceType={recurrenceType}
+                onRecurrenceTypeChange={setRecurrenceType}
+                recurrenceDays={recurrenceDays}
+                onToggleDay={toggleDay}
+                recurrenceEndDate={recurrenceEndDate}
+                onRecurrenceEndDateChange={setRecurrenceEndDate}
+                minDate={startDate}
+              />
             )}
           </div>
 

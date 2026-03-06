@@ -2,11 +2,10 @@
 
 import {getAuthUser} from '@/lib/auth';
 import {traceAction, traceQuery} from '@/lib/logger';
+import {HEX_COLOR_REGEX, UUID_REGEX} from '@/lib/validators';
 import {db, eventCategories} from '@forme/shared';
 import {and, asc, eq} from 'drizzle-orm';
 import {revalidatePath} from 'next/cache';
-
-const HEX_COLOR_REGEX = /^#[0-9a-fA-F]{6}$/;
 
 const DEFAULT_CATEGORIES = [
   { name: '업무', color: '#3b82f6', icon: '📋', sortOrder: 0 },
@@ -112,8 +111,6 @@ export async function deleteCategory(id: string) {
     revalidatePath('/calendar');
   });
 }
-
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function reorderCategories(orderedIds: string[]) {
   return traceAction('reorderCategories', async () => {

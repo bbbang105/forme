@@ -2,12 +2,11 @@
 
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useRouter, useSearchParams} from 'next/navigation';
-import {Clock, Newspaper, Sparkles, Star} from 'lucide-react';
-import {cn} from '@/lib/utils';
+import {Newspaper} from 'lucide-react';
 import {Skeleton} from '@/components/ui/skeleton';
 import {CurationCard, type CurationItemData, CurationListRow} from './curation-card';
-import {CurationFilters, type StatusFilter} from './curation-filters';
-import {CurationSearch} from './curation-search';
+import {type StatusFilter} from './curation-filters';
+import {FeedFilterBar, type SortMode} from './feed-filter-bar';
 import dynamic from 'next/dynamic';
 
 const SourceManager = dynamic(
@@ -21,8 +20,6 @@ const SourceManager = dynamic(
 );
 
 const PAGE_SIZE = 12;
-
-type SortMode = 'latest' | 'recommended';
 
 export function CurationFeed() {
   const router = useRouter();
@@ -276,65 +273,23 @@ export function CurationFeed() {
         <SourceManager onCrawlComplete={handleCrawlComplete} onFavoritesChange={handleFavoritesChange} />
       </div>
 
-      {/* Search */}
-      <div className="mb-4">
-        <CurationSearch
-          value={search}
-          onChange={(v) => updateFilters({ search: v })}
-        />
-      </div>
-
-      {/* Favorite sources bar */}
-      {favoriteSources.length > 0 && (
-        <div className="mb-3 flex gap-2 overflow-x-auto scrollbar-hide">
-          {favoriteSources.map((src) => (
-            <button
-              key={src.id}
-              onClick={() =>
-                updateFilters({ sourceId: sourceId === src.id ? '' : src.id })
-              }
-              className={cn(
-                'inline-flex items-center gap-1 shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer border',
-                sourceId === src.id
-                  ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30'
-                  : 'bg-background text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground'
-              )}
-            >
-              <Star className="h-3 w-3 text-amber-500" fill="currentColor" />
-              {src.name}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Filters */}
-      <div className="mb-4">
-        <CurationFilters
-          categories={categories}
-          selectedCategory={category}
-          onCategoryChange={(c) => updateFilters({ category: c })}
-          status={status}
-          onStatusChange={(s) => updateFilters({ status: s })}
-          selectedTags={selectedTags}
-          onTagsChange={(tags) => updateFilters({ tags })}
-        />
-      </div>
-
-      {/* Sort toggle */}
-      <div className="flex items-center gap-1.5 mb-6">
-        <SortButton
-          active={sort === 'latest'}
-          onClick={() => updateFilters({ sort: 'latest' })}
-          icon={<Clock className="h-3.5 w-3.5" />}
-          label={status === 'read' ? '최근 읽은 순' : '최신순'}
-        />
-        <SortButton
-          active={sort === 'recommended'}
-          onClick={() => updateFilters({ sort: 'recommended' })}
-          icon={<Sparkles className="h-3.5 w-3.5" />}
-          label="추천순"
-        />
-      </div>
+      {/* Filter bar: search + favorites + filters + sort */}
+      <FeedFilterBar
+        search={search}
+        onSearchChange={(v) => updateFilters({ search: v })}
+        categories={categories}
+        selectedCategory={category}
+        onCategoryChange={(c) => updateFilters({ category: c })}
+        status={status}
+        onStatusChange={(s) => updateFilters({ status: s })}
+        selectedTags={selectedTags}
+        onTagsChange={(tags) => updateFilters({ tags })}
+        sort={sort}
+        onSortChange={(s) => updateFilters({ sort: s })}
+        sourceId={sourceId}
+        onSourceIdChange={(id) => updateFilters({ sourceId: id })}
+        favoriteSources={favoriteSources}
+      />
 
       {/* Feed */}
       <div className="min-h-[30vh]">
@@ -395,34 +350,6 @@ export function CurationFeed() {
       )}
       </div>
     </div>
-  );
-}
-
-function SortButton({
-  active,
-  onClick,
-  icon,
-  label,
-}: {
-  active: boolean;
-  onClick: () => void;
-  icon: React.ReactNode;
-  label: string;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium',
-        'transition-colors cursor-pointer',
-        active
-          ? 'bg-foreground text-background'
-          : 'border border-border text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-      )}
-    >
-      {icon}
-      {label}
-    </button>
   );
 }
 

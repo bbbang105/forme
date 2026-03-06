@@ -20,6 +20,7 @@ pnpm 모노레포: `packages/web` (Next.js 16 PWA) + `packages/shared` (DB 스�
 | DnD | @dnd-kit (core + sortable) |
 | 에디터 | TipTap + CodeBlockLowlight (lowlight 선택적 12언어 등록) |
 | 패키지 관리 | pnpm workspace |
+| 번들 분석 | @next/bundle-analyzer (`ANALYZE=true pnpm build`) |
 | 배포 | Vercel (리전: `icn1` 서울) |
 
 ## 개발 명령어
@@ -43,7 +44,9 @@ pnpm db:push          # 스키마 직접 push (dev용)
 - DB 접근 시 RLS 의존 (`auth.uid() = user_id`), 추가 권한 체크 불필요
 - 스타일: Tailwind 유틸리티 클래스, 하드코딩 색상 금지 (CSS 변수 사용)
 - 컴포넌트: shadcn/ui 기반, `components/ui/`에 위치
-- Server Actions 입력 검증: 날짜(YYYY-MM-DD), 색상(#hex), 길이 제한 등 서버측 검증 필수
+- 공유 검증 상수: `lib/validators.ts` (DATE_REGEX, HEX_COLOR_REGEX, UUID_REGEX, TIME_REGEX) — 모든 actions/API에서 import
+- Server Actions 입력 검증: 날짜(YYYY-MM-DD), 색상(#hex), UUID, 길이 제한 등 서버측 검증 필수
+- Server Actions UUID 검증: 모든 CRUD 함수의 id 파라미터에 UUID_REGEX 검증 적용
 - KST 시간대: `Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' })` 사용
 - API 트레이싱: `withTracing()` 래퍼로 모든 API 라우트 자동 타이밍 측정
 - Server Action 트레이싱: `traceAction()` + `traceQuery()` 래퍼로 DB 쿼리 성능 측정
@@ -56,7 +59,10 @@ pnpm db:push          # 스키마 직접 push (dev용)
 - 외부 API: Open-Meteo (서울 날씨, 서버 컴포넌트 fetch, revalidate 3600)
 - 팟캐스트 플레이어: `usePlayer()` (상태/컨트롤) + `usePlayerTime()` (currentTime/duration) 컨텍스트 분리
 - DB 커넥션: `max: 1` (Supabase Transaction Pooler가 실제 풀 관리, 서버리스 최적)
-- 성능: `serverExternalPackages`로 서버 전용 패키지 번들 제외, AVIF 이미지 포맷, 병렬 쿼리 (`Promise.all`)
+- 성능: `serverExternalPackages`로 서버 전용 패키지 번들 제외, AVIF 이미지 포맷, 병렬 쿼리 (`Promise.all`), SW LRU 캐시 (오디오 50개, 정적 100개)
+- SSRF 방어: `lib/url-safety.ts` — IPv4/IPv6 사설 대역, IPv4-mapped IPv6, ULA(fc00::/7), Link-Local(fe80::/10) 차단
+- 컴포넌트 분리: 대형 컴포넌트 → 하위 컴포넌트 추출 (source-card, crawl-settings-form, calendar-header, recurrence-form, feed-filter-bar, tag-input)
+- 자동저장 훅: `hooks/use-auto-save.ts` — saveFnRef 패턴, Promise 기반 동시 저장 방어, detach() API
 - 테스트: Vitest + `vi.hoisted()` Proxy 기반 DB 목 패턴 (`packages/web/src/__tests__/`)
 
 ## 핵심 파일
@@ -77,7 +83,8 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/shared/src/schema/` | Drizzle DB 스키마 (전체) |
 | `packages/shared/src/db.ts` | DB 싱글톤 (SSL 강제, max:1 서버리스 최적) |
 | `packages/web/src/lib/crawl-feed.ts` | RSS 크롤 (feedsmith, since 필터, SSRF 방어) |
-| `packages/web/src/lib/url-safety.ts` | SSRF 방어 유틸 |
+| `packages/web/src/lib/validators.ts` | 공유 검증 정규식 (DATE, HEX_COLOR, UUID, TIME) |
+| `packages/web/src/lib/url-safety.ts` | SSRF 방어 유틸 (IPv4/IPv6/ULA/Link-Local 차단) |
 | `packages/web/src/lib/auth.ts` | 인증 유틸 (React.cache 기반 getAuthUser) |
 | `packages/web/src/lib/logger.ts` | 구조화 로거 (withTracing, traceAction, traceQuery) |
 | `packages/web/src/lib/r2.ts` | Cloudflare R2 업로드/삭제 유틸 (Cache-Control 포함) |
@@ -93,14 +100,16 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/components/features/podcast/player-context.tsx` | 팟캐스트 플레이어 (PlayerContext + PlayerTimeContext 분리, localStorage 이어듣기, 청취시간 DB 동기화) |
 | `packages/web/src/components/features/memo/memo-editor-lazy.tsx` | MemoEditor 지연 로딩 래퍼 (next/dynamic, ssr: false) |
 | `packages/web/src/components/features/curation/mini-card-thumbnail.tsx` | 대시보드 큐레이션 썸네일 (클라이언트 onError 폴백) |
-| `packages/web/public/sw.js` | Service Worker (PWA + 푸시 + 전략별 캐싱 + 오디오 오프라인) |
+| `packages/web/public/sw.js` | Service Worker (PWA + 푸시 + 전략별 캐싱 + 오디오 오프라인 + LRU trimCache) |
 | `packages/web/src/app/manifest.ts` | PWA 매니페스트 (MetadataRoute) |
 | `packages/web/src/lib/actions/calendar.ts` | 캘린더 이벤트 Server Actions (CRUD + 반복 확장 + excludeRecurringDate/deleteRecurringAfter) |
 | `packages/web/src/lib/actions/todos.ts` | 투두 Server Actions (CRUD + 토글 + 입력 검증) |
 | `packages/web/src/components/features/calendar/calendar-client.tsx` | 캘린더 메인 클라이언트 (월간뷰, 스와이프, optimistic updates, 데스크톱 2컬럼 레이아웃) |
 | `packages/web/src/components/features/calendar/calendar-grid.tsx` | 캘린더 그리드 (lane 기반 이벤트 배치, 세로 격자, 멀티데이 바 연결) |
 | `packages/web/src/components/features/calendar/todo-list.tsx` | 투두 리스트 (optimistic 추가/토글/삭제, IME 처리) |
-| `packages/web/src/components/features/calendar/event-form.tsx` | 이벤트 폼 (생성/수정/삭제, 반복 설정 UI, optimistic 콜백) |
+| `packages/web/src/components/features/calendar/calendar-header.tsx` | 캘린더 헤더 (월 네비게이션, 오늘 버튼) |
+| `packages/web/src/components/features/calendar/event-form.tsx` | 이벤트 폼 (생성/수정/삭제, optimistic 콜백) |
+| `packages/web/src/components/features/calendar/recurrence-form.tsx` | 반복 일정 설정 UI (매주/격주, 요일 선택, 종료일) |
 | `packages/web/src/components/features/calendar/event-list.tsx` | 이벤트 목록 (선택 날짜별 필터링, 반복 삭제 3옵션 다이얼로그) |
 | `packages/web/src/components/features/calendar/category-manager.tsx` | 이벤트 카테고리 관리 다이얼로그 |
 | `packages/web/src/components/features/calendar/types.ts` | 캘린더 공유 타입 (CalendarEvent, Todo, EventCategory) |
@@ -110,7 +119,9 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/hooks/use-swipe.ts` | 터치 스와이프 훅 (모바일 월 이동) |
 | `packages/shared/src/schema/memos.ts` | 메모 스키마 (JSONB content + contentText + tags) |
 | `packages/web/src/lib/actions/memos.ts` | 메모 Server Actions (CRUD + 검색 + 고정 + 페이지네이션 + 태그 + TipTap JSON 검증) |
-| `packages/web/src/components/features/memo/memo-editor.tsx` | TipTap 에디터 (자동저장, 고정/삭제, 태그, 전체화면 fixed 레이아웃) |
+| `packages/web/src/hooks/use-auto-save.ts` | 자동저장 훅 (debounce, flush on blur/visibility, Promise 동시저장 방어) |
+| `packages/web/src/components/features/memo/memo-editor.tsx` | TipTap 에디터 (useAutoSave 훅, 고정/삭제, 전체화면 fixed 레이아웃) |
+| `packages/web/src/components/features/memo/tag-input.tsx` | 태그 입력 컴포넌트 (추가/삭제, MAX_TAGS=5) |
 | `packages/web/src/components/features/memo/memo-toolbar.tsx` | 에디터 서식 툴바 (B/I/U/S, H1-H3, 리스트, 체크리스트, 링크, 이미지, 인라인코드, 코드블록) |
 | `packages/web/src/components/features/memo/image-block.tsx` | 커스텀 이미지 확장 (React NodeView: 리사이즈, 삭제 버튼, 캡션) |
 | `packages/web/src/components/features/memo/image-drop-plugin.ts` | 이미지 드래그앤드롭/붙여넣기 업로드 ProseMirror 플러그인 |
@@ -126,6 +137,9 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/components/features/dashboard/weather-widget.tsx` | 서울 날씨 위젯 (서버 컴포넌트, WMO 픽토그램) |
 | `packages/web/src/components/features/dashboard/daily-missions.tsx` | 데일리 미션 카드 (프로그레스 바, 스트릭 표시) |
 | `packages/web/src/components/features/dashboard/attendance-recorder.tsx` | 출석 기록 (클라이언트, 방문 시 자동 호출) |
+| `packages/web/src/components/features/curation/source-card.tsx` | 소스 카드 (DnD, 즐겨찾기, 활성/비활성 토글) |
+| `packages/web/src/components/features/curation/crawl-settings-form.tsx` | 크롤 설정 폼 (기간 선택, 수집 시작) |
+| `packages/web/src/components/features/curation/feed-filter-bar.tsx` | 피드 필터 바 (검색, 즐겨찾기 소스, 카테고리/상태 필터, 정렬) |
 | `packages/web/src/components/features/curation/mini-card-link.tsx` | 대시보드 큐레이션 클릭 시 읽음 처리 래퍼 |
 
 ## 인증 구조
