@@ -212,6 +212,11 @@ const DayCell = React.memo(function DayCell({
 
             if (isMultiDay) {
               // Multi-day event bar (connected across cells)
+              // Show time on the second day to avoid overlapping with title on mobile
+              const startNextDate = parseLocalDate(event.startDate);
+              startNextDate.setDate(startNextDate.getDate() + 1);
+              const isSecondDay = dateKey === dateToKey(startNextDate);
+
               return (
                 <div
                   key={event.id}
@@ -234,11 +239,10 @@ const DayCell = React.memo(function DayCell({
                     <span className="flex items-center gap-0.5">
                       {category && <span className="shrink-0">{category.icon}</span>}
                       <span className="truncate">{event.title}</span>
-                      {event.startTime && (
-                        <span className="shrink-0 ml-auto opacity-70" style={{ fontSize: '8px' }}>
-                          {event.startTime.slice(0, 5)}
-                        </span>
-                      )}
+                    </span>
+                  ) : isSecondDay && event.startTime ? (
+                    <span className="opacity-70" style={{ fontSize: '8px' }}>
+                      {event.startTime.slice(0, 5)}
                     </span>
                   ) : (
                     '\u00A0'
