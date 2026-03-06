@@ -31,23 +31,32 @@ function expandRecurringEvents(
       continue;
     }
 
-    const eventStartDate = new Date(event.startDate + 'T00:00:00');
-    const rStart = new Date(rangeStart + 'T00:00:00');
+    // 로컬 날짜 포맷 (UTC 변환 방지 - KST 서버에서 toISOString()은 하루 밀림)
+    const fmtLocal = (d: Date) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+
+    const eventStartDate = new Date(event.startDate + 'T12:00:00');
+    const rStart = new Date(rangeStart + 'T12:00:00');
     const effectiveEnd = event.recurrenceEndDate
-      ? new Date(event.recurrenceEndDate + 'T00:00:00')
-      : new Date(rangeEnd + 'T00:00:00');
-    const rEnd = new Date(Math.min(effectiveEnd.getTime(), new Date(rangeEnd + 'T00:00:00').getTime()));
+      ? new Date(event.recurrenceEndDate + 'T12:00:00')
+      : new Date(rangeEnd + 'T12:00:00');
+    const rEnd = new Date(Math.min(effectiveEnd.getTime(), new Date(rangeEnd + 'T12:00:00').getTime()));
 
     const iterStart = new Date(Math.max(rStart.getTime(), eventStartDate.getTime()));
     const weekStart = new Date(iterStart);
     weekStart.setDate(weekStart.getDate() - weekStart.getDay());
 
     const current = new Date(weekStart);
+    current.setHours(12, 0, 0, 0);
     while (current <= rEnd) {
       for (const dayOfWeek of days) {
         const instanceDate = new Date(current);
         instanceDate.setDate(instanceDate.getDate() + dayOfWeek);
-        const dateStr = instanceDate.toISOString().split('T')[0];
+        const dateStr = fmtLocal(instanceDate);
 
         if (instanceDate < eventStartDate || instanceDate > rEnd || instanceDate < rStart) continue;
         if (excluded.has(dateStr)) continue;
