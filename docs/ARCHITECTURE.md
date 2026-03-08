@@ -26,10 +26,10 @@ graph TB
     LOG[lib/logger.ts<br/>구조화 로깅]
   end
 
-  subgraph Cron["Vercel Cron"]
-    CR1[cron/curation<br/>자동 크롤]
-    CR2[cron/calendar-daily<br/>08시 데일리 요약]
-    CR3[cron/calendar-reminder<br/>15분 주기 리마인더]
+  subgraph Cron["Scheduled Jobs"]
+    CR1[Vercel Cron<br/>curation 크롤]
+    CR2[Vercel Cron<br/>calendar-daily 08시]
+    CR3[Supabase pg_cron<br/>calendar-reminder 15분]
   end
 
   subgraph External["External Services"]
@@ -291,7 +291,7 @@ erDiagram
 | POST | `/api/curation/sources/reorder` | 즐겨찾기 순서 배치 업데이트 |
 | GET | `/api/cron/curation` | Cron 자동 크롤 + 푸시 (verifyCronAuth 인증) |
 | GET | `/api/cron/calendar-daily` | 08시 KST 데일리 요약 푸시 (오늘 일정+투두 카운트) |
-| GET | `/api/cron/calendar-reminder` | 15분 주기 이벤트 1시간 전 리마인더 푸시 |
+| GET | `/api/cron/calendar-reminder` | 이벤트 1시간 전 리마인더 (Supabase pg_cron 15분 주기 호출) |
 | POST | `/api/memo/image` | 메모 이미지 R2 업로드 (5MB) |
 | POST | `/api/podcast/upload` | 팟캐스트 오디오 R2 업로드 (200MB) |
 | GET/POST/DELETE | `/api/push/subscribe` | 푸시 구독 관리 |

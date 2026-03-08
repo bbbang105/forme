@@ -15,13 +15,14 @@ pnpm 모노레포: `packages/web` (Next.js 16 PWA) + `packages/shared` (DB 스�
 | ORM | Drizzle ORM (`packages/shared/src/schema/`) |
 | 스토리지 | Cloudflare R2 (팟캐스트 음성, 메모 이미지) |
 | 스타일링 | Tailwind CSS 4 + shadcn/ui + Radix UI |
-| 푸시알림 | web-push + Service Worker |
+| 푸시알림 | web-push + Service Worker + Supabase pg_cron (리마인더) |
 | RSS | feedsmith |
 | DnD | @dnd-kit (core + sortable + modifiers) |
 | 에디터 | TipTap + CodeBlockLowlight (lowlight 선택적 12언어 등록) |
 | 패키지 관리 | pnpm workspace |
 | 번들 분석 | @next/bundle-analyzer (`ANALYZE=true pnpm build`) |
-| 배포 | Vercel (리전: `icn1` 서울) |
+| 배포 | Vercel (리전: `icn1` 서울, Hobby 플랜) |
+| 스케줄링 | Vercel Cron (일 1회) + Supabase pg_cron + pg_net (고빈도) |
 
 ## 개발 명령어
 
@@ -103,7 +104,8 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/lib/cron-auth.ts` | Cron 공유 인증 유틸 (verifyCronAuth, safeCompare) |
 | `packages/web/src/app/api/cron/curation/route.ts` | Cron 자동 크롤 + 푸시 알림 (verifyCronAuth 인증, 응답에 내부 상세 미노출) |
 | `packages/web/src/app/api/cron/calendar-daily/route.ts` | Cron 데일리 요약 푸시 (08:00 KST, 일정+투두 카운트, reminderSent 리셋) |
-| `packages/web/src/app/api/cron/calendar-reminder/route.ts` | Cron 일정 리마인더 푸시 (15분 간격, 1시간 전 알림, 반복 일정 대응) |
+| `packages/web/src/app/api/cron/calendar-reminder/route.ts` | 일정 리마인더 푸시 (Supabase pg_cron 15분 호출, 1시간 전 알림, 반복 일정 대응) |
+| `supabase/pg-cron-setup.sql` | Supabase pg_cron + pg_net 설정 SQL (calendar-reminder 15분 스케줄) |
 | `packages/web/src/app/api/podcast/upload/route.ts` | 팟캐스트 오디오 R2 업로드 |
 | `packages/web/src/app/api/podcast/episodes/route.ts` | 팟캐스트 에피소드 CRUD |
 | `packages/web/src/app/api/push/subscribe/route.ts` | 푸시 구독 등록/해제/조회 |
