@@ -1,41 +1,14 @@
-import {cn} from '@/lib/utils';
-
-interface LogoProps {
-  className?: string;
-  size?: 'sm' | 'md' | 'lg';
-}
+import { useId } from 'react';
 
 /**
- * forme 워드마크 로고 — "for" + "me" (포인트 컬러)
+ * 로고 마크 — 레트로 {f} 픽토그램
+ * 중괄호 안의 f — "내 안의 모든 것"
+ * square caps + scanline 텍스처로 레트로 개발자 감성
  */
-export function Logo({ className, size = 'md' }: LogoProps) {
-  const sizes = {
-    sm: 'text-base',
-    md: 'text-lg',
-    lg: 'text-2xl',
-  };
+export function LogoMark({ size = 24 }: { size?: number }) {
+  const uid = useId();
+  const scanId = `lm-scan-${uid}`;
 
-  return (
-    <span className={cn('inline-flex items-center', className)}>
-      <span
-        className={cn(
-          sizes[size],
-          'font-black tracking-tighter select-none',
-        )}
-      >
-        for
-        <span className="text-primary">me</span>
-      </span>
-    </span>
-  );
-}
-
-/**
- * 로고 마크 — 둥근 사각형 안에 라운드 스트로크 'f'
- * 두꺼운 둥근 선으로 부드럽고 친근한 느낌
- * 상단 곡선이 자연스럽게 흐르고, 작은 악센트 점이 포인트
- */
-function LogoMark({ size = 24 }: { size?: number }) {
   return (
     <svg
       width={size}
@@ -46,21 +19,21 @@ function LogoMark({ size = 24 }: { size?: number }) {
       className="shrink-0"
       aria-hidden="true"
     >
-      {/* 배경 — 약간 더 둥근 사각형 */}
-      <rect width="32" height="32" rx="9" className="fill-primary" />
-
-      {/* f — 두꺼운 라운드 스트로크 */}
-      <g stroke="white" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" fill="none">
-        {/* 스템 + 상단 곡선: 아래에서 위로 올라가서 오른쪽으로 휘는 곡선 */}
-        <path d="M14 25V14.5C14 10 16.5 7.5 20.5 7.5" />
-        {/* 크로스바 */}
-        <path d="M10.5 17H19" />
+      <defs>
+        <pattern id={scanId} width="4" height="4" patternUnits="userSpaceOnUse">
+          <rect width="4" height="2" className="fill-primary" opacity="0.04" />
+        </pattern>
+      </defs>
+      <rect width="32" height="32" rx="7" className="fill-zinc-900" />
+      <rect width="32" height="32" rx="7" fill={`url(#${scanId})`} />
+      {/* {f} — square caps for retro pixel feel */}
+      <g className="stroke-primary" strokeWidth="2.4" strokeLinecap="square" strokeLinejoin="miter" fill="none">
+        <polyline points="9,8 7,8 7,14 5.5,16 7,18 7,24 9,24" />
+        <line x1="16" y1="11" x2="16" y2="24" />
+        <line x1="13" y1="16.5" x2="19.5" y2="16.5" />
+        <polyline points="16,11 16,9.5 18.5,8" />
+        <polyline points="23,8 25,8 25,14 26.5,16 25,18 25,24 23,24" />
       </g>
-
-      {/* 악센트 점 — 오른쪽 상단에 작은 원 (포인트, 개성) */}
-      <circle cx="23" cy="8.5" r="2" fill="white" opacity="0.6" />
     </svg>
   );
 }
-
-export { LogoMark };

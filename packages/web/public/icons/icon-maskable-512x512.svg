@@ -1,4 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
   <rect width="512" height="512" fill="#18181b"/>
-  <text x="256" y="320" font-family="system-ui,-apple-system,sans-serif" font-size="256" font-weight="900" fill="#0ea5e9" text-anchor="middle" letter-spacing="-10">me</text>
+  <defs>
+    <pattern id="scanlines" width="4" height="4" patternUnits="userSpaceOnUse">
+      <rect width="4" height="2" fill="#0ea5e9" opacity="0.03"/>
+    </pattern>
+  </defs>
+  <rect width="512" height="512" fill="url(#scanlines)"/>
+  <!-- { f } retro — inward for maskable safe zone -->
+  <g fill="none" stroke="#0ea5e9" stroke-width="22" stroke-linecap="square" stroke-linejoin="miter">
+    <polyline points="164,148 136,148 136,232 108,256 136,280 136,364 164,364"/>
+    <line x1="256" y1="184" x2="256" y2="364"/>
+    <line x1="220" y1="264" x2="296" y2="264"/>
+    <polyline points="256,184 256,166 286,148"/>
+    <polyline points="348,148 376,148 376,232 404,256 376,280 376,364 348,364"/>
+  </g>
 </svg>
