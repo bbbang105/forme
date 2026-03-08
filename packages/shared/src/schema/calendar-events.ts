@@ -13,6 +13,7 @@ export const calendarEvents = pgTable('calendar_events', {
   location: varchar('location', { length: 200 }),
   categoryId: uuid('category_id'),
   isCompleted: boolean('is_completed').notNull().default(false),
+  reminderSent: boolean('reminder_sent').notNull().default(false),
   recurrenceType: varchar('recurrence_type', { length: 10 }),
   recurrenceDays: integer('recurrence_days').array(),
   recurrenceEndDate: date('recurrence_end_date'),

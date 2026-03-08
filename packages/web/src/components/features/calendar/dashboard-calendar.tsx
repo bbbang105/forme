@@ -40,7 +40,7 @@ export async function DashboardCalendar() {
           gte(calendarEvents.endDate, today),
         )
       )
-      .orderBy(asc(calendarEvents.startDate))
+      .orderBy(asc(calendarEvents.startDate), asc(calendarEvents.startTime))
       .limit(3),
   ]);
 

@@ -1,9 +1,13 @@
 'use client';
 
-import {useState, useTransition} from 'react';
-import {CheckCircle2, ChevronRight, Circle, Pencil, Plus, Trash2} from 'lucide-react';
+import {forwardRef, useState, useTransition, useCallback} from 'react';
+import {CheckCircle2, ChevronRight, Circle, GripVertical, Pencil, Plus, Trash2} from 'lucide-react';
+import {closestCenter, DndContext, type DragEndEvent, PointerSensor, TouchSensor, useSensor, useSensors} from '@dnd-kit/core';
+import {SortableContext, useSortable, verticalListSortingStrategy} from '@dnd-kit/sortable';
+import {CSS} from '@dnd-kit/utilities';
+import {restrictToVerticalAxis} from '@dnd-kit/modifiers';
 import {cn} from '@/lib/utils';
-import {createTodo, deleteTodo, toggleTodo, updateTodo} from '@/lib/actions/todos';
+import {createTodo, deleteTodo, reorderTodos, toggleTodo, updateTodo} from '@/lib/actions/todos';
 import {Input} from '@/components/ui/input';
 import {
     AlertDialog,
@@ -25,6 +29,7 @@ interface TodoListProps {
   onCreated: (tempId: string, created: Todo) => void;
   onDelete: (todoId: string) => void;
   onUpdate: (todoId: string, content: string) => void;
+  onReorder: (reordered: Todo[]) => void;
 }
 
 export function TodoList({
@@ -35,10 +40,16 @@ export function TodoList({
   onCreated,
   onDelete,
   onUpdate,
+  onReorder,
 }: TodoListProps) {
   const [newContent, setNewContent] = useState('');
   const [isPending, startTransition] = useTransition();
   const [showCompleted, setShowCompleted] = useState(false);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
+  );
 
   const handleAdd = () => {
     const trimmed = newContent.trim();
@@ -103,6 +114,32 @@ export function TodoList({
     });
   };
 
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const incomplete = todos.filter((t) => !t.isCompleted);
+    const oldIdx = incomplete.findIndex((t) => t.id === active.id);
+    const newIdx = incomplete.findIndex((t) => t.id === over.id);
+    if (oldIdx === -1 || newIdx === -1) return;
+
+    const reordered = [...incomplete];
+    const [moved] = reordered.splice(oldIdx, 1);
+    reordered.splice(newIdx, 0, moved);
+
+    const updated = reordered.map((t, i) => ({ ...t, sortOrder: i }));
+    const completed = todos.filter((t) => t.isCompleted);
+    onReorder([...updated, ...completed]);
+
+    startTransition(async () => {
+      try {
+        await reorderTodos(updated.map((t) => ({ id: t.id, sortOrder: t.sortOrder })));
+      } catch {
+        // rollback handled by next fetch
+      }
+    });
+  }, [todos, onReorder]);
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
       e.preventDefault();
@@ -138,20 +175,32 @@ export function TodoList({
         </button>
       </div>
 
-      {/* Incomplete todos */}
+      {/* Incomplete todos — sortable */}
       {incomplete.length > 0 && (
-        <div className="space-y-0.5">
-          {incomplete.map((todo) => (
-            <TodoItem
-              key={todo.id}
-              todo={todo}
-              onToggle={handleToggle}
-              onDelete={handleDelete}
-              onUpdate={handleUpdate}
-              isPending={isPending}
-            />
-          ))}
-        </div>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+          modifiers={[restrictToVerticalAxis]}
+        >
+          <SortableContext
+            items={incomplete.map((t) => t.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <div className="space-y-0.5">
+              {incomplete.map((todo) => (
+                <SortableTodoItem
+                  key={todo.id}
+                  todo={todo}
+                  onToggle={handleToggle}
+                  onDelete={handleDelete}
+                  onUpdate={handleUpdate}
+                  isPending={isPending}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
       )}
 
       {/* Completed todos — collapsible */}
@@ -182,28 +231,84 @@ export function TodoList({
       )}
 
       {/* Empty state */}
-      {todos.length === 0 && (
-        <p className="text-sm text-muted-foreground text-center py-4">
-          할 일이 없습니다
-        </p>
-      )}
+      {todos.length === 0 && <TodoEmptyState />}
     </div>
   );
 }
 
-function TodoItem({
-  todo,
-  onToggle,
-  onDelete,
-  onUpdate,
-  isPending,
-}: {
+// ─── Empty state ──────────────────────────────────────────────────────────
+
+const EMPTY_TODO_MESSAGES = [
+  { emoji: '\u{1F389}', text: '오늘은 자유의 날!' },
+  { emoji: '\u2600\uFE0F', text: '할 일 없는 하루도 좋아요' },
+  { emoji: '\u{1F334}', text: '여유로운 하루 보내세요' },
+  { emoji: '\u2728', text: '오늘은 쉬어가는 날' },
+  { emoji: '\u{1F340}', text: '행운 가득한 하루!' },
+];
+
+function TodoEmptyState() {
+  // 날짜 기반 결정적 선택 (렌더 순수성 유지)
+  const message = EMPTY_TODO_MESSAGES[new Date().getDate() % EMPTY_TODO_MESSAGES.length];
+
+  return (
+    <p className="text-sm text-muted-foreground text-center py-4">
+      <span className="mr-1">{message.emoji}</span>
+      {message.text}
+    </p>
+  );
+}
+
+// ─── Sortable wrapper ──────────────────────────────────────────────────────
+
+function SortableTodoItem(props: {
   todo: Todo;
   onToggle: (id: string, currentIsCompleted: boolean) => void;
   onDelete: (id: string) => void;
   onUpdate: (id: string, content: string) => void;
   isPending: boolean;
 }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: props.todo.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <TodoItem
+      {...props}
+      ref={setNodeRef}
+      style={style}
+      isDragging={isDragging}
+      dragHandleProps={{ ...attributes, ...listeners }}
+    />
+  );
+}
+
+// ─── TodoItem ──────────────────────────────────────────────────────────────
+
+interface TodoItemProps {
+  todo: Todo;
+  onToggle: (id: string, currentIsCompleted: boolean) => void;
+  onDelete: (id: string) => void;
+  onUpdate: (id: string, content: string) => void;
+  isPending: boolean;
+  style?: React.CSSProperties;
+  isDragging?: boolean;
+  dragHandleProps?: Record<string, unknown>;
+}
+
+const TodoItem = forwardRef<HTMLDivElement, TodoItemProps>(function TodoItem(
+  { todo, onToggle, onDelete, onUpdate, isPending, style, isDragging, dragHandleProps },
+  ref,
+) {
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(todo.content);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -234,18 +339,34 @@ function TodoItem({
 
   return (
     <div
+      ref={ref}
+      style={style}
       className={cn(
-        'group flex items-center gap-2.5 px-2 py-1.5 rounded-md transition-colors',
+        'group flex items-center gap-1.5 px-1 py-1.5 rounded-md transition-colors',
         'hover:bg-muted/50',
+        isDragging && 'opacity-50 shadow-lg z-10 bg-card',
       )}
     >
+      {/* Drag handle — always visible for incomplete, hidden for completed */}
+      {dragHandleProps ? (
+        <button
+          className="shrink-0 p-0.5 rounded text-muted-foreground/30 hover:text-muted-foreground/60 cursor-grab active:cursor-grabbing touch-none"
+          aria-label="드래그하여 순서 변경"
+          {...dragHandleProps}
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
+      ) : (
+        <div className="w-5 shrink-0" />
+      )}
+
       <button
         onClick={() => onToggle(todo.id, todo.isCompleted)}
         disabled={isPending}
         className="shrink-0 transition-transform active:scale-95"
       >
         {todo.isCompleted
-          ? <CheckCircle2 className="h-[18px] w-[18px] text-primary" />
+          ? <CheckCircle2 className="h-[18px] w-[18px] text-primary animate-check-bounce" />
           : <Circle className="h-[18px] w-[18px] text-muted-foreground/40 hover:text-muted-foreground/60" />
         }
       </button>
@@ -262,7 +383,7 @@ function TodoItem({
       ) : (
         <span
           className={cn(
-            'flex-1 text-sm transition-colors',
+            'flex-1 text-sm transition-colors min-w-0 truncate',
             todo.isCompleted && 'line-through text-muted-foreground',
           )}
         >
@@ -270,22 +391,24 @@ function TodoItem({
         </span>
       )}
 
-      <div className="flex items-center gap-0.5 shrink-0 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-        <button
-          onClick={() => { setEditContent(todo.content); setIsEditing(true); }}
-          disabled={isPending || isEditing}
-          className="p-1 rounded hover:bg-muted/50 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </button>
-        <button
-          onClick={() => setShowDeleteConfirm(true)}
-          disabled={isPending}
-          className="p-1 rounded hover:bg-destructive/10 text-destructive/50 hover:text-destructive transition-colors"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </button>
-      </div>
+      {!isEditing && (
+        <div className="flex items-center gap-0.5 shrink-0 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+          <button
+            onClick={() => { setEditContent(todo.content); setIsEditing(true); }}
+            disabled={isPending || isEditing}
+            className="p-1 rounded hover:bg-muted/50 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            disabled={isPending}
+            className="p-1 rounded hover:bg-destructive/10 text-destructive/50 hover:text-destructive transition-colors"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
 
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <AlertDialogContent>
@@ -308,4 +431,4 @@ function TodoItem({
       </AlertDialog>
     </div>
   );
-}
+});

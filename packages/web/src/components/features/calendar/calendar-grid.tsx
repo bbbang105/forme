@@ -59,12 +59,16 @@ function parseLocalDate(dateStr: string): Date {
  * Also returns eventsByDate: each date maps to the events that cover it.
  */
 function computeEventLanes(events: CalendarEvent[]) {
-  // 1. Sort: start date ascending → longer duration first → id for stability
+  // 1. Sort: start date ascending → longer duration first → startTime ascending → id for stability
   const sorted = [...events].sort((a, b) => {
     const startCmp = a.startDate.localeCompare(b.startDate);
     if (startCmp !== 0) return startCmp;
     const endCmp = b.endDate.localeCompare(a.endDate);
     if (endCmp !== 0) return endCmp;
+    const aTime = a.startTime ?? '';
+    const bTime = b.startTime ?? '';
+    const timeCmp = aTime.localeCompare(bTime);
+    if (timeCmp !== 0) return timeCmp;
     return a.id.localeCompare(b.id);
   });
 
@@ -98,9 +102,15 @@ function computeEventLanes(events: CalendarEvent[]) {
     }
   }
 
-  // 4. Sort each day's events by lane
+  // 4. Sort each day's events by lane, then by startTime ascending
   for (const list of map.values()) {
-    list.sort((a, b) => (laneMap.get(a.id) ?? 0) - (laneMap.get(b.id) ?? 0));
+    list.sort((a, b) => {
+      const laneCmp = (laneMap.get(a.id) ?? 0) - (laneMap.get(b.id) ?? 0);
+      if (laneCmp !== 0) return laneCmp;
+      const aTime = a.startTime ?? '';
+      const bTime = b.startTime ?? '';
+      return aTime.localeCompare(bTime);
+    });
   }
 
   return { eventsByDate: map, eventLaneMap: laneMap };
@@ -143,6 +153,11 @@ const DayCell = React.memo(function DayCell({
     [dayTodos],
   );
 
+  const colorDots = useMemo(() => {
+    const colors = [...new Set(dayEvents.map((e) => e.color))];
+    return colors.slice(0, 3);
+  }, [dayEvents]);
+
   // Build lane array with nulls for empty lanes
   const lanes = useMemo(() => {
     if (dayEvents.length === 0) return [];
@@ -172,7 +187,7 @@ const DayCell = React.memo(function DayCell({
       )}
     >
       {/* Date number */}
-      <div className="flex justify-center pt-0.5 pb-px">
+      <div className="flex flex-col items-center pt-0.5 pb-px">
         <span
           className={cn(
             'flex items-center justify-center w-6 h-6 rounded-full text-xs font-medium',
@@ -185,6 +200,17 @@ const DayCell = React.memo(function DayCell({
         >
           {format(day, 'd')}
         </span>
+        {colorDots.length > 0 && (
+          <div className="flex gap-0.5 mt-px">
+            {colorDots.map((c) => (
+              <span
+                key={c}
+                className="w-1 h-1 rounded-full"
+                style={{ backgroundColor: c }}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Event bars (lane-based) */}

@@ -372,7 +372,19 @@ function EventFormContent({
                   inputMode="numeric"
                   placeholder="09:00"
                   value={startTime}
-                  onChange={(e) => setStartTime(formatTimeInput(e.target.value))}
+                  onChange={(e) => {
+                    const val = formatTimeInput(e.target.value);
+                    setStartTime(val);
+                    // 완성된 시간(HH:MM)이면 종료 시간을 +1시간으로 동기화
+                    if (!isEditing && val.length === 5) {
+                      const [hh, mm] = val.split(':').map(Number);
+                      if (hh < 23) {
+                        setEndTime(`${String(hh + 1).padStart(2, '0')}:${String(mm).padStart(2, '0')}`);
+                      } else {
+                        setEndTime('23:59');
+                      }
+                    }
+                  }}
                   maxLength={5}
                 />
               </div>

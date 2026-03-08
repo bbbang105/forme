@@ -15,13 +15,14 @@ pnpm 모노레포: `packages/web` (Next.js 16 PWA) + `packages/shared` (DB 스�
 | ORM | Drizzle ORM (`packages/shared/src/schema/`) |
 | 스토리지 | Cloudflare R2 (팟캐스트 음성, 메모 이미지) |
 | 스타일링 | Tailwind CSS 4 + shadcn/ui + Radix UI |
-| 푸시알림 | web-push + Service Worker |
+| 푸시알림 | web-push + Service Worker + Supabase pg_cron (리마인더) |
 | RSS | feedsmith |
-| DnD | @dnd-kit (core + sortable) |
+| DnD | @dnd-kit (core + sortable + modifiers) |
 | 에디터 | TipTap + CodeBlockLowlight (lowlight 선택적 12언어 등록) |
 | 패키지 관리 | pnpm workspace |
 | 번들 분석 | @next/bundle-analyzer (`ANALYZE=true pnpm build`) |
-| 배포 | Vercel (리전: `icn1` 서울) |
+| 배포 | Vercel (리전: `icn1` 서울, Hobby 플랜) |
+| 스케줄링 | Vercel Cron (일 1회) + Supabase pg_cron + pg_net (고빈도) |
 
 ## 개발 명령어
 
@@ -52,7 +53,10 @@ pnpm db:push          # 스키마 직접 push (dev용)
 - API 트레이싱: `withTracing()` 래퍼로 모든 API 라우트 자동 타이밍 측정
 - Server Action 트레이싱: `traceAction()` + `traceQuery()` 래퍼로 DB 쿼리 성능 측정
 - 무거운 컴포넌트: `next/dynamic` + `ssr: false`로 지연 로딩 (TipTap, DnD Kit, EventForm, CategoryManager 등)
-- 캘린더 인터랙션: Optimistic updates 패턴, 데스크톱 2컬럼 (`lg:flex-row`), lane 기반 이벤트 배치 (hazel-admin 스타일, greedy lane 할당 + 멀티데이 바 연결), 삭제 시 AlertDialog 확인 모달, 반복 일정 (매주/격주 + 요일 선택, excludedDates로 개별 삭제, recurrenceEndDate로 이후 삭제)
+- 캘린더 인터랙션: Optimistic updates 패턴, 데스크톱 2컬럼 (`lg:flex-row`), lane 기반 이벤트 배치 (hazel-admin 스타일, greedy lane 할당 + startTime 순 정렬 + 멀티데이 바 연결), 삭제 시 AlertDialog 확인 모달, 반복 일정 (매주/격주 + 요일 선택, excludedDates로 개별 삭제, recurrenceEndDate로 이후 삭제)
+- 투두: DnD 드래그 순서변경 (@dnd-kit, GripVertical 핸들, 모바일 항상 표시), 밀린 투두 칩 (date < 오늘 && 미완료 → amber 칩 + "오늘로" 이동), 완료 애니메이션 (check-bounce), 빈 상태 격려 문구
+- Cron 인증: `lib/cron-auth.ts` — `verifyCronAuth()` 공유 헬퍼 (timingSafeEqual + CRON_USER_ID 검증), 모든 cron 라우트에서 사용
+- 푸시 알림 Cron: 데일리 요약 (08:00 KST, 일정+투두 카운트), 일정 리마인더 (15분 간격, startTime 1시간 전, reminderSent 플래그)
 - 모바일 PWA: viewport `maximumScale: 1, userScalable: false`, 모든 input/textarea/select `text-base`(16px) 이상 (iOS 자동 줌 방지), 크롬 스타일 pull-to-refresh (`overscroll-behavior-y: contain` + DOM 직접 조작 + 컨텐츠 translateY + 인라인 SVG 인디케이터 + `window.location.reload()`)
 - Safari PWA 대응: Dialog `flex flex-col` + `inset-y-0 my-auto` 센터링 (grid+translate 금지), `body[data-scroll-locked]`에서 `overscroll-behavior-y: auto` 해제, pull-to-refresh에서 다이얼로그 열림 감지 스킵
 - 큐레이션 정렬: status=read 탭에서 readAt DESC 정렬 (최근 읽은 순)
@@ -80,7 +84,7 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/components/layout/tab-bar.tsx` | 하단 탭바 (5탭) |
 | `packages/web/src/components/layout/header.tsx` | 헤더 (forme 로고 + 다크모드 토글) |
 | `packages/web/src/components/ui/logo.tsx` | 레트로 {f} 픽토그램 로고마크 (useId 패턴 ID, 다크모드 대응) |
-| `packages/shared/src/schema/calendar-events.ts` | 캘린더 이벤트 스키마 (반복: recurrenceType/Days/EndDate, excludedDates) |
+| `packages/shared/src/schema/calendar-events.ts` | 캘린더 이벤트 스키마 (반복: recurrenceType/Days/EndDate, excludedDates, reminderSent) |
 | `packages/shared/src/schema/todos.ts` | 투두 스키마 |
 | `packages/shared/src/schema/` | Drizzle DB 스키마 (전체) |
 | `packages/shared/src/db.ts` | DB 싱글톤 (SSL 강제, max:1 서버리스 최적) |
@@ -97,7 +101,11 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/lib/greetings.ts` | 대시보드 인사 문구 (100개 랜덤) |
 | `packages/web/src/app/api/curation/crawl/route.ts` | SSE 수동 크롤 API |
 | `packages/web/src/app/api/curation/sources/reorder/route.ts` | 즐겨찾기 소스 순서 배치 업데이트 |
-| `packages/web/src/app/api/cron/curation/route.ts` | Cron 자동 크롤 + 푸시 알림 (timingSafeEqual 인증, 응답에 내부 상세 미노출) |
+| `packages/web/src/lib/cron-auth.ts` | Cron 공유 인증 유틸 (verifyCronAuth, safeCompare) |
+| `packages/web/src/app/api/cron/curation/route.ts` | Cron 자동 크롤 + 푸시 알림 (verifyCronAuth 인증, 응답에 내부 상세 미노출) |
+| `packages/web/src/app/api/cron/calendar-daily/route.ts` | Cron 데일리 요약 푸시 (08:00 KST, 일정+투두 카운트, reminderSent 리셋) |
+| `packages/web/src/app/api/cron/calendar-reminder/route.ts` | 일정 리마인더 푸시 (Supabase pg_cron 15분 호출, 1시간 전 알림, 반복 일정 대응) |
+| `supabase/pg-cron-setup.sql` | Supabase pg_cron + pg_net 설정 SQL (calendar-reminder 15분 스케줄) |
 | `packages/web/src/app/api/podcast/upload/route.ts` | 팟캐스트 오디오 R2 업로드 |
 | `packages/web/src/app/api/podcast/episodes/route.ts` | 팟캐스트 에피소드 CRUD |
 | `packages/web/src/app/api/push/subscribe/route.ts` | 푸시 구독 등록/해제/조회 |
@@ -107,14 +115,14 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/public/sw.js` | Service Worker (PWA + 푸시 + 전략별 캐싱 + 오디오 오프라인 + LRU trimCache) |
 | `packages/web/src/app/manifest.ts` | PWA 매니페스트 (MetadataRoute) |
 | `packages/web/src/lib/actions/calendar.ts` | 캘린더 이벤트 Server Actions (CRUD + 반복 확장 + excludeRecurringDate/deleteRecurringAfter) |
-| `packages/web/src/lib/actions/todos.ts` | 투두 Server Actions (CRUD + 토글 + 입력 검증) |
-| `packages/web/src/components/features/calendar/calendar-client.tsx` | 캘린더 메인 클라이언트 (월간뷰, 스와이프, optimistic updates, 데스크톱 2컬럼 레이아웃) |
-| `packages/web/src/components/features/calendar/calendar-grid.tsx` | 캘린더 그리드 (lane 기반 이벤트 배치, 세로 격자, 멀티데이 바 연결) |
-| `packages/web/src/components/features/calendar/todo-list.tsx` | 투두 리스트 (optimistic 추가/토글/삭제, IME 처리) |
+| `packages/web/src/lib/actions/todos.ts` | 투두 Server Actions (CRUD + 토글 + DnD 벌크 reorder + 입력 검증) |
+| `packages/web/src/components/features/calendar/calendar-client.tsx` | 캘린더 메인 클라이언트 (월간뷰, 스와이프, optimistic updates, 데스크톱 2컬럼, 밀린 투두 칩) |
+| `packages/web/src/components/features/calendar/calendar-grid.tsx` | 캘린더 그리드 (lane 기반 이벤트 배치, startTime 순 정렬, 컬러 dot, 멀티데이 바 연결) |
+| `packages/web/src/components/features/calendar/todo-list.tsx` | 투두 리스트 (DnD 순서변경, optimistic 추가/토글/삭제, 완료 애니메이션, 빈 상태 격려 문구) |
 | `packages/web/src/components/features/calendar/calendar-header.tsx` | 캘린더 헤더 (월 네비게이션, 오늘 버튼) |
-| `packages/web/src/components/features/calendar/event-form.tsx` | 이벤트 폼 (생성/수정/삭제, optimistic 콜백, 모바일 flex 스크롤 레이아웃) |
+| `packages/web/src/components/features/calendar/event-form.tsx` | 이벤트 폼 (생성/수정/삭제, optimistic 콜백, 종료시간 자동동기화, 모바일 flex 스크롤 레이아웃) |
 | `packages/web/src/components/features/calendar/recurrence-form.tsx` | 반복 일정 설정 UI (매주/격주, 요일 선택, 종료일) |
-| `packages/web/src/components/features/calendar/event-list.tsx` | 이벤트 목록 (선택 날짜별 필터링, 반복 삭제 3옵션 다이얼로그) |
+| `packages/web/src/components/features/calendar/event-list.tsx` | 이벤트 목록 (선택 날짜별 필터링, 반복 삭제 3옵션 다이얼로그, 빈 상태 격려 문구) |
 | `packages/web/src/components/features/calendar/category-manager.tsx` | 이벤트 카테고리 관리 다이얼로그 |
 | `packages/web/src/components/features/calendar/types.ts` | 캘린더 공유 타입 (CalendarEvent, Todo, EventCategory) |
 | `packages/shared/src/schema/event-categories.ts` | 이벤트 카테고리 스키마 |
@@ -185,6 +193,7 @@ study-admin 스타일: Sky Blue `#0ea5e9` 포인트, Pretendard 폰트, 다크�
 | `docs/plans/26-03-05-calendar-redesign.md` | 캘린더 리디자인 설계 (카테고리+2컬럼 레이아웃) |
 | `docs/plans/26-03-05-performance-optimization.md` | PWA 성능 최적화 (리전, 번들, 렌더링, 워터폴) |
 | `docs/26-03-08-safari-dialog-scroll-fix.md` | Safari 다이얼로그 스크롤 수정 (Chrome vs Safari 차이, 해결책) |
+| `docs/plans/26-03-08-calendar-push-ux-design.md` | 캘린더 푸시알림 + UX 개선 설계 (데일리 요약, 리마인더, 밀린 투두, 애니메이션) |
 
 ## docs 파일명 컨벤션
 

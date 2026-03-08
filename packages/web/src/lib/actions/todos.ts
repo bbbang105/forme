@@ -4,7 +4,7 @@ import {getAuthUser} from '@/lib/auth';
 import {traceAction, traceQuery} from '@/lib/logger';
 import {DATE_REGEX, UUID_REGEX} from '@/lib/validators';
 import {db, todos} from '@forme/shared';
-import {and, asc, eq, gte, lte, sql} from 'drizzle-orm';
+import {and, asc, eq, gte, inArray, lte, sql} from 'drizzle-orm';
 import {revalidatePath} from 'next/cache';
 
 export async function getTodosByDate(date: string) {
@@ -101,6 +101,7 @@ export async function updateTodo(
     content?: string;
     isCompleted?: boolean;
     sortOrder?: number;
+    date?: string;
   }
 ) {
   return traceAction('updateTodo', async () => {
@@ -109,11 +110,13 @@ export async function updateTodo(
 
     if (data.content !== undefined && !data.content.trim()) throw new Error('내용을 입력해주세요');
     if (data.content !== undefined && data.content.trim().length > 1000) throw new Error('내용은 1000자 이내여야 합니다');
+    if (data.date !== undefined && !DATE_REGEX.test(data.date)) throw new Error('잘못된 날짜 형식입니다');
 
     const updates: Record<string, unknown> = { updatedAt: new Date() };
     if (data.content !== undefined) updates.content = data.content.trim();
     if (data.isCompleted !== undefined) updates.isCompleted = data.isCompleted;
     if (data.sortOrder !== undefined) updates.sortOrder = data.sortOrder;
+    if (data.date !== undefined) updates.date = data.date;
 
     const [row] = await traceQuery('todos.update', () =>
       db
@@ -128,10 +131,44 @@ export async function updateTodo(
         .returning()
     );
 
-    // Content/sort-order edit — only the calendar view needs refreshing
     revalidatePath('/calendar');
+    // Date change affects the dashboard today's-todos widget
+    if (data.date !== undefined) revalidatePath('/dashboard');
     return row;
   }, { id });
+}
+
+export async function reorderTodos(items: { id: string; sortOrder: number }[]) {
+  return traceAction('reorderTodos', async () => {
+    const user = await getAuthUser();
+
+    if (items.length === 0 || items.length > 100) throw new Error('정렬 항목 수가 올바르지 않습니다');
+
+    for (const item of items) {
+      if (!UUID_REGEX.test(item.id)) throw new Error('잘못된 ID입니다');
+      if (!Number.isInteger(item.sortOrder) || item.sortOrder < 0) throw new Error('잘못된 정렬 순서입니다');
+    }
+
+    // CASE WHEN 벌크 업데이트 (1 쿼리)
+    const now = new Date();
+    const ids = items.map((i) => i.id);
+    const cases = items.map((i) => sql`WHEN ${todos.id} = ${i.id} THEN ${i.sortOrder}`);
+
+    await traceQuery('todos.reorder', () =>
+      db
+        .update(todos)
+        .set({
+          sortOrder: sql`CASE ${sql.join(cases, sql` `)} END`,
+          updatedAt: now,
+        })
+        .where(and(
+          inArray(todos.id, ids),
+          eq(todos.userId, user.id),
+        ))
+    );
+
+    revalidatePath('/calendar');
+  }, { count: items.length });
 }
 
 export async function deleteTodo(id: string) {
