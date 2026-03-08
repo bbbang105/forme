@@ -170,6 +170,11 @@
     overscroll-behavior-y: contain;
   }
 
+  /* Radix 오버레이(Dialog/Sheet/Select 등)가 열리면 overscroll-behavior 해제 (Safari fixed 스크롤 버그 방지) */
+  body[data-scroll-locked] {
+    overscroll-behavior-y: auto;
+  }
+
   h1, h2, h3, h4, h5, h6 {
     letter-spacing: -0.025em;
   }

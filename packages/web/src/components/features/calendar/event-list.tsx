@@ -72,7 +72,7 @@ export function EventList({ events, selectedDate, categories, onEdit, onDelete, 
           >
             {/* 완료 체크 */}
             <button
-              onClick={() => onToggle(event.id, !event.isCompleted)}
+              onClick={() => onToggle(event._originalId ?? event.id, !event.isCompleted)}
               className="mt-0.5 shrink-0 transition-transform active:scale-95"
             >
               {event.isCompleted
