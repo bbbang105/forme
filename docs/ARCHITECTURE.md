@@ -1,6 +1,6 @@
 # forme - 아키텍처 & 기술 선정 이유
 
-> 최종 업데이트: 2026-03-08 (Cron 보안 강화 + UUID 검증 통일 + API auth-first 패턴)
+> 최종 업데이트: 2026-03-08 (SW network-first 전환 + Cron 보안 강화 + UUID 검증 통일)
 
 개인 올인원 PWA. 큐레이션(RSS), 캘린더, 메모(리치 에디터), 팟캐스트를 하나의 앱에 통합.
 모바일 퍼스트, 오프라인 지원, 푸시 알림까지 네이티브 앱 수준의 경험을 웹으로 제공.
@@ -358,7 +358,7 @@ erDiagram
 | 계층 | 전략 | 세부 |
 |------|------|------|
 | Service Worker | cache-first + LRU | `/_next/static/` (max 100), 폰트, 아이콘, 오디오 (max 50) |
-| Service Worker | stale-while-revalidate | HTML 페이지 |
+| Service Worker | network-first (4초 타임아웃) | HTML / RSC 페이지 (오프라인 시 캐시 폴백) |
 | Service Worker | network-first | `/api/curation`, `/api/push` |
 | R2 업로드 | `Cache-Control` 헤더 | 오디오 30일 immutable, 이미지 7일 |
 | 인증 | `React.cache` | 요청당 `getUser()` 1회 |

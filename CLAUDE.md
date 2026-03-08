@@ -61,7 +61,7 @@ pnpm db:push          # 스키마 직접 push (dev용)
 - 외부 API: Open-Meteo (서울 날씨, 서버 컴포넌트 fetch, revalidate 3600)
 - 팟캐스트 플레이어: `usePlayer()` (상태/컨트롤) + `usePlayerTime()` (currentTime/duration) 컨텍스트 분리
 - DB 커넥션: `max: 1` (Supabase Transaction Pooler가 실제 풀 관리, 서버리스 최적)
-- 성능: `serverExternalPackages`로 서버 전용 패키지 번들 제외, AVIF 이미지 포맷, 병렬 쿼리 (`Promise.all`), SW LRU 캐시 (오디오 50개, 정적 100개)
+- 성능: `serverExternalPackages`로 서버 전용 패키지 번들 제외, AVIF 이미지 포맷, 병렬 쿼리 (`Promise.all`), SW LRU 캐시 (오디오 50개, 정적 100개), SW HTML/RSC network-first (4초 타임아웃 + 캐시 폴백)
 - SSRF 방어: `lib/url-safety.ts` — IPv4/IPv6 사설 대역, IPv4-mapped IPv6, ULA(fc00::/7), Link-Local(fe80::/10) 차단
 - 컴포넌트 분리: 대형 컴포넌트 → 하위 컴포넌트 추출 (source-card, crawl-settings-form, calendar-header, recurrence-form, feed-filter-bar, tag-input)
 - 자동저장 훅: `hooks/use-auto-save.ts` — saveFnRef 패턴, Promise 기반 동시 저장 방어, detach() API

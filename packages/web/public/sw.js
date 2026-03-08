@@ -2,7 +2,7 @@
 
 // forme - Service Worker (Offline Cache + Push Notifications)
 
-const CACHE_NAME = 'forme-v3';
+const CACHE_NAME = 'forme-v4';
 const AUDIO_CACHE_NAME = 'forme-audio-v1';
 const STATIC_ASSETS = [
   '/icons/icon-192x192.png',
@@ -11,6 +11,14 @@ const STATIC_ASSETS = [
 
 const MAX_AUDIO_CACHE_ITEMS = 50;
 const MAX_STATIC_CACHE_ITEMS = 100;
+const NETWORK_TIMEOUT_MS = 4000;
+
+/** 타임아웃 fetch: 느린 네트워크에서 무한 대기 방지 */
+function fetchWithTimeout(request, ms) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  return fetch(request, { signal: controller.signal }).finally(() => clearTimeout(timer));
+}
 
 /** LRU 캐시 정리: 오래된 항목부터 삭제 */
 async function trimCache(cacheName, maxItems) {
@@ -49,7 +57,7 @@ self.addEventListener('activate', (event) => {
 // - /icons/: cache-first
 // - /api/curation, /api/push: network-first
 // - /api/* (기타): network-only
-// - HTML 페이지: stale-while-revalidate
+// - HTML / RSC 페이지: network-first (4초 타임아웃, 오프라인 시 캐시 폴백)
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
@@ -182,21 +190,25 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // ── 6. Stale-while-revalidate: HTML 페이지
+  // ── 6. Network-first: HTML / RSC 페이지 (4초 타임아웃, 오프라인 시 캐시 폴백)
   event.respondWith(
-    caches.match(request).then((cached) => {
-      const networkFetch = fetch(request).then((response) => {
+    fetchWithTimeout(request, NETWORK_TIMEOUT_MS)
+      .then((response) => {
         if (response.ok) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
         }
         return response;
-      });
-      // 캐시가 있으면 즉시 반환하고 백그라운드에서 갱신
-      return cached || networkFetch.catch(() =>
-        new Response('Offline', { status: 503 })
-      );
-    })
+      })
+      .catch(() =>
+        caches.match(request).then((cached) =>
+          cached ||
+          new Response(
+            '<!DOCTYPE html><html><body><p>Offline</p></body></html>',
+            { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+          )
+        )
+      )
   );
 });
 
