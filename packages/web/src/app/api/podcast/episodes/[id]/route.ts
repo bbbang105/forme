@@ -4,23 +4,22 @@ import {db, podcastEpisodes} from '@forme/shared';
 import {and, eq} from 'drizzle-orm';
 import {deleteFromR2, extractR2Key} from '@/lib/r2';
 import {withTracing} from '@/lib/logger';
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import {UUID_REGEX} from '@/lib/validators';
 
 /**
  * PATCH /api/podcast/episodes/[id]
  * Update title and/or description.
  */
 export const PATCH = withTracing('PATCH /api/podcast/episodes/[id]', async (request, ctx) => {
-  const { id } = await (ctx as { params: Promise<{ id: string }> }).params;
-  if (!UUID_RE.test(id)) {
-    return NextResponse.json({ error: 'Invalid episode id' }, { status: 400 });
-  }
-
   const supabase = await createClient();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const { id } = await (ctx as { params: Promise<{ id: string }> }).params;
+  if (!UUID_REGEX.test(id)) {
+    return NextResponse.json({ error: 'Invalid episode id' }, { status: 400 });
   }
 
   let body: { title?: string; description?: string };
@@ -76,15 +75,15 @@ export const PATCH = withTracing('PATCH /api/podcast/episodes/[id]', async (requ
  * Deletes the episode record and its R2 audio file.
  */
 export const DELETE = withTracing('DELETE /api/podcast/episodes/[id]', async (request, ctx) => {
-  const { id } = await (ctx as { params: Promise<{ id: string }> }).params;
-  if (!UUID_RE.test(id)) {
-    return NextResponse.json({ error: 'Invalid episode id' }, { status: 400 });
-  }
-
   const supabase = await createClient();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const { id } = await (ctx as { params: Promise<{ id: string }> }).params;
+  if (!UUID_REGEX.test(id)) {
+    return NextResponse.json({ error: 'Invalid episode id' }, { status: 400 });
   }
 
   try {

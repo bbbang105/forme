@@ -1,6 +1,6 @@
 # forme - 아키텍처 & 기술 선정 이유
 
-> 최종 업데이트: 2026-03-08 (Safari PWA 다이얼로그 스크롤 수정 + Pull-to-Refresh 개선)
+> 최종 업데이트: 2026-03-08 (Cron 보안 강화 + UUID 검증 통일 + API auth-first 패턴)
 
 개인 올인원 PWA. 큐레이션(RSS), 캘린더, 메모(리치 에디터), 팟캐스트를 하나의 앱에 통합.
 모바일 퍼스트, 오프라인 지원, 푸시 알림까지 네이티브 앱 수준의 경험을 웹으로 제공.
@@ -279,7 +279,7 @@ erDiagram
 | GET | `/api/curation` | 큐레이션 아이템 목록 (커서 페이지네이션) |
 | POST | `/api/curation/crawl` | SSE 수동 크롤 |
 | POST | `/api/curation/sources/reorder` | 즐겨찾기 순서 배치 업데이트 |
-| POST | `/api/cron/curation` | Cron 자동 크롤 + 푸시 |
+| GET | `/api/cron/curation` | Cron 자동 크롤 + 푸시 (timingSafeEqual 인증) |
 | POST | `/api/memo/image` | 메모 이미지 R2 업로드 (5MB) |
 | POST | `/api/podcast/upload` | 팟캐스트 오디오 R2 업로드 (200MB) |
 | GET/POST/DELETE | `/api/push/subscribe` | 푸시 구독 관리 |
@@ -292,8 +292,10 @@ erDiagram
 |--------|------|
 | 인증 | Discord OAuth + Supabase Auth |
 | 인가 | PostgreSQL RLS (`auth.uid() = user_id`) |
-| 입력 검증 | `lib/validators.ts` 공유 정규식 + Server Action/API에서 날짜, 색상, URL, 길이, UUID 형식 검증 |
-| UUID 검증 | 모든 CRUD 함수의 id 파라미터에 UUID_REGEX 적용 (calendar, todos, memos, categories) |
+| 입력 검증 | `lib/validators.ts` 공유 정규식 + Server Action/API에서 날짜, 색상, URL, 길이, UUID 형식 검증. 인라인 정규식 금지 |
+| UUID 검증 | 모든 CRUD 함수의 id 파라미터에 UUID_REGEX 적용 (calendar, todos, memos, categories, curation, podcast) |
+| API 핸들러 순서 | 인증(auth) → 입력 검증(UUID 등) → 비즈니스 로직 (인증 전 입력 검증 금지) |
+| Cron 인증 | `timingSafeEqual`로 CRON_SECRET 비교 (타이밍 공격 방어), 응답에 내부 상세 미노출 |
 | 네트워크 | SSRF 방어 (`isSafeUrl` — IPv4/IPv6 사설, IPv4-mapped IPv6, ULA, Link-Local 차단), HTTPS 강제 |
 | 헤더 | CSP, HSTS, X-Frame-Options, Permissions-Policy |
 | 리다이렉트 | `ALLOWED_PATHS` 화이트리스트 |
