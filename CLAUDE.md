@@ -79,7 +79,7 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/lib/supabase/server.ts` | 서버 Supabase 클라이언트 |
 | `packages/web/src/components/layout/tab-bar.tsx` | 하단 탭바 (5탭) |
 | `packages/web/src/components/layout/header.tsx` | 헤더 (forme 로고 + 다크모드 토글) |
-| `packages/web/src/components/ui/logo.tsx` | forme 워드마크 로고 (showMark 제거, 워드마크 전용) |
+| `packages/web/src/components/ui/logo.tsx` | 레트로 {f} 픽토그램 로고마크 (useId 패턴 ID, 다크모드 대응) |
 | `packages/shared/src/schema/calendar-events.ts` | 캘린더 이벤트 스키마 (반복: recurrenceType/Days/EndDate, excludedDates) |
 | `packages/shared/src/schema/todos.ts` | 투두 스키마 |
 | `packages/shared/src/schema/` | Drizzle DB 스키마 (전체) |

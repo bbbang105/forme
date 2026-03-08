@@ -6,7 +6,7 @@ import Link from 'next/link';
 import {useTheme} from 'next-themes';
 import {Moon, Sun, User} from 'lucide-react';
 import {Button} from '@/components/ui/button';
-import {Logo} from '@/components/ui/logo';
+import {LogoMark} from '@/components/ui/logo';
 import {cn} from '@/lib/utils';
 
 /**
@@ -77,7 +77,7 @@ export function Header() {
     >
       <div className="flex items-center justify-between h-14 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
         <Link href="/dashboard" aria-label="홈">
-          <Logo size="md" />
+          <LogoMark size={38} />
         </Link>
         <div className="flex items-center gap-1">
           <Button
