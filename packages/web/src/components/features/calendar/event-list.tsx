@@ -15,6 +15,12 @@ import {
 import {Button} from '@/components/ui/button';
 import type {CalendarEvent, EventCategory} from './types';
 
+const EMPTY_EVENT_MESSAGES = [
+  { emoji: '\u{1F4C5}', text: '오늘은 일정이 없어요' },
+  { emoji: '\u{1F33F}', text: '한가로운 하루네요' },
+  { emoji: '\u2615', text: '여유롭게 보내세요' },
+];
+
 interface EventListProps {
   events: CalendarEvent[];
   selectedDate: Date;
@@ -49,7 +55,17 @@ export function EventList({ events, selectedDate, categories, onEdit, onDelete, 
     return m;
   }, [categories]);
 
-  if (dayEvents.length === 0) return null;
+  // 날짜 기반 결정적 선택 (렌더 순수성 유지)
+  const emptyMessage = EMPTY_EVENT_MESSAGES[new Date().getDate() % EMPTY_EVENT_MESSAGES.length];
+
+  if (dayEvents.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground text-center py-4">
+        <span className="mr-1">{emptyMessage.emoji}</span>
+        {emptyMessage.text}
+      </p>
+    );
+  }
 
   const isRecurringInstance = !!deleteTarget?.recurrenceType;
 

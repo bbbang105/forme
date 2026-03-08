@@ -1,6 +1,6 @@
 # forme - 아키텍처 & 기술 선정 이유
 
-> 최종 업데이트: 2026-03-08 (레트로 {f} 로고/파비콘 리디자인 + SW network-first 전환 + Cron 보안 강화)
+> 최종 업데이트: 2026-03-08 (캘린더 푸시알림 + 투두 DnD + UX 개선 + Cron 인증 공유 유틸)
 
 개인 올인원 PWA. 큐레이션(RSS), 캘린더, 메모(리치 에디터), 팟캐스트를 하나의 앱에 통합.
 모바일 퍼스트, 오프라인 지원, 푸시 알림까지 네이티브 앱 수준의 경험을 웹으로 제공.
@@ -26,6 +26,12 @@ graph TB
     LOG[lib/logger.ts<br/>구조화 로깅]
   end
 
+  subgraph Cron["Vercel Cron"]
+    CR1[cron/curation<br/>자동 크롤]
+    CR2[cron/calendar-daily<br/>08시 데일리 요약]
+    CR3[cron/calendar-reminder<br/>15분 주기 리마인더]
+  end
+
   subgraph External["External Services"]
     SB[(Supabase<br/>Auth + PostgreSQL + RLS)]
     R2[(Cloudflare R2<br/>오디오 + 이미지)]
@@ -43,6 +49,9 @@ graph TB
   NJ -->|세션 갱신| SB
   DC -->|OAuth 콜백| SB
   SW -->|web-push| API
+  CR1 -->|verifyCronAuth| API
+  CR2 -->|verifyCronAuth| API
+  CR3 -->|verifyCronAuth| API
 ```
 
 **핵심 원칙**: Server Components 우선, RLS로 데이터 격리, 서버 측 입력 검증 필수 (`lib/validators.ts` 공유 정규식), 최소한의 클라이언트 상태, 무거운 컴포넌트 지연 로딩, 인터랙션 optimistic updates, 반응형 레이아웃 (모바일 단일컬럼 ↔ 데스크톱 멀티컬럼), Vercel 리전과 DB 리전 코로케이션 (서울). Safari PWA 호환성 우선 (`flex flex-col` Dialog, `overscroll-behavior` 조건부 해제).
@@ -228,6 +237,7 @@ erDiagram
     varchar location
     uuid categoryId FK
     boolean isCompleted
+    boolean reminderSent
   }
 
   todos {
@@ -279,7 +289,9 @@ erDiagram
 | GET | `/api/curation` | 큐레이션 아이템 목록 (커서 페이지네이션) |
 | POST | `/api/curation/crawl` | SSE 수동 크롤 |
 | POST | `/api/curation/sources/reorder` | 즐겨찾기 순서 배치 업데이트 |
-| GET | `/api/cron/curation` | Cron 자동 크롤 + 푸시 (timingSafeEqual 인증) |
+| GET | `/api/cron/curation` | Cron 자동 크롤 + 푸시 (verifyCronAuth 인증) |
+| GET | `/api/cron/calendar-daily` | 08시 KST 데일리 요약 푸시 (오늘 일정+투두 카운트) |
+| GET | `/api/cron/calendar-reminder` | 15분 주기 이벤트 1시간 전 리마인더 푸시 |
 | POST | `/api/memo/image` | 메모 이미지 R2 업로드 (5MB) |
 | POST | `/api/podcast/upload` | 팟캐스트 오디오 R2 업로드 (200MB) |
 | GET/POST/DELETE | `/api/push/subscribe` | 푸시 구독 관리 |
@@ -295,7 +307,7 @@ erDiagram
 | 입력 검증 | `lib/validators.ts` 공유 정규식 + Server Action/API에서 날짜, 색상, URL, 길이, UUID 형식 검증. 인라인 정규식 금지 |
 | UUID 검증 | 모든 CRUD 함수의 id 파라미터에 UUID_REGEX 적용 (calendar, todos, memos, categories, curation, podcast) |
 | API 핸들러 순서 | 인증(auth) → 입력 검증(UUID 등) → 비즈니스 로직 (인증 전 입력 검증 금지) |
-| Cron 인증 | `timingSafeEqual`로 CRON_SECRET 비교 (타이밍 공격 방어), 응답에 내부 상세 미노출 |
+| Cron 인증 | `verifyCronAuth()` 공유 유틸 — `timingSafeEqual`로 CRON_SECRET 비교 + UUID 검증 (타이밍 공격 방어), 응답에 내부 상세 미노출 |
 | 네트워크 | SSRF 방어 (`isSafeUrl` — IPv4/IPv6 사설, IPv4-mapped IPv6, ULA, Link-Local 차단), HTTPS 강제 |
 | 헤더 | CSP, HSTS, X-Frame-Options, Permissions-Policy |
 | 리다이렉트 | `ALLOWED_PATHS` 화이트리스트 |
@@ -351,7 +363,7 @@ erDiagram
 | `useCallback` | CalendarClient 핸들러 (handleSelectDate 등) | WeekRow React.memo 정상 작동 |
 | 중복 Auth 제거 | Dashboard 컴포넌트 → `getAuthUser()` 통일 | 요청당 auth 3회 → 1회 |
 | 쿼리 병렬화 | DashboardCalendar todos + events → `Promise.all` | 순차 → 동시 실행 |
-| Reorder API 병렬화 | N개 순차 UPDATE → `Promise.all` | 50개 기준 10초 → ~5ms |
+| Reorder 벌크 업데이트 | N개 순차 UPDATE → SQL CASE WHEN 단일 쿼리 | 50개 기준 10초 → ~5ms |
 
 ### 캐싱 전략
 
@@ -408,6 +420,8 @@ erDiagram
 | web-push | 3.6.7 | 푸시 알림 |
 | feedsmith | 2.9.0 | RSS 파싱 |
 | @dnd-kit/core | 6.3.1 | 드래그앤드롭 |
+| @dnd-kit/sortable | 10.0.0 | 정렬 DnD |
+| @dnd-kit/modifiers | 9.0.0 | DnD 축 제한 |
 | @next/bundle-analyzer | 16.1.6 | 번들 분석 |
 | typescript | 5.9.3 | 타입 체크 |
 | node | >=22.0.0 | 런타임 |

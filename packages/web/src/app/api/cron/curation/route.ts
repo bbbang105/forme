@@ -1,35 +1,19 @@
-import {timingSafeEqual} from 'node:crypto';
 import {NextResponse} from 'next/server';
 import {crawlSource, type CrawlSourceResult, getActiveSourcesForUser} from '@/lib/crawl-feed';
 import {sendPushToUser} from '@/lib/push';
 import {withTracing} from '@/lib/logger';
-import {UUID_REGEX} from '@/lib/validators';
+import {verifyCronAuth} from '@/lib/cron-auth';
 
 export const maxDuration = 300;
-
-function safeCompare(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(Buffer.from(a), Buffer.from(b));
-}
 
 /**
  * GET /api/cron/curation
  * Vercel Cron job: runs daily to crawl all active RSS sources for the app user.
- * Requires Authorization: Bearer <CRON_SECRET> header (set by Vercel automatically).
- * Requires CRON_USER_ID env var to identify the single app user.
  */
 export const GET = withTracing('GET /api/cron/curation', async (request) => {
-  const authHeader = request.headers.get('authorization');
-  const secret = process.env.CRON_SECRET?.trim();
-  if (!secret || !authHeader || !safeCompare(authHeader, `Bearer ${secret}`)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const userId = process.env.CRON_USER_ID?.trim();
-  if (!userId || !UUID_REGEX.test(userId)) {
-    console.error('[cron/curation] CRON_USER_ID env var is missing or not a valid UUID');
-    return NextResponse.json({ error: 'Server misconfiguration' }, { status: 500 });
-  }
+  const auth = verifyCronAuth(request);
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+  const userId = auth.userId;
 
   const startedAt = Date.now();
   const since = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000);

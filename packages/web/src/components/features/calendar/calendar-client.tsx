@@ -3,7 +3,7 @@
 import {useCallback, useEffect, useMemo, useRef, useState, useTransition} from 'react';
 import {addMonths, endOfMonth, format, startOfMonth, subMonths} from 'date-fns';
 import {ko} from 'date-fns/locale';
-import {CalendarDays, Plus} from 'lucide-react';
+import {CalendarDays, Circle, Plus} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {Card} from '@/components/ui/card';
 import {Skeleton} from '@/components/ui/skeleton';
@@ -20,12 +20,14 @@ import {
     toggleCalendarEvent
 } from '@/lib/actions/calendar';
 import {getCategories} from '@/lib/actions/categories';
-import {getTodosByDateRange} from '@/lib/actions/todos';
+import {getTodosByDateRange, toggleTodo, updateTodo} from '@/lib/actions/todos';
 import {useSwipe} from '@/hooks/use-swipe';
 import {CalendarHeader} from './calendar-header';
 
 const EventForm = dynamic(() => import('./event-form').then(m => m.EventForm), {ssr: false});
 const CategoryManager = dynamic(() => import('./category-manager').then(m => m.CategoryManager), {ssr: false});
+
+const EMPTY_DAY_MESSAGES = ['오늘은 여유로운 하루!', '한가한 하루네요', '일정이 없는 날이에요', '자유로운 하루를 보내세요', '쉬어가는 하루'];
 
 export function CalendarClient() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -144,6 +146,47 @@ export function CalendarClient() {
       prev.map((t) => (t.id === todoId ? { ...t, content } : t))
     );
   }, []);
+
+  const handleTodoReorder = useCallback((reordered: Todo[]) => {
+    setTodos((prev) => {
+      const reorderedIds = new Set(reordered.map((t) => t.id));
+      const others = prev.filter((t) => !reorderedIds.has(t.id));
+      return [...others, ...reordered];
+    });
+  }, []);
+
+
+  const handleTodoDateChange = useCallback((todoId: string, newDate: string) => {
+    setTodos((prev) =>
+      prev.map((t) => (t.id === todoId ? { ...t, date: newDate } : t))
+    );
+  }, []);
+
+  const handleMoveToToday = useCallback((todoId: string) => {
+    const today = format(new Date(), 'yyyy-MM-dd');
+    handleTodoDateChange(todoId, today);
+    startFetching(async () => {
+      try {
+        await updateTodo(todoId, { date: today });
+      } catch {
+        // rollback handled by next fetch
+        fetchData();
+      }
+    });
+  }, [handleTodoDateChange, fetchData]);
+
+  const handleOverdueToggle = useCallback((todoId: string) => {
+    // Optimistically mark as completed
+    handleTodoToggle(todoId, true);
+    startFetching(async () => {
+      try {
+        await toggleTodo(todoId);
+      } catch {
+        // rollback
+        handleTodoToggle(todoId, false);
+      }
+    });
+  }, [handleTodoToggle]);
 
   // ─── Optimistic event callbacks ───────────────────────────────────────────
 
@@ -277,7 +320,11 @@ export function CalendarClient() {
 
   // ─── Derived state ────────────────────────────────────────────────────────
 
-  const emptyMessages = ['오늘은 여유로운 하루!', '한가한 하루네요', '일정이 없는 날이에요', '자유로운 하루를 보내세요', '쉬어가는 하루'];
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+  const overdueTodos = useMemo(
+    () => todos.filter((t) => !t.isCompleted && t.date < todayStr),
+    [todos, todayStr],
+  );
 
   const dayEvents = useMemo(
     () => events.filter((e) => e.startDate <= selectedDateStr && e.endDate >= selectedDateStr),
@@ -418,7 +465,7 @@ export function CalendarClient() {
           <Card className="p-6 text-center animate-fade-in">
             <p className="text-2xl mb-1">(&#x25D5;&#x203F;&#x25D5;)</p>
             <p className="text-sm text-muted-foreground">
-              {emptyMessages[selectedDate.getDate() % emptyMessages.length]}
+              {EMPTY_DAY_MESSAGES[selectedDate.getDate() % EMPTY_DAY_MESSAGES.length]}
             </p>
             <Button variant="outline" size="sm" className="mt-3" onClick={handleAddEvent}>
               <Plus className="h-3.5 w-3.5 mr-1" />
@@ -452,6 +499,14 @@ export function CalendarClient() {
             </div>
           )}
 
+          {overdueTodos.length > 0 && (
+            <OverdueTodoChip
+              todos={overdueTodos}
+              onMoveToToday={handleMoveToToday}
+              onToggle={handleOverdueToggle}
+            />
+          )}
+
           <TodoList
             todos={selectedDateTodos}
             selectedDate={selectedDateStr}
@@ -460,6 +515,7 @@ export function CalendarClient() {
             onCreated={handleTodoCreated}
             onDelete={handleTodoDelete}
             onUpdate={handleTodoUpdate}
+            onReorder={handleTodoReorder}
           />
         </Card>
       </div>
@@ -489,6 +545,60 @@ export function CalendarClient() {
         categories={categories}
         onCategoriesChange={setCategories}
       />
+    </div>
+  );
+}
+
+// ─── Overdue Todo Chip ──────────────────────────────────────────────────────
+
+function OverdueTodoChip({
+  todos,
+  onMoveToToday,
+  onToggle,
+}: {
+  todos: Todo[];
+  onMoveToToday: (id: string) => void;
+  onToggle: (id: string) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="mb-2">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/25 transition-colors"
+      >
+        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+        밀린 할 일 {todos.length}개
+      </button>
+
+      {isOpen && (
+        <div className="mt-2 space-y-1 animate-fade-in">
+          {todos.map((todo) => (
+            <div
+              key={todo.id}
+              className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-amber-500/5 border border-amber-500/20"
+            >
+              <button
+                onClick={() => onToggle(todo.id)}
+                className="shrink-0"
+              >
+                <Circle className="h-4 w-4 text-muted-foreground/40 hover:text-muted-foreground/60" />
+              </button>
+              <span className="text-xs text-amber-600 dark:text-amber-400 shrink-0 font-medium">
+                {todo.date.slice(5).replace('-', '/')}
+              </span>
+              <span className="flex-1 text-sm truncate">{todo.content}</span>
+              <button
+                onClick={() => onMoveToToday(todo.id)}
+                className="shrink-0 text-xs text-primary hover:text-primary/80 font-medium px-2 py-0.5 rounded hover:bg-primary/10 transition-colors"
+              >
+                오늘로
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

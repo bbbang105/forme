@@ -104,6 +104,7 @@ auth.users (Supabase 관리)
 | location | VARCHAR(200) | NULL | |
 | category_id | UUID | NULL | FK → event_categories |
 | is_completed | BOOLEAN | NOT NULL | DEFAULT false |
+| reminder_sent | BOOLEAN | NOT NULL | DEFAULT false, Cron 리마인더 발송 여부 |
 | recurrence_type | VARCHAR(10) | NULL | 'weekly' \| 'biweekly' |
 | recurrence_days | INTEGER[] | NULL | [0=일, 1=월, ..., 6=토] |
 | recurrence_end_date | DATE | NULL | 반복 종료일 |
