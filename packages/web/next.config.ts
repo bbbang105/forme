@@ -6,6 +6,9 @@ const withBundleAnalyzer = bundleAnalyzer({
 });
 
 const nextConfig: NextConfig = {
+  turbopack: {
+    root: '../..',
+  },
   experimental: {
     proxyClientMaxBodySize: '200mb',
   },
