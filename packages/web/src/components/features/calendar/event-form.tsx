@@ -233,15 +233,15 @@ function EventFormContent({
   const isRecurringInstance = !!event?.recurrenceType;
 
   return (
-      <DialogContent className="sm:max-w-md max-h-[calc(100dvh-2rem)]" onInteractOutside={(e) => e.preventDefault()} onPointerDownOutside={(e) => e.preventDefault()}>
-        <DialogHeader>
+      <DialogContent className="sm:max-w-md flex flex-col p-0 gap-0" onInteractOutside={(e) => e.preventDefault()} onPointerDownOutside={(e) => e.preventDefault()}>
+        <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
           <DialogTitle>{isEditing ? '일정 수정' : '새 일정'}</DialogTitle>
           <DialogDescription>
             {isEditing ? '일정 정보를 수정하세요' : '새로운 일정을 추가하세요'}
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4 px-2">
+        <form onSubmit={handleSubmit} className="space-y-3 px-6 pb-6 overflow-y-auto min-h-0 flex-1">
           {error && (
             <p className="text-sm text-destructive bg-destructive/10 px-3 py-2 rounded-md">
               {error}
@@ -276,7 +276,7 @@ function EventFormContent({
                   </button>
                 )}
               </div>
-              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+              <div className="flex gap-2 flex-wrap">
                 {categories.map((cat) => (
                   <button
                     key={cat.id}
@@ -344,6 +344,7 @@ function EventFormContent({
                   if (!isRecurring && e.target.value > endDate) setEndDate(e.target.value);
                 }}
                 required
+                className="text-sm"
               />
             </div>
             {!isRecurring && (
@@ -355,6 +356,7 @@ function EventFormContent({
                   onChange={(e) => setEndDate(e.target.value)}
                   min={startDate}
                   required
+                  className="text-sm"
                 />
               </div>
             )}
@@ -436,7 +438,7 @@ function EventFormContent({
             />
           </div>
 
-          <DialogFooter className="gap-2">
+          <DialogFooter className="gap-2 sticky bottom-0 bg-background pt-3 pb-1">
             {isEditing && (
               <Button
                 type="button"

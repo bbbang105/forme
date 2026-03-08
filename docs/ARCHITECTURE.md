@@ -1,6 +1,6 @@
 # forme - 아키텍처 & 기술 선정 이유
 
-> 최종 업데이트: 2026-03-06 (코드 리팩터링 + DB 인덱스 + 성능/보안 개선)
+> 최종 업데이트: 2026-03-08 (Safari PWA 다이얼로그 스크롤 수정 + Pull-to-Refresh 개선)
 
 개인 올인원 PWA. 큐레이션(RSS), 캘린더, 메모(리치 에디터), 팟캐스트를 하나의 앱에 통합.
 모바일 퍼스트, 오프라인 지원, 푸시 알림까지 네이티브 앱 수준의 경험을 웹으로 제공.
@@ -45,7 +45,7 @@ graph TB
   SW -->|web-push| API
 ```
 
-**핵심 원칙**: Server Components 우선, RLS로 데이터 격리, 서버 측 입력 검증 필수 (`lib/validators.ts` 공유 정규식), 최소한의 클라이언트 상태, 무거운 컴포넌트 지연 로딩, 인터랙션 optimistic updates, 반응형 레이아웃 (모바일 단일컬럼 ↔ 데스크톱 멀티컬럼), Vercel 리전과 DB 리전 코로케이션 (서울).
+**핵심 원칙**: Server Components 우선, RLS로 데이터 격리, 서버 측 입력 검증 필수 (`lib/validators.ts` 공유 정규식), 최소한의 클라이언트 상태, 무거운 컴포넌트 지연 로딩, 인터랙션 optimistic updates, 반응형 레이아웃 (모바일 단일컬럼 ↔ 데스크톱 멀티컬럼), Vercel 리전과 DB 리전 코로케이션 (서울). Safari PWA 호환성 우선 (`flex flex-col` Dialog, `overscroll-behavior` 조건부 해제).
 
 ---
 
@@ -299,6 +299,20 @@ erDiagram
 | 리다이렉트 | `ALLOWED_PATHS` 화이트리스트 |
 | 업로드 | MIME 검증, 크기 제한, 안전한 키 생성 |
 | 푸시 | HTTPS endpoint 강제, 소유자 확인 |
+
+---
+
+## Safari PWA 호환성
+
+| 문제 | 원인 | 해결 |
+|------|------|------|
+| Dialog 내부 스크롤 불가 | `overscroll-behavior-y: contain`이 Safari에서 fixed 자식 스크롤까지 차단 | `body[data-scroll-locked]`에서 `overscroll-behavior-y: auto` 해제 |
+| Dialog 콘텐츠 클리핑 | Safari에서 `display: grid` + `overflow-y: auto` 조합이 스크롤 대신 클리핑 | `dialog.tsx` 기본 레이아웃을 `flex flex-col`로 변경 |
+| Dialog 수직 센터링 + 스크롤 충돌 | `top-50% translate-y-[-50%]` transform이 Safari overflow와 충돌 | `inset-y-0 my-auto`로 transform 없는 센터링 |
+| Pull-to-Refresh HMR 에러 | lucide-react import가 Turbopack 모듈 팩토리와 충돌 | 인라인 SVG로 외부 의존성 제거 |
+| Pull-to-Refresh 시 데이터 미갱신 | `router.refresh()`가 서버 컴포넌트만 리페치 | `window.location.reload()`로 전체 새로고침 |
+
+상세: `docs/26-03-08-safari-dialog-scroll-fix.md`
 
 ---
 

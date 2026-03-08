@@ -1,7 +1,6 @@
 'use client';
 
 import {useCallback, useEffect, useRef} from 'react';
-import {useRouter} from 'next/navigation';
 
 const THRESHOLD = 70;
 const MAX_PULL = 120;
@@ -10,7 +9,6 @@ const RESISTANCE = 0.45;
 type PullState = 'idle' | 'pulling' | 'ready' | 'refreshing';
 
 export function usePullToRefresh(containerRef: React.RefObject<HTMLDivElement | null>) {
-  const router = useRouter();
   const startY = useRef(0);
   const pullDistance = useRef(0);
   const state = useRef<PullState>('idle');
@@ -101,7 +99,7 @@ export function usePullToRefresh(containerRef: React.RefObject<HTMLDivElement | 
       while (el && el !== document.body) {
         const style = window.getComputedStyle(el);
         const overflowY = style.overflowY;
-        if ((overflowY === 'auto' || overflowY === 'scroll') && el.scrollTop > 0) {
+        if ((overflowY === 'auto' || overflowY === 'scroll') && (el.scrollTop > 0 || el.scrollHeight > el.clientHeight)) {
           return el;
         }
         el = el.parentElement;
@@ -113,6 +111,9 @@ export function usePullToRefresh(containerRef: React.RefObject<HTMLDivElement | 
       if (state.current === 'refreshing') return;
       // Tolerance of 5px for sub-pixel scroll after router.refresh()
       if (window.scrollY > 5) return;
+
+      // Skip pull-to-refresh when dialog/modal is open (Safari scroll bug)
+      if (document.body.hasAttribute('data-scroll-locked')) return;
 
       const target = e.target as HTMLElement;
       if (findScrollableParent(target)) return;
@@ -168,16 +169,10 @@ export function usePullToRefresh(containerRef: React.RefObject<HTMLDivElement | 
         updateIconState('refreshing');
         applyTransform(THRESHOLD * 0.6, true);
 
-        router.refresh();
-
-        // Animate back then fully clear styles
+        // 애니메이션 표시 후 전체 새로고침
         resetTimer.current = setTimeout(() => {
-          applyTransform(0, true);
-          // Wait for animation to finish, then clear all inline styles
-          setTimeout(() => {
-            resetToIdle();
-          }, 350);
-        }, 800);
+          window.location.reload();
+        }, 400);
       } else {
         // Animate back then clear
         applyTransform(0, true);
@@ -197,7 +192,7 @@ export function usePullToRefresh(containerRef: React.RefObject<HTMLDivElement | 
       document.removeEventListener('touchend', onTouchEnd);
       if (resetTimer.current) clearTimeout(resetTimer.current);
     };
-  }, [applyTransform, updateIconState, clearAllStyles, router]);
+  }, [applyTransform, updateIconState, clearAllStyles]);
 
   return { setIndicatorRef, setIconRef };
 }

@@ -170,12 +170,13 @@ export function CalendarClient() {
   }, [fetchData]);
 
   const handleEventToggle = useCallback((eventId: string, isCompleted: boolean) => {
+    const match = (e: CalendarEvent) => e.id === eventId || e._originalId === eventId;
     setEvents((prev) =>
-      prev.map((e) => (e.id === eventId ? { ...e, isCompleted } : e))
+      prev.map((e) => (match(e) ? { ...e, isCompleted } : e))
     );
     toggleCalendarEvent(eventId).catch(() => {
       setEvents((prev) =>
-        prev.map((e) => (e.id === eventId ? { ...e, isCompleted: !isCompleted } : e))
+        prev.map((e) => (match(e) ? { ...e, isCompleted: !isCompleted } : e))
       );
     });
   }, []);
