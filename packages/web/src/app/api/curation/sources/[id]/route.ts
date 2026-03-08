@@ -3,9 +3,7 @@ import {createClient} from '@/lib/supabase/server';
 import {curationSources, db} from '@forme/shared';
 import {and, eq} from 'drizzle-orm';
 import {withTracing} from '@/lib/logger';
-
-const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import {UUID_REGEX} from '@/lib/validators';
 
 export const PATCH = withTracing('PATCH /api/curation/sources/[id]', async (request, ctx) => {
   const { id } = await (ctx as { params: Promise<{ id: string }> }).params;

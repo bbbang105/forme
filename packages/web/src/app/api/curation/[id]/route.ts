@@ -3,11 +3,7 @@ import {createClient} from '@/lib/supabase/server';
 import {curationItems, curationSources, db} from '@forme/shared';
 import {and, eq} from 'drizzle-orm';
 import {withTracing} from '@/lib/logger';
-
-// ── Constants ──
-
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import {UUID_REGEX} from '@/lib/validators';
 
 // ── Types ──
 
@@ -40,7 +36,7 @@ export const PATCH = withTracing('PATCH /api/curation/[id]', async (request, ctx
   }
 
   // ── Validate route param ──
-  if (!id || !UUID_RE.test(id)) {
+  if (!id || !UUID_REGEX.test(id)) {
     return NextResponse.json(
       { error: 'Invalid item id: must be a UUID' },
       { status: 400 }

@@ -44,9 +44,10 @@ pnpm db:push          # 스키마 직접 push (dev용)
 - DB 접근 시 RLS 의존 (`auth.uid() = user_id`), 추가 권한 체크 불필요
 - 스타일: Tailwind 유틸리티 클래스, 하드코딩 색상 금지 (CSS 변수 사용)
 - 컴포넌트: shadcn/ui 기반, `components/ui/`에 위치
-- 공유 검증 상수: `lib/validators.ts` (DATE_REGEX, HEX_COLOR_REGEX, UUID_REGEX, TIME_REGEX) — 모든 actions/API에서 import
+- 공유 검증 상수: `lib/validators.ts` (DATE_REGEX, HEX_COLOR_REGEX, UUID_REGEX, TIME_REGEX) — 모든 actions/API에서 import (인라인 정규식 금지)
 - Server Actions 입력 검증: 날짜(YYYY-MM-DD), 색상(#hex), UUID, 길이 제한 등 서버측 검증 필수
 - Server Actions UUID 검증: 모든 CRUD 함수의 id 파라미터에 UUID_REGEX 검증 적용
+- API Route 핸들러 순서: 인증(auth) → 입력 검증(UUID 등) → 비즈니스 로직 (인증 전에 입력 검증하지 않음)
 - KST 시간대: `Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' })` 사용
 - API 트레이싱: `withTracing()` 래퍼로 모든 API 라우트 자동 타이밍 측정
 - Server Action 트레이싱: `traceAction()` + `traceQuery()` 래퍼로 DB 쿼리 성능 측정
@@ -96,7 +97,7 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/lib/greetings.ts` | 대시보드 인사 문구 (100개 랜덤) |
 | `packages/web/src/app/api/curation/crawl/route.ts` | SSE 수동 크롤 API |
 | `packages/web/src/app/api/curation/sources/reorder/route.ts` | 즐겨찾기 소스 순서 배치 업데이트 |
-| `packages/web/src/app/api/cron/curation/route.ts` | Cron 자동 크롤 + 푸시 알림 |
+| `packages/web/src/app/api/cron/curation/route.ts` | Cron 자동 크롤 + 푸시 알림 (timingSafeEqual 인증, 응답에 내부 상세 미노출) |
 | `packages/web/src/app/api/podcast/upload/route.ts` | 팟캐스트 오디오 R2 업로드 |
 | `packages/web/src/app/api/podcast/episodes/route.ts` | 팟캐스트 에피소드 CRUD |
 | `packages/web/src/app/api/push/subscribe/route.ts` | 푸시 구독 등록/해제/조회 |
