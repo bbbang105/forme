@@ -142,7 +142,7 @@ export function EventList({ events, selectedDate, categories, onEdit, onDelete, 
             </div>
 
             {/* 수정 / 삭제 */}
-            <div className="flex items-center gap-0.5 shrink-0 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+            <div className="flex items-center gap-0.5 shrink-0">
               <button
                 onClick={() => onEdit(event)}
                 className="p-1.5 rounded hover:bg-muted/50 text-muted-foreground/50 hover:text-muted-foreground transition-colors"

@@ -38,6 +38,7 @@ interface RawItem {
   isBookmarked: boolean;
   collectedAt: Date;
   sourceName: string | null;
+  memo: string | null;
 }
 
 // ── Serializer ──
@@ -57,6 +58,7 @@ function serializeItem(item: RawItem) {
     isBookmarked: item.isBookmarked,
     collectedAt: item.collectedAt.toISOString(),
     sourceName: item.sourceName ?? null,
+    memo: item.memo ?? null,
   };
 }
 
@@ -306,6 +308,7 @@ export const GET = withTracing('GET /api/curation', async (request) => {
           isBookmarked: curationItems.isBookmarked,
           collectedAt: curationItems.collectedAt,
           sourceName: curationSources.name,
+          memo: curationItems.memo,
           score: scoreExpr!.as('score'),
           sortDate: sortDateExpr.as('sort_date'),
         })
@@ -354,6 +357,7 @@ export const GET = withTracing('GET /api/curation', async (request) => {
         isBookmarked: curationItems.isBookmarked,
         collectedAt: curationItems.collectedAt,
         sourceName: curationSources.name,
+        memo: curationItems.memo,
         sortDate: sortDateExpr.as('sort_date'),
       })
       .from(curationItems)

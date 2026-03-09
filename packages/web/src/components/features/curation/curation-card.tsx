@@ -1,10 +1,11 @@
 'use client';
 
-import {memo, useMemo, useState} from 'react';
+import {memo, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import Image from 'next/image';
-import {Bookmark} from 'lucide-react';
+import {Bookmark, MessageSquare, Trash2} from 'lucide-react';
 import {cn} from '@/lib/utils';
 import {formatRelativeDate, getArticleGradient, getCategoryStyle,} from '@/lib/curation-utils';
+import {Checkbox} from '@/components/ui/checkbox';
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -26,12 +27,19 @@ export interface CurationItemData {
   isBookmarked: boolean;
   collectedAt: string;
   sourceName: string | null;
+  memo: string | null;
 }
 
 interface CurationCardProps {
   item: CurationItemData;
   onToggleBookmark: (id: string, isBookmarked: boolean) => void;
   onMarkRead: (id: string) => void;
+  onDelete?: (id: string) => void;
+  onMemoChange?: (id: string, memo: string | null) => void;
+  showMemo?: boolean;
+  selectMode?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (id: string) => void;
 }
 
 function Thumbnail({
@@ -73,15 +81,149 @@ function Thumbnail({
   );
 }
 
+function InlineMemo({
+  itemId,
+  initialMemo,
+  onMemoChange,
+}: {
+  itemId: string;
+  initialMemo: string | null;
+  onMemoChange: (id: string, memo: string | null) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(initialMemo ?? '');
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const savingRef = useRef(false);
+
+  useEffect(() => {
+    setValue(initialMemo ?? '');
+  }, [initialMemo]);
+
+  useEffect(() => {
+    if (editing && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [editing]);
+
+  const save = useCallback(() => {
+    if (savingRef.current) return;
+    savingRef.current = true;
+    const trimmed = value.trim();
+    const newMemo = trimmed || null;
+    if (newMemo !== (initialMemo ?? null)) {
+      onMemoChange(itemId, newMemo);
+    }
+    setEditing(false);
+    savingRef.current = false;
+  }, [value, initialMemo, itemId, onMemoChange]);
+
+  if (!editing && !initialMemo) {
+    return (
+      <button
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setEditing(true);
+        }}
+        className="flex items-center gap-1 text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors mt-1"
+      >
+        <MessageSquare className="h-3 w-3" />
+        <span>메모 추가</span>
+      </button>
+    );
+  }
+
+  if (!editing) {
+    return (
+      <button
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setEditing(true);
+        }}
+        className="w-full text-left mt-1.5 px-2.5 py-1.5 rounded-md bg-muted/50 border border-border/40 text-xs text-muted-foreground hover:border-border transition-colors"
+      >
+        <div className="flex items-start gap-1.5">
+          <MessageSquare className="h-3 w-3 mt-0.5 shrink-0 text-muted-foreground/60" />
+          <span className="line-clamp-2 whitespace-pre-wrap">{initialMemo}</span>
+        </div>
+      </button>
+    );
+  }
+
+  return (
+    <div
+      className="mt-1.5"
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }}
+    >
+      <textarea
+        ref={inputRef}
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={save}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            save();
+          }
+          if (e.key === 'Escape') {
+            setValue(initialMemo ?? '');
+            setEditing(false);
+          }
+        }}
+        maxLength={500}
+        rows={2}
+        placeholder="메모를 입력하세요..."
+        className="w-full text-base sm:text-xs px-2.5 py-1.5 rounded-md bg-muted/50 border border-primary/30 text-foreground placeholder:text-muted-foreground/50 resize-none focus:outline-none focus:ring-1 focus:ring-primary/40"
+      />
+      <div className="flex items-center justify-between mt-1">
+        <span className="text-[10px] text-muted-foreground/50">{value.length}/500</span>
+        <div className="flex gap-1">
+          <button
+            onClick={() => {
+              setValue(initialMemo ?? '');
+              setEditing(false);
+            }}
+            className="text-[10px] text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded"
+          >
+            취소
+          </button>
+          <button
+            onClick={save}
+            className="text-[10px] text-primary font-medium hover:text-primary/80 px-1.5 py-0.5 rounded"
+          >
+            저장
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export const CurationCard = memo(function CurationCard({
   item,
   onToggleBookmark,
   onMarkRead,
+  onDelete,
+  onMemoChange,
+  showMemo,
+  selectMode,
+  selected,
+  onToggleSelect,
 }: CurationCardProps) {
   const catStyle = getCategoryStyle(item.category);
   const dateLabel = formatRelativeDate(item.publishedAt ?? item.collectedAt);
 
-  const handleClick = () => {
+  const handleClick = (e: React.MouseEvent) => {
+    if (selectMode) {
+      e.preventDefault();
+      e.stopPropagation();
+      onToggleSelect?.(item.id);
+      return;
+    }
     if (!item.isRead) {
       onMarkRead(item.id);
     }
@@ -93,18 +235,36 @@ export const CurationCard = memo(function CurationCard({
     onToggleBookmark(item.id, !item.isBookmarked);
   };
 
+  const handleDelete = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onDelete?.(item.id);
+  };
+
   return (
     <a
-      href={item.url}
-      target="_blank"
-      rel="noopener noreferrer"
+      href={selectMode ? undefined : item.url}
+      target={selectMode ? undefined : '_blank'}
+      rel={selectMode ? undefined : 'noopener noreferrer'}
       onClick={handleClick}
       className={cn(
-        'group flex flex-col rounded-xl border border-border/60 bg-card',
+        'group relative flex flex-col rounded-xl border border-border/60 bg-card',
         'hover:border-primary/30 hover:shadow-md transition-all duration-200',
-        'focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2'
+        'focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
+        selectMode && 'cursor-pointer',
+        selected && 'ring-2 ring-primary border-primary/40'
       )}
     >
+      {/* Select checkbox */}
+      {selectMode && (
+        <div className="absolute top-2 left-2 z-10">
+          <Checkbox
+            checked={selected}
+            className="h-5 w-5 border-2 bg-background/80 backdrop-blur-sm"
+          />
+        </div>
+      )}
+
       {/* Thumbnail */}
       <div className="relative aspect-video w-full overflow-hidden rounded-t-xl bg-muted">
         <Thumbnail
@@ -164,22 +324,42 @@ export const CurationCard = memo(function CurationCard({
             {item.sourceName && dateLabel && <span>·</span>}
             {dateLabel && <span className="shrink-0">{dateLabel}</span>}
           </div>
-          <button
-            onClick={handleBookmark}
-            className={cn(
-              'p-1.5 rounded-md transition-colors shrink-0',
-              item.isBookmarked
-                ? 'text-amber-500'
-                : 'text-muted-foreground/40 hover:text-amber-500'
-            )}
-            aria-label={item.isBookmarked ? '북마크 해제' : '북마크'}
-          >
-            <Bookmark
-              className="h-5 w-5"
-              fill={item.isBookmarked ? 'currentColor' : 'none'}
-            />
-          </button>
+          {!selectMode && (
+            <div className="flex items-center gap-0.5">
+              <button
+                onClick={handleDelete}
+                className="p-1.5 rounded-md transition-colors text-muted-foreground/40 hover:text-destructive"
+                aria-label="삭제"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+              <button
+                onClick={handleBookmark}
+                className={cn(
+                  'p-1.5 rounded-md transition-colors shrink-0',
+                  item.isBookmarked
+                    ? 'text-amber-500'
+                    : 'text-muted-foreground/40 hover:text-amber-500'
+                )}
+                aria-label={item.isBookmarked ? '북마크 해제' : '북마크'}
+              >
+                <Bookmark
+                  className="h-5 w-5"
+                  fill={item.isBookmarked ? 'currentColor' : 'none'}
+                />
+              </button>
+            </div>
+          )}
         </div>
+
+        {/* Inline memo (bookmark tab only) */}
+        {showMemo && !selectMode && onMemoChange && (
+          <InlineMemo
+            itemId={item.id}
+            initialMemo={item.memo}
+            onMemoChange={onMemoChange}
+          />
+        )}
       </div>
     </a>
   );
@@ -190,11 +370,23 @@ export const CurationListRow = memo(function CurationListRow({
   item,
   onToggleBookmark,
   onMarkRead,
+  onDelete,
+  onMemoChange,
+  showMemo,
+  selectMode,
+  selected,
+  onToggleSelect,
 }: CurationCardProps) {
   const catStyle = getCategoryStyle(item.category);
   const dateLabel = formatRelativeDate(item.publishedAt ?? item.collectedAt);
 
-  const handleClick = () => {
+  const handleClick = (e: React.MouseEvent) => {
+    if (selectMode) {
+      e.preventDefault();
+      e.stopPropagation();
+      onToggleSelect?.(item.id);
+      return;
+    }
     if (!item.isRead) {
       onMarkRead(item.id);
     }
@@ -206,18 +398,36 @@ export const CurationListRow = memo(function CurationListRow({
     onToggleBookmark(item.id, !item.isBookmarked);
   };
 
+  const handleDelete = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onDelete?.(item.id);
+  };
+
   return (
     <a
-      href={item.url}
-      target="_blank"
-      rel="noopener noreferrer"
+      href={selectMode ? undefined : item.url}
+      target={selectMode ? undefined : '_blank'}
+      rel={selectMode ? undefined : 'noopener noreferrer'}
       onClick={handleClick}
       className={cn(
         'group flex items-start gap-4 py-4 px-3 -mx-3 rounded-lg',
         'hover:bg-muted/40 transition-colors',
-        'focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2'
+        'focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
+        selectMode && 'cursor-pointer',
+        selected && 'bg-primary/5'
       )}
     >
+      {/* Checkbox */}
+      {selectMode && (
+        <div className="flex items-center shrink-0 pt-2">
+          <Checkbox
+            checked={selected}
+            className="h-5 w-5 border-2"
+          />
+        </div>
+      )}
+
       {/* Small thumbnail */}
       <div className="w-[100px] h-[64px] shrink-0 rounded-md overflow-hidden bg-muted">
         <Thumbnail
@@ -274,25 +484,45 @@ export const CurationListRow = memo(function CurationListRow({
             </span>
           )}
         </div>
+
+        {/* Inline memo (bookmark tab only) */}
+        {showMemo && !selectMode && onMemoChange && (
+          <InlineMemo
+            itemId={item.id}
+            initialMemo={item.memo}
+            onMemoChange={onMemoChange}
+          />
+        )}
       </div>
 
       {/* Actions */}
-      <div className="flex items-center shrink-0 pt-1">
-        <button
-          onClick={handleBookmark}
-          className={cn(
-            'p-1.5 rounded-md transition-colors',
-            item.isBookmarked
-              ? 'text-amber-500'
-              : 'text-muted-foreground/40 hover:text-amber-500'
-          )}
-          aria-label={item.isBookmarked ? '북마크 해제' : '북마크'}
-        >
-          <Bookmark
-            className="h-4.5 w-4.5"
-            fill={item.isBookmarked ? 'currentColor' : 'none'}
-          />
-        </button>
+      <div className="flex items-center gap-0.5 shrink-0 pt-1">
+        {!selectMode && (
+          <>
+            <button
+              onClick={handleDelete}
+              className="p-1.5 rounded-md transition-colors text-muted-foreground/40 hover:text-destructive"
+              aria-label="삭제"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+            <button
+              onClick={handleBookmark}
+              className={cn(
+                'p-1.5 rounded-md transition-colors',
+                item.isBookmarked
+                  ? 'text-amber-500'
+                  : 'text-muted-foreground/40 hover:text-amber-500'
+              )}
+              aria-label={item.isBookmarked ? '북마크 해제' : '북마크'}
+            >
+              <Bookmark
+                className="h-4.5 w-4.5"
+                fill={item.isBookmarked ? 'currentColor' : 'none'}
+              />
+            </button>
+          </>
+        )}
       </div>
     </a>
   );

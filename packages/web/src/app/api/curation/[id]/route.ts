@@ -10,7 +10,66 @@ import {UUID_REGEX} from '@/lib/validators';
 interface PatchBody {
   isRead?: boolean;
   isBookmarked?: boolean;
+  memo?: string | null;
 }
+
+/**
+ * DELETE /api/curation/[id]
+ *
+ * Deletes a single curation item.
+ * Ownership is verified by joining through curation_sources.user_id.
+ */
+export const DELETE = withTracing('DELETE /api/curation/[id]', async (_request, ctx) => {
+  const { id } = await (ctx as { params: Promise<{ id: string }> }).params;
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  if (!id || !UUID_REGEX.test(id)) {
+    return NextResponse.json(
+      { error: 'Invalid item id: must be a UUID' },
+      { status: 400 }
+    );
+  }
+
+  try {
+    const [existing] = await db
+      .select({ id: curationItems.id })
+      .from(curationItems)
+      .innerJoin(
+        curationSources,
+        eq(curationItems.sourceId, curationSources.id)
+      )
+      .where(
+        and(
+          eq(curationItems.id, id),
+          eq(curationSources.userId, user.id)
+        )
+      )
+      .limit(1);
+
+    if (!existing) {
+      return NextResponse.json({ error: 'Item not found' }, { status: 404 });
+    }
+
+    await db.delete(curationItems).where(eq(curationItems.id, id));
+
+    return new NextResponse(null, { status: 204 });
+  } catch (err) {
+    console.error(`[DELETE /api/curation/${id}]`, err);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+});
 
 /**
  * PATCH /api/curation/[id]
@@ -51,12 +110,12 @@ export const PATCH = withTracing('PATCH /api/curation/[id]', async (request, ctx
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const { isRead, isBookmarked } = body;
+  const { isRead, isBookmarked, memo } = body;
 
   // At least one field must be provided
-  if (isRead === undefined && isBookmarked === undefined) {
+  if (isRead === undefined && isBookmarked === undefined && memo === undefined) {
     return NextResponse.json(
-      { error: 'At least one of isRead or isBookmarked must be provided' },
+      { error: 'At least one of isRead, isBookmarked, or memo must be provided' },
       { status: 400 }
     );
   }
@@ -106,6 +165,7 @@ export const PATCH = withTracing('PATCH /api/curation/[id]', async (request, ctx
       isRead: boolean;
       isBookmarked: boolean;
       readAt: Date | null;
+      memo: string | null;
     }> = {};
 
     if (isRead !== undefined) {
@@ -113,6 +173,9 @@ export const PATCH = withTracing('PATCH /api/curation/[id]', async (request, ctx
       updateValues.readAt = isRead ? new Date() : null;
     }
     if (isBookmarked !== undefined) updateValues.isBookmarked = isBookmarked;
+    if (memo !== undefined) {
+      updateValues.memo = memo ? memo.slice(0, 500) : null;
+    }
 
     // ── Update ──
     const [updated] = await db
@@ -141,6 +204,7 @@ export const PATCH = withTracing('PATCH /api/curation/[id]', async (request, ctx
       isRead: updated.isRead,
       isBookmarked: updated.isBookmarked,
       collectedAt: updated.collectedAt.toISOString(),
+      memo: updated.memo ?? null,
     });
   } catch (err) {
     console.error(`[PATCH /api/curation/${id}]`, err);
