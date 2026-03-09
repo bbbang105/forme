@@ -1,6 +1,6 @@
 # forme - 아키텍처 & 기술 선정 이유
 
-> 최종 업데이트: 2026-03-09 (큐레이션 UX 개선 — 삭제/일괄삭제, 북마크 메모, 스와이프, 컴팩트뷰, 키보드 네비)
+> 최종 업데이트: 2026-03-09 (UX/UI 개선 — 에러 바운더리, 접근성, 성능 최적화, 이모지→아이콘 통일)
 
 개인 올인원 PWA. 큐레이션(RSS), 캘린더, 메모(리치 에디터), 팟캐스트를 하나의 앱에 통합.
 모바일 퍼스트, 오프라인 지원, 푸시 알림까지 네이티브 앱 수준의 경험을 웹으로 제공.
@@ -181,7 +181,9 @@ flowchart LR
 - **크롤링**: Cron/SSE → feedsmith 파싱 → SSRF 방어 → DB 적재
 - **인증**: `React.cache` 기반 `getAuthUser()` — 동일 요청 내 중복 인증 제거
 - **캘린더**: Optimistic updates — 로컬 상태 즉시 반영, 서버 백그라운드 동기화. 데스크톱 2컬럼 (`lg:flex-row` 캘린더 | 상세), 모바일 단일 컬럼. 이벤트 카테고리(아이콘+색상) 지원
-- **큐레이션 UX**: 스와이프 액션 (`useSwipeAction` 훅, axis-lock + 타이머 정리), 컴팩트뷰 토글 (localStorage), 키보드 네비 (j/k/o/b), 일괄 삭제 (100개 청크), 인라인 메모 (북마크 탭, key prop 동기화)
+- **큐레이션 UX**: 스와이프 액션 (`useSwipeAction` 훅, axis-lock + 타이머 정리), 컴팩트뷰 토글 (localStorage), 키보드 네비 (j/k/o/b, DOM 직접 포커스링), 일괄 삭제 (100개 청크, 다이얼로그 스피너), 인라인 메모 (북마크 탭, key prop 동기화)
+- **에러 처리**: 모든 (main) 페이지 error.tsx (calendar, curation, memo, podcast) — `error` prop 로깅, 사용자에게 제네릭 메시지만 표출
+- **접근성**: 탭바 `aria-current="page"`, 검색 `aria-label`, 이벤트 폼 색상 `focus-visible:ring-2` + `aria-label`, 버튼 로딩 스피너 (Loader2)
 
 ---
 
@@ -364,7 +366,8 @@ erDiagram
 | 전략 | 대상 | 효과 |
 |------|------|------|
 | PlayerContext 분리 | `usePlayer()` (상태) + `usePlayerTime()` (시간) | 4Hz 전체 리렌더 → 시간 UI만 |
-| `React.memo` | CurationCard, CurationListRow | 필터 변경 시 무관한 카드 리렌더 방지 |
+| `React.memo` | CurationCard, CurationListRow, EpisodeCard, MemoCard | 필터/재생 변경 시 무관한 카드 리렌더 방지 |
+| DOM 직접 포커스링 | CurationFeed 키보드 네비 | focusIndex `useRef` + `data-curation-feed` 스코프 → j/k 키 리렌더 제거 |
 | `useCallback` | CalendarClient 핸들러 (handleSelectDate 등) | WeekRow React.memo 정상 작동 |
 | 중복 Auth 제거 | Dashboard 컴포넌트 → `getAuthUser()` 통일 | 요청당 auth 3회 → 1회 |
 | 쿼리 병렬화 | DashboardCalendar todos + events → `Promise.all` | 순차 → 동시 실행 |

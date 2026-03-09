@@ -1,4 +1,5 @@
 import { getDailyMissionStats } from '@/lib/actions/activity';
+import { CheckSquare, Flame, Headphones, Newspaper } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 function ProgressBar({ current, target, color }: { current: number; target: number; color: string }) {
@@ -25,7 +26,7 @@ export async function DailyMissions() {
 
   const missions = [
     {
-      emoji: '📰',
+      icon: <Newspaper className="h-4 w-4 text-blue-500" />,
       label: '큐레이션 읽기',
       current: stats.curation.today,
       target: stats.curation.target,
@@ -37,7 +38,7 @@ export async function DailyMissions() {
       unit: '개',
     },
     {
-      emoji: '🎧',
+      icon: <Headphones className="h-4 w-4 text-purple-500" />,
       label: '팟캐스트 듣기',
       current: stats.podcast.todaySeconds,
       target: stats.podcast.targetSeconds,
@@ -49,7 +50,7 @@ export async function DailyMissions() {
       unit: '',
     },
     {
-      emoji: '✅',
+      icon: <CheckSquare className="h-4 w-4 text-green-500" />,
       label: '투두 완료',
       current: stats.todos.completed,
       target: Math.max(stats.todos.total, 1),
@@ -69,7 +70,7 @@ export async function DailyMissions() {
         <h3 className="text-sm font-semibold">오늘의 미션</h3>
         {stats.attendance.streak > 0 && (
           <span className="text-sm font-medium">
-            🔥 {stats.attendance.streak}일 연속 출석
+            <Flame className="h-4 w-4 text-orange-500 inline" /> {stats.attendance.streak}일 연속 출석
           </span>
         )}
       </div>
@@ -82,7 +83,7 @@ export async function DailyMissions() {
             <div key={m.label} className="space-y-1">
               <div className="flex items-center justify-between text-sm">
                 <span className="flex items-center gap-1.5">
-                  <span>{m.emoji}</span>
+                  <span>{m.icon}</span>
                   <span className={cn(completed && 'text-muted-foreground line-through')}>
                     {m.label}
                   </span>

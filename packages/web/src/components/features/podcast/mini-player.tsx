@@ -1,7 +1,7 @@
 'use client';
 
 import {useState} from 'react';
-import {Loader2, Pause, Play, RotateCcw, X} from 'lucide-react';
+import {Loader2, Mic, Pause, Play, RotateCcw, X} from 'lucide-react';
 import {cn} from '@/lib/utils';
 import {usePlayer, usePlayerTime} from './player-context';
 import {AudioPlayer} from './audio-player';
@@ -53,7 +53,7 @@ export function MiniPlayer() {
           className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 active:scale-95 transition-transform"
           aria-label="플레이어 확장"
         >
-          <span className="text-lg">🎙️</span>
+          <Mic className="h-5 w-5 text-primary" />
         </button>
 
         {/* Title - tap to expand */}

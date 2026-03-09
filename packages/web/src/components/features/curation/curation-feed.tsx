@@ -2,10 +2,10 @@
 
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useRouter, useSearchParams} from 'next/navigation';
-import {CheckSquare, LayoutGrid, LayoutList, Newspaper, Trash2, X} from 'lucide-react';
+import {CheckSquare, LayoutGrid, LayoutList, Loader2, Newspaper, Trash2, X} from 'lucide-react';
 import {cn} from '@/lib/utils';
 import {Skeleton} from '@/components/ui/skeleton';
-import {Button} from '@/components/ui/button';
+import {Button, buttonVariants} from '@/components/ui/button';
 import {
     AlertDialog,
     AlertDialogCancel,
@@ -358,36 +358,59 @@ export function CurationFeed() {
     setSelectedIds(new Set());
   }, []);
 
-  // ── Keyboard navigation ──
+  // ── Keyboard navigation (DOM-based focus to avoid re-renders) ──
 
-  const [focusIndex, setFocusIndex] = useState(-1);
-  const focusIndexRef = useRef(focusIndex);
-  useEffect(() => { focusIndexRef.current = focusIndex; }, [focusIndex]);
+  const focusIndexRef = useRef(-1);
 
   // Reset focus on filter/data change
-  useEffect(() => { setFocusIndex(-1); }, [category, status, search, tagsParam, sort, sourceId]);
+  useEffect(() => {
+    const feed = document.querySelector('[data-curation-feed]');
+    const prev = feed?.querySelector('[data-curation-focused]');
+    if (prev) {
+      prev.removeAttribute('data-curation-focused');
+      prev.classList.remove('ring-2', 'ring-primary/50', 'rounded-xl');
+    }
+    focusIndexRef.current = -1;
+  }, [category, status, search, tagsParam, sort, sourceId]);
 
   useEffect(() => {
     if (selectMode || loading || items.length === 0) return;
 
+    function applyFocusRing(index: number) {
+      const feed = document.querySelector('[data-curation-feed]');
+      if (!feed) return;
+      // Remove old
+      const prev = feed.querySelector('[data-curation-focused]');
+      if (prev) {
+        prev.removeAttribute('data-curation-focused');
+        prev.classList.remove('ring-2', 'ring-primary/50', 'rounded-xl');
+      }
+      // Apply new
+      const el = feed.querySelector(`[data-curation-index="${index}"]`);
+      if (el) {
+        el.setAttribute('data-curation-focused', '');
+        el.classList.add('ring-2', 'ring-primary/50', 'rounded-xl');
+        el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    }
+
     function handleKeyDown(e: KeyboardEvent) {
-      // Skip if user is typing in an input or editable element
       const el = e.target as HTMLElement;
       const tag = el?.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el?.isContentEditable) return;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || tag === 'BUTTON' || el?.isContentEditable || el?.closest('[role="dialog"]')) return;
 
       const idx = focusIndexRef.current;
 
       if (e.key === 'j' || e.key === 'ArrowDown') {
         e.preventDefault();
         const next = Math.min(idx + 1, items.length - 1);
-        setFocusIndex(next);
-        scrollToItem(next);
+        focusIndexRef.current = next;
+        applyFocusRing(next);
       } else if (e.key === 'k' || e.key === 'ArrowUp') {
         e.preventDefault();
         const prev = Math.max(idx - 1, 0);
-        setFocusIndex(prev);
-        scrollToItem(prev);
+        focusIndexRef.current = prev;
+        applyFocusRing(prev);
       } else if (e.key === 'o' || e.key === 'Enter') {
         if (idx >= 0 && idx < items.length) {
           if (!items[idx].isRead) handleMarkRead(items[idx].id);
@@ -398,11 +421,6 @@ export function CurationFeed() {
           handleToggleBookmark(items[idx].id, !items[idx].isBookmarked);
         }
       }
-    }
-
-    function scrollToItem(index: number) {
-      const el = document.querySelector(`[data-curation-index="${index}"]`);
-      el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }
 
     window.addEventListener('keydown', handleKeyDown);
@@ -502,11 +520,11 @@ export function CurationFeed() {
           <Button
             variant="destructive"
             size="sm"
-            disabled={selectedIds.size === 0}
+            disabled={selectedIds.size === 0 || deleting}
             onClick={() => setBulkDeleteOpen(true)}
           >
-            <Trash2 className="h-4 w-4 mr-1.5" />
-            삭제
+            {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Trash2 className="h-4 w-4 mr-1.5" />}
+            {deleting ? '삭제 중...' : '삭제'}
           </Button>
         </div>
       )}
@@ -530,14 +548,14 @@ export function CurationFeed() {
       />
 
       {/* Feed */}
-      <div className="min-h-[30vh]">
+      <div className="min-h-[30vh]" data-curation-feed>
       {loading ? (
         <FeedSkeleton />
       ) : items.length === 0 ? (
         <div className="flex flex-col items-center justify-center min-h-[30vh] text-center">
           <p className="text-sm text-muted-foreground">
             {search
-              ? `"${search}" 검색 결과가 없습니다.`
+              ? `"${search.slice(0, 100)}" 검색 결과가 없습니다.`
               : selectedTags.length > 0
                 ? '선택한 태그에 맞는 글이 없습니다.'
                 : status === 'unread'
@@ -560,7 +578,7 @@ export function CurationFeed() {
               <div
                 key={item.id}
                 data-curation-index={i}
-                className={cn(focusIndex === i && 'ring-2 ring-primary/50 rounded-xl')}
+                className=""
               >
                 <CurationCard
                   item={item}
@@ -584,7 +602,7 @@ export function CurationFeed() {
               <div
                 key={item.id}
                 data-curation-index={i}
-                className={cn(focusIndex === i && 'ring-2 ring-primary/50 rounded-lg')}
+                className=""
               >
                 <CurationListRow
                   item={item}
@@ -625,15 +643,12 @@ export function CurationFeed() {
           </AlertDialogHeader>
           <div className="flex justify-end gap-2 mt-2">
             <AlertDialogCancel>취소</AlertDialogCancel>
-            <AlertDialogAction asChild>
-              <Button
-                variant="destructive"
-                size="sm"
-                disabled={deleting}
-                onClick={handleDeleteConfirm}
-              >
-                삭제
-              </Button>
+            <AlertDialogAction
+              className={buttonVariants({ variant: 'destructive', size: 'sm' })}
+              disabled={deleting}
+              onClick={handleDeleteConfirm}
+            >
+              {deleting ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" />삭제 중...</> : '삭제'}
             </AlertDialogAction>
           </div>
         </AlertDialogContent>
@@ -650,15 +665,12 @@ export function CurationFeed() {
           </AlertDialogHeader>
           <div className="flex justify-end gap-2 mt-2">
             <AlertDialogCancel>취소</AlertDialogCancel>
-            <AlertDialogAction asChild>
-              <Button
-                variant="destructive"
-                size="sm"
-                disabled={deleting}
-                onClick={handleBulkDeleteConfirm}
-              >
-                {selectedIds.size}개 삭제
-              </Button>
+            <AlertDialogAction
+              className={buttonVariants({ variant: 'destructive', size: 'sm' })}
+              disabled={deleting}
+              onClick={handleBulkDeleteConfirm}
+            >
+              {deleting ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" />삭제 중...</> : `${selectedIds.size}개 삭제`}
             </AlertDialogAction>
           </div>
         </AlertDialogContent>

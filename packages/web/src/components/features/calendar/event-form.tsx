@@ -23,7 +23,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import {createCalendarEvent, deleteCalendarEvent, updateCalendarEvent} from '@/lib/actions/calendar';
-import {MapPin, Trash2} from 'lucide-react';
+import {Loader2, MapPin, Trash2} from 'lucide-react';
 import {cn} from '@/lib/utils';
 import type {CalendarEvent, EventCategory} from './types';
 import {RecurrenceForm} from './recurrence-form';
@@ -425,13 +425,13 @@ function EventFormContent({
                   key={c.value}
                   type="button"
                   onClick={() => setColor(c.value)}
-                  className="w-5 h-5 sm:w-6 sm:h-6 rounded-full transition-all border-2"
+                  className="w-5 h-5 sm:w-6 sm:h-6 rounded-full transition-all border-2 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   style={{
                     backgroundColor: c.value,
                     borderColor: color === c.value ? 'var(--foreground)' : 'transparent',
                     transform: color === c.value ? 'scale(1.15)' : 'scale(1)',
                   }}
-                  title={c.label}
+                  aria-label={`색상: ${c.label}`}
                 />
               ))}
             </div>
@@ -474,7 +474,7 @@ function EventFormContent({
               취소
             </Button>
             <Button type="submit" size="sm" disabled={isPending} className="w-full sm:w-auto">
-              {isPending ? '저장 중...' : isEditing ? '수정' : '추가'}
+              {isPending ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" />저장 중...</> : isEditing ? '수정' : '추가'}
             </Button>
           </DialogFooter>
         </form>
