@@ -76,6 +76,7 @@ auth.users (Supabase 관리)
 | is_bookmarked | BOOLEAN | NOT NULL | DEFAULT false |
 | collected_at | TIMESTAMPTZ | NOT NULL | DEFAULT NOW() |
 | read_at | TIMESTAMPTZ | NULL | 읽음 처리 시각 (게이미피케이션 스트릭 계산용) |
+| memo | TEXT | NULL | 북마크 메모 (최대 500자, 인라인 편집) |
 
 ### user_daily_activity
 

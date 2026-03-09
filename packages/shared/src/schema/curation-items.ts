@@ -15,6 +15,7 @@ export const curationItems = pgTable('curation_items', {
   isBookmarked: boolean('is_bookmarked').notNull().default(false),
   collectedAt: timestamp('collected_at', { withTimezone: true }).notNull().defaultNow(),
   readAt: timestamp('read_at', { withTimezone: true }),
+  memo: text('memo'),
 }, (table) => ({
   sourceUrlIdx: uniqueIndex('idx_items_source_url').on(table.sourceId, table.url),
   publishedIdx: index('idx_items_published').on(table.publishedAt),

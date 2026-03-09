@@ -1,8 +1,16 @@
 'use client';
 
-import {forwardRef, useState, useTransition, useCallback} from 'react';
+import {forwardRef, useCallback, useState, useTransition} from 'react';
 import {CheckCircle2, ChevronRight, Circle, GripVertical, Pencil, Plus, Trash2} from 'lucide-react';
-import {closestCenter, DndContext, type DragEndEvent, PointerSensor, TouchSensor, useSensor, useSensors} from '@dnd-kit/core';
+import {
+    closestCenter,
+    DndContext,
+    type DragEndEvent,
+    PointerSensor,
+    TouchSensor,
+    useSensor,
+    useSensors
+} from '@dnd-kit/core';
 import {SortableContext, useSortable, verticalListSortingStrategy} from '@dnd-kit/sortable';
 import {CSS} from '@dnd-kit/utilities';
 import {restrictToVerticalAxis} from '@dnd-kit/modifiers';
@@ -392,7 +400,7 @@ const TodoItem = forwardRef<HTMLDivElement, TodoItemProps>(function TodoItem(
       )}
 
       {!isEditing && (
-        <div className="flex items-center gap-0.5 shrink-0 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+        <div className="flex items-center gap-0.5 shrink-0">
           <button
             onClick={() => { setEditContent(todo.content); setIsEditing(true); }}
             disabled={isPending || isEditing}

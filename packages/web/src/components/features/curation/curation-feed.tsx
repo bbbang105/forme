@@ -2,8 +2,19 @@
 
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useRouter, useSearchParams} from 'next/navigation';
-import {Newspaper} from 'lucide-react';
+import {CheckSquare, LayoutGrid, LayoutList, Newspaper, Trash2, X} from 'lucide-react';
+import {cn} from '@/lib/utils';
 import {Skeleton} from '@/components/ui/skeleton';
+import {Button} from '@/components/ui/button';
+import {
+    AlertDialog,
+    AlertDialogCancel,
+    AlertDialogAction,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import {CurationCard, type CurationItemData, CurationListRow} from './curation-card';
 import {type StatusFilter} from './curation-filters';
 import {FeedFilterBar, type SortMode} from './feed-filter-bar';
@@ -47,6 +58,25 @@ export function CurationFeed() {
   const [hasSources, setHasSources] = useState(true);
   const [favoriteSources, setFavoriteSources] = useState<{ id: string; name: string }[]>([]);
 
+  // View density
+  const [compact, setCompact] = useState(() => {
+    try { return localStorage.getItem('forme-curation-compact') === 'true'; } catch { return false; }
+  });
+  const toggleCompact = useCallback(() => {
+    setCompact((prev) => {
+      const next = !prev;
+      try { localStorage.setItem('forme-curation-compact', String(next)); } catch { /* noop */ }
+      return next;
+    });
+  }, []);
+
+  // Selection & delete state
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
   // Refs for infinite scroll
   const sentinelRef = useRef<HTMLDivElement>(null);
   const cursorRef = useRef(cursor);
@@ -60,6 +90,12 @@ export function CurationFeed() {
   useEffect(() => {
     hasMoreRef.current = hasMore;
   }, [hasMore]);
+
+  // Exit select mode on filter change
+  useEffect(() => {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+  }, [category, status, search, tagsParam, sort, sourceId]);
 
   // URL sync helper
   const updateFilters = useCallback(
@@ -150,8 +186,6 @@ export function CurationFeed() {
   }, [category, status, search, tagsParam, sort, sourceId, fetchItems]);
 
   // Infinite scroll
-  // `loading` is a dependency so the observer re-attaches to the NEW sentinel
-  // DOM node after a loading cycle unmounts/remounts the sentinel.
   useEffect(() => {
     const sentinel = sentinelRef.current;
     if (!sentinel || loading) return;
@@ -194,7 +228,6 @@ export function CurationFeed() {
       });
 
       if (!res.ok) {
-        // Revert on failure
         setItems((prev) =>
           prev.map((item) =>
             item.id === id ? { ...item, isBookmarked: !isBookmarked } : item
@@ -206,7 +239,6 @@ export function CurationFeed() {
   );
 
   const handleMarkRead = useCallback(async (id: string) => {
-    // On the unread tab, remove the item immediately; otherwise just toggle
     if (status === 'unread') {
       setItems((prev) => prev.filter((item) => item.id !== id));
     } else {
@@ -224,10 +256,158 @@ export function CurationFeed() {
     });
 
     if (!res.ok) {
-      // Revert: re-fetch to restore correct state
       fetchItems(null, false);
     }
   }, [status, fetchItems]);
+
+  // ── Memo handler ──
+
+  const handleMemoChange = useCallback(async (id: string, memo: string | null) => {
+    setItems((prev) =>
+      prev.map((item) =>
+        item.id === id ? { ...item, memo } : item
+      )
+    );
+
+    const res = await fetch(`/api/curation/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ memo }),
+    });
+
+    if (!res.ok) {
+      fetchItems(null, false);
+    }
+  }, [fetchItems]);
+
+  const isBookmarkTab = status === 'bookmarked';
+
+  // ── Delete handlers ──
+
+  const handleDeleteRequest = useCallback((id: string) => {
+    const item = items.find((i) => i.id === id);
+    setDeleteTarget(item ? { id: item.id, title: item.title } : null);
+  }, [items]);
+
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+
+    setItems((prev) => prev.filter((item) => item.id !== deleteTarget.id));
+
+    const res = await fetch(`/api/curation/${deleteTarget.id}`, {
+      method: 'DELETE',
+    });
+
+    if (!res.ok) {
+      fetchItems(null, false);
+    }
+    setDeleteTarget(null);
+    setDeleting(false);
+  }, [deleteTarget, fetchItems]);
+
+  const handleBulkDeleteConfirm = useCallback(async () => {
+    if (selectedIds.size === 0) return;
+    setDeleting(true);
+
+    const ids = [...selectedIds];
+    setItems((prev) => prev.filter((item) => !selectedIds.has(item.id)));
+
+    // chunk into batches of 100
+    let failed = false;
+    for (let i = 0; i < ids.length; i += 100) {
+      const chunk = ids.slice(i, i + 100);
+      const res = await fetch('/api/curation/bulk-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: chunk }),
+      });
+      if (!res.ok) failed = true;
+    }
+
+    if (failed) {
+      fetchItems(null, false);
+    }
+    setSelectedIds(new Set());
+    setSelectMode(false);
+    setBulkDeleteOpen(false);
+    setDeleting(false);
+  }, [selectedIds, fetchItems]);
+
+  // ── Selection helpers ──
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAll = useCallback(() => {
+    if (selectedIds.size === items.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(items.map((i) => i.id)));
+    }
+  }, [items, selectedIds.size]);
+
+  const exitSelectMode = useCallback(() => {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+  }, []);
+
+  // ── Keyboard navigation ──
+
+  const [focusIndex, setFocusIndex] = useState(-1);
+  const focusIndexRef = useRef(focusIndex);
+  useEffect(() => { focusIndexRef.current = focusIndex; }, [focusIndex]);
+
+  // Reset focus on filter/data change
+  useEffect(() => { setFocusIndex(-1); }, [category, status, search, tagsParam, sort, sourceId]);
+
+  useEffect(() => {
+    if (selectMode || loading || items.length === 0) return;
+
+    function handleKeyDown(e: KeyboardEvent) {
+      // Skip if user is typing in an input or editable element
+      const el = e.target as HTMLElement;
+      const tag = el?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el?.isContentEditable) return;
+
+      const idx = focusIndexRef.current;
+
+      if (e.key === 'j' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        const next = Math.min(idx + 1, items.length - 1);
+        setFocusIndex(next);
+        scrollToItem(next);
+      } else if (e.key === 'k' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        const prev = Math.max(idx - 1, 0);
+        setFocusIndex(prev);
+        scrollToItem(prev);
+      } else if (e.key === 'o' || e.key === 'Enter') {
+        if (idx >= 0 && idx < items.length) {
+          if (!items[idx].isRead) handleMarkRead(items[idx].id);
+          window.open(items[idx].url, '_blank', 'noopener,noreferrer');
+        }
+      } else if (e.key === 'b') {
+        if (idx >= 0 && idx < items.length) {
+          handleToggleBookmark(items[idx].id, !items[idx].isBookmarked);
+        }
+      }
+    }
+
+    function scrollToItem(index: number) {
+      const el = document.querySelector(`[data-curation-index="${index}"]`);
+      el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectMode, loading, items, handleMarkRead, handleToggleBookmark]);
 
   const handleCrawlComplete = useCallback(() => {
     fetchCategories();
@@ -270,10 +450,68 @@ export function CurationFeed() {
           <h2 className="text-lg font-semibold">큐레이션</h2>
           <p className="text-xs text-muted-foreground mt-0.5">관심 있는 RSS 피드를 구독하고 한곳에서 읽어보세요</p>
         </div>
-        <SourceManager onCrawlComplete={handleCrawlComplete} onFavoritesChange={handleFavoritesChange} />
+        <div className="flex items-center gap-1.5">
+          {/* Compact/Card toggle — mobile/tablet only */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 lg:hidden"
+            onClick={toggleCompact}
+            aria-label={compact ? '카드 뷰' : '컴팩트 뷰'}
+          >
+            {compact ? <LayoutGrid className="h-4 w-4" /> : <LayoutList className="h-4 w-4" />}
+          </Button>
+          {!selectMode ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSelectMode(true)}
+              disabled={loading || items.length === 0}
+            >
+              <CheckSquare className="h-4 w-4 mr-1.5" />
+              선택
+            </Button>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={exitSelectMode}
+            >
+              <X className="h-4 w-4 mr-1" />
+              취소
+            </Button>
+          )}
+          <SourceManager onCrawlComplete={handleCrawlComplete} onFavoritesChange={handleFavoritesChange} />
+        </div>
       </div>
 
-      {/* Filter bar: search + favorites + filters + sort */}
+      {/* Select mode action bar */}
+      {selectMode && (
+        <div className="flex items-center justify-between gap-3 mb-4 px-3 py-2.5 rounded-lg bg-muted/60 border border-border/60">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={toggleSelectAll}
+              className="text-sm font-medium text-primary hover:underline"
+            >
+              {selectedIds.size === items.length ? '전체 해제' : '전체 선택'}
+            </button>
+            <span className="text-sm text-muted-foreground">
+              {selectedIds.size}개 선택됨
+            </span>
+          </div>
+          <Button
+            variant="destructive"
+            size="sm"
+            disabled={selectedIds.size === 0}
+            onClick={() => setBulkDeleteOpen(true)}
+          >
+            <Trash2 className="h-4 w-4 mr-1.5" />
+            삭제
+          </Button>
+        </div>
+      )}
+
+      {/* Filter bar */}
       <FeedFilterBar
         search={search}
         onSearchChange={(v) => updateFilters({ search: v })}
@@ -314,26 +552,52 @@ export function CurationFeed() {
       ) : (
         <>
           {/* Card grid (mobile/tablet) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:hidden gap-4">
-            {items.map((item) => (
-              <CurationCard
+          <div className={cn(
+            'lg:hidden',
+            compact ? 'flex flex-col gap-2' : 'grid grid-cols-1 sm:grid-cols-2 gap-4'
+          )}>
+            {items.map((item, i) => (
+              <div
                 key={item.id}
-                item={item}
-                onToggleBookmark={handleToggleBookmark}
-                onMarkRead={handleMarkRead}
-              />
+                data-curation-index={i}
+                className={cn(focusIndex === i && 'ring-2 ring-primary/50 rounded-xl')}
+              >
+                <CurationCard
+                  item={item}
+                  onToggleBookmark={handleToggleBookmark}
+                  onMarkRead={handleMarkRead}
+                  onDelete={handleDeleteRequest}
+                  onMemoChange={handleMemoChange}
+                  showMemo={isBookmarkTab}
+                  selectMode={selectMode}
+                  selected={selectedIds.has(item.id)}
+                  onToggleSelect={toggleSelect}
+                  compact={compact}
+                />
+              </div>
             ))}
           </div>
 
           {/* List view (desktop) */}
           <div className="hidden lg:block divide-y divide-border/60">
-            {items.map((item) => (
-              <CurationListRow
+            {items.map((item, i) => (
+              <div
                 key={item.id}
-                item={item}
-                onToggleBookmark={handleToggleBookmark}
-                onMarkRead={handleMarkRead}
-              />
+                data-curation-index={i}
+                className={cn(focusIndex === i && 'ring-2 ring-primary/50 rounded-lg')}
+              >
+                <CurationListRow
+                  item={item}
+                  onToggleBookmark={handleToggleBookmark}
+                  onMarkRead={handleMarkRead}
+                  onDelete={handleDeleteRequest}
+                  onMemoChange={handleMemoChange}
+                  showMemo={isBookmarkTab}
+                  selectMode={selectMode}
+                  selected={selectedIds.has(item.id)}
+                  onToggleSelect={toggleSelect}
+                />
+              </div>
             ))}
           </div>
 
@@ -349,6 +613,56 @@ export function CurationFeed() {
         </>
       )}
       </div>
+
+      {/* Single delete confirm */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>글을 삭제하시겠습니까?</AlertDialogTitle>
+            <AlertDialogDescription>
+              &quot;{deleteTarget?.title}&quot; 글이 삭제됩니다. 이 작업은 되돌릴 수 없습니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex justify-end gap-2 mt-2">
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <Button
+                variant="destructive"
+                size="sm"
+                disabled={deleting}
+                onClick={handleDeleteConfirm}
+              >
+                삭제
+              </Button>
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk delete confirm */}
+      <AlertDialog open={bulkDeleteOpen} onOpenChange={(open) => !open && setBulkDeleteOpen(false)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{selectedIds.size}개 글을 삭제하시겠습니까?</AlertDialogTitle>
+            <AlertDialogDescription>
+              선택한 {selectedIds.size}개의 글이 삭제됩니다. 이 작업은 되돌릴 수 없습니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex justify-end gap-2 mt-2">
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <Button
+                variant="destructive"
+                size="sm"
+                disabled={deleting}
+                onClick={handleBulkDeleteConfirm}
+              >
+                {selectedIds.size}개 삭제
+              </Button>
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

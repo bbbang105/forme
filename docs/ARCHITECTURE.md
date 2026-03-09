@@ -1,6 +1,6 @@
 # forme - 아키텍처 & 기술 선정 이유
 
-> 최종 업데이트: 2026-03-08 (캘린더 푸시알림 + 투두 DnD + UX 개선 + Cron 인증 공유 유틸)
+> 최종 업데이트: 2026-03-09 (큐레이션 UX 개선 — 삭제/일괄삭제, 북마크 메모, 스와이프, 컴팩트뷰, 키보드 네비)
 
 개인 올인원 PWA. 큐레이션(RSS), 캘린더, 메모(리치 에디터), 팟캐스트를 하나의 앱에 통합.
 모바일 퍼스트, 오프라인 지원, 푸시 알림까지 네이티브 앱 수준의 경험을 웹으로 제공.
@@ -181,6 +181,7 @@ flowchart LR
 - **크롤링**: Cron/SSE → feedsmith 파싱 → SSRF 방어 → DB 적재
 - **인증**: `React.cache` 기반 `getAuthUser()` — 동일 요청 내 중복 인증 제거
 - **캘린더**: Optimistic updates — 로컬 상태 즉시 반영, 서버 백그라운드 동기화. 데스크톱 2컬럼 (`lg:flex-row` 캘린더 | 상세), 모바일 단일 컬럼. 이벤트 카테고리(아이콘+색상) 지원
+- **큐레이션 UX**: 스와이프 액션 (`useSwipeAction` 훅, axis-lock + 타이머 정리), 컴팩트뷰 토글 (localStorage), 키보드 네비 (j/k/o/b), 일괄 삭제 (100개 청크), 인라인 메모 (북마크 탭, key prop 동기화)
 
 ---
 
@@ -213,6 +214,7 @@ erDiagram
     timestamp publishedAt
     boolean isRead
     boolean isBookmarked
+    text memo
   }
 
   event_categories {
@@ -286,7 +288,10 @@ erDiagram
 
 | Method | Endpoint | 설명 |
 |--------|----------|------|
-| GET | `/api/curation` | 큐레이션 아이템 목록 (커서 페이지네이션) |
+| GET | `/api/curation` | 큐레이션 아이템 목록 (커서 페이지네이션, memo 포함) |
+| PATCH | `/api/curation/[id]` | 아이템 읽음/북마크/메모 업데이트 (ownership join 검증) |
+| DELETE | `/api/curation/[id]` | 아이템 단건 삭제 (ownership join 검증) |
+| POST | `/api/curation/bulk-delete` | 아이템 일괄 삭제 (max 100, UUID 전수 검증) |
 | POST | `/api/curation/crawl` | SSE 수동 크롤 |
 | POST | `/api/curation/sources/reorder` | 즐겨찾기 순서 배치 업데이트 |
 | GET | `/api/cron/curation` | Cron 자동 크롤 + 푸시 (verifyCronAuth 인증) |
