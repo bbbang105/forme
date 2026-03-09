@@ -5,7 +5,7 @@ import {useRouter, useSearchParams} from 'next/navigation';
 import {CheckSquare, LayoutGrid, LayoutList, Loader2, Newspaper, Trash2, X} from 'lucide-react';
 import {cn} from '@/lib/utils';
 import {Skeleton} from '@/components/ui/skeleton';
-import {Button} from '@/components/ui/button';
+import {Button, buttonVariants} from '@/components/ui/button';
 import {
     AlertDialog,
     AlertDialogCancel,
@@ -643,15 +643,12 @@ export function CurationFeed() {
           </AlertDialogHeader>
           <div className="flex justify-end gap-2 mt-2">
             <AlertDialogCancel>취소</AlertDialogCancel>
-            <AlertDialogAction asChild>
-              <Button
-                variant="destructive"
-                size="sm"
-                disabled={deleting}
-                onClick={handleDeleteConfirm}
-              >
-                {deleting ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" />삭제 중...</> : '삭제'}
-              </Button>
+            <AlertDialogAction
+              className={buttonVariants({ variant: 'destructive', size: 'sm' })}
+              disabled={deleting}
+              onClick={handleDeleteConfirm}
+            >
+              {deleting ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" />삭제 중...</> : '삭제'}
             </AlertDialogAction>
           </div>
         </AlertDialogContent>
@@ -668,15 +665,12 @@ export function CurationFeed() {
           </AlertDialogHeader>
           <div className="flex justify-end gap-2 mt-2">
             <AlertDialogCancel>취소</AlertDialogCancel>
-            <AlertDialogAction asChild>
-              <Button
-                variant="destructive"
-                size="sm"
-                disabled={deleting}
-                onClick={handleBulkDeleteConfirm}
-              >
-                {deleting ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" />삭제 중...</> : `${selectedIds.size}개 삭제`}
-              </Button>
+            <AlertDialogAction
+              className={buttonVariants({ variant: 'destructive', size: 'sm' })}
+              disabled={deleting}
+              onClick={handleBulkDeleteConfirm}
+            >
+              {deleting ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" />삭제 중...</> : `${selectedIds.size}개 삭제`}
             </AlertDialogAction>
           </div>
         </AlertDialogContent>
