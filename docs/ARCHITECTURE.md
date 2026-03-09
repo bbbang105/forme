@@ -1,6 +1,6 @@
 # forme - 아키텍처 & 기술 선정 이유
 
-> 최종 업데이트: 2026-03-09 (UX/UI 개선 — 에러 바운더리, 접근성, 성능 최적화, 이모지→아이콘 통일)
+> 최종 업데이트: 2026-03-09 (팟캐스트 반자동화 — Discord 웹훅 + NotebookLM 워크플로우)
 
 개인 올인원 PWA. 큐레이션(RSS), 캘린더, 메모(리치 에디터), 팟캐스트를 하나의 앱에 통합.
 모바일 퍼스트, 오프라인 지원, 푸시 알림까지 네이티브 앱 수준의 경험을 웹으로 제공.
@@ -27,9 +27,10 @@ graph TB
   end
 
   subgraph Cron["Scheduled Jobs"]
-    CR1[Vercel Cron<br/>curation 크롤]
+    CR1[Vercel Cron<br/>curation 크롤 22시]
     CR2[Vercel Cron<br/>calendar-daily 08시]
     CR3[Supabase pg_cron<br/>calendar-reminder 15분]
+    CR4[Vercel Cron<br/>podcast-reminder 23시]
   end
 
   subgraph External["External Services"]
@@ -37,6 +38,7 @@ graph TB
     R2[(Cloudflare R2<br/>오디오 + 이미지)]
     RSS[RSS Feeds<br/>큐레이션 소스]
     DC[Discord OAuth]
+    DW[Discord Webhook<br/>팟캐스트 알림]
   end
 
   RC -->|Server Actions| SA
@@ -50,8 +52,10 @@ graph TB
   DC -->|OAuth 콜백| SB
   SW -->|web-push| API
   CR1 -->|verifyCronAuth| API
+  CR1 -->|URL 목록| DW
   CR2 -->|verifyCronAuth| API
   CR3 -->|verifyCronAuth| API
+  CR4 -->|리마인더| DW
 ```
 
 **핵심 원칙**: Server Components 우선, RLS로 데이터 격리, 서버 측 입력 검증 필수 (`lib/validators.ts` 공유 정규식), 최소한의 클라이언트 상태, 무거운 컴포넌트 지연 로딩, 인터랙션 optimistic updates, 반응형 레이아웃 (모바일 단일컬럼 ↔ 데스크톱 멀티컬럼), Vercel 리전과 DB 리전 코로케이션 (서울). Safari PWA 호환성 우선 (`flex flex-col` Dialog, `overscroll-behavior` 조건부 해제).
@@ -296,11 +300,12 @@ erDiagram
 | POST | `/api/curation/bulk-delete` | 아이템 일괄 삭제 (max 100, UUID 전수 검증) |
 | POST | `/api/curation/crawl` | SSE 수동 크롤 |
 | POST | `/api/curation/sources/reorder` | 즐겨찾기 순서 배치 업데이트 |
-| GET | `/api/cron/curation` | Cron 자동 크롤 + 푸시 (verifyCronAuth 인증) |
+| GET | `/api/cron/curation` | Cron 자동 크롤 + 푸시 + Discord NotebookLM URL 전송 (verifyCronAuth 인증) |
 | GET | `/api/cron/calendar-daily` | 08시 KST 데일리 요약 푸시 (오늘 일정+투두 카운트) |
 | GET | `/api/cron/calendar-reminder` | 이벤트 1시간 전 리마인더 (Supabase pg_cron 15분 주기 호출) |
 | POST | `/api/memo/image` | 메모 이미지 R2 업로드 (5MB) |
 | POST | `/api/podcast/upload` | 팟캐스트 오디오 R2 업로드 (200MB) |
+| GET | `/api/cron/podcast-reminder` | 23시 KST 팟캐스트 제작 Discord 리마인더 (verifyCronAuth 인증) |
 | GET/POST/DELETE | `/api/push/subscribe` | 푸시 구독 관리 |
 
 ---
@@ -320,6 +325,7 @@ erDiagram
 | 리다이렉트 | `ALLOWED_PATHS` 화이트리스트 |
 | 업로드 | MIME 검증, 크기 제한, 안전한 키 생성 |
 | 푸시 | HTTPS endpoint 강제, 소유자 확인 |
+| Discord 웹훅 | URL 정규식 패턴 검증 (`discord.com/api/webhooks/`), 5초 타임아웃, 에러 내부 흡수 |
 
 ---
 

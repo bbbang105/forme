@@ -67,6 +67,8 @@ pnpm db:push          # 스키마 직접 push (dev용)
 - 게이미피케이션: 출석 스트릭, 데일리 미션 (큐레이션 5개/팟캐스트 10분/투두 완료), 하이브리드 데이터 (전용 테이블 + 기존 데이터 계산)
 - 외부 API: Open-Meteo (서울 날씨, 서버 컴포넌트 fetch, revalidate 3600)
 - 팟캐스트 플레이어: `usePlayer()` (상태/컨트롤) + `usePlayerTime()` (currentTime/duration) 컨텍스트 분리
+- 팟캐스트 반자동화: 큐레이션 cron(22:00 KST) 후 Discord로 NotebookLM용 URL 전송 → 23:00 리마인더 → 수동 NotebookLM 생성 → 앱에서 업로드
+- Discord 웹훅: `lib/discord.ts` — URL 패턴 검증 + 5초 타임아웃 + 에러 내부 흡수
 - DB 커넥션: `max: 1` (Supabase Transaction Pooler가 실제 풀 관리, 서버리스 최적)
 - 성능: `serverExternalPackages`로 서버 전용 패키지 번들 제외, AVIF 이미지 포맷, 병렬 쿼리 (`Promise.all`), SW LRU 캐시 (오디오 50개, 정적 100개), SW HTML/RSC network-first (4초 타임아웃 + 캐시 폴백), 리스트 아이템 `React.memo` (CurationCard, CurationListRow, EpisodeCard, MemoCard)
 - 에러 바운더리: 모든 (main) 페이지에 `error.tsx` 배치 (calendar, curation, memo, podcast), `error` prop 로깅 + 제네릭 메시지만 표출
@@ -116,6 +118,8 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/app/api/podcast/episodes/route.ts` | 팟캐스트 에피소드 CRUD |
 | `packages/web/src/app/api/push/subscribe/route.ts` | 푸시 구독 등록/해제/조회 |
 | `packages/web/src/components/features/podcast/player-context.tsx` | 팟캐스트 플레이어 (PlayerContext + PlayerTimeContext 분리, localStorage 이어듣기, 청취시간 DB 동기화) |
+| `packages/web/src/lib/discord.ts` | Discord 웹훅 전송 유틸 (sendDiscordMessage, sendDiscordEmbed) |
+| `packages/web/src/app/api/cron/podcast-reminder/route.ts` | 팟캐스트 제작 리마인더 (23:00 KST, Discord 알림) |
 | `packages/web/src/components/features/podcast/episode-card.tsx` | 에피소드 카드 (React.memo, 재생/일시정지, 메뉴) |
 | `packages/web/src/components/features/memo/memo-editor-lazy.tsx` | MemoEditor 지연 로딩 래퍼 (next/dynamic, ssr: false) |
 | `packages/web/src/components/features/curation/mini-card-thumbnail.tsx` | 대시보드 큐레이션 썸네일 (클라이언트 onError 폴백) |

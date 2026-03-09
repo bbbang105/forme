@@ -1,8 +1,11 @@
 import {NextResponse} from 'next/server';
 import {crawlSource, type CrawlSourceResult, getActiveSourcesForUser} from '@/lib/crawl-feed';
 import {sendPushToUser} from '@/lib/push';
+import {sendDiscordEmbed} from '@/lib/discord';
 import {withTracing} from '@/lib/logger';
 import {verifyCronAuth} from '@/lib/cron-auth';
+import {curationItems, curationSources, db} from '@forme/shared';
+import {and, desc, eq, gte} from 'drizzle-orm';
 
 export const maxDuration = 300;
 
@@ -73,6 +76,46 @@ export const GET = withTracing('GET /api/cron/curation', async (request) => {
       });
     } catch (err) {
       console.error('[cron/curation] push notification failed', err);
+    }
+  }
+
+  // NotebookLM용 URL 목록 Discord 전송
+  if (totalNewItems > 0) {
+    try {
+      const recentItems = await db
+        .select({
+          title: curationItems.title,
+          url: curationItems.url,
+          category: curationItems.category,
+        })
+        .from(curationItems)
+        .innerJoin(
+          curationSources,
+          eq(curationItems.sourceId, curationSources.id),
+        )
+        .where(
+          and(
+            eq(curationSources.userId, userId),
+            gte(curationItems.collectedAt, since),
+          ),
+        )
+        .orderBy(desc(curationItems.collectedAt))
+        .limit(20);
+
+      const urlList = recentItems
+        .map((item) => `- [${item.category}] ${item.title}\n  ${item.url}`)
+        .join('\n');
+
+      const countNote = totalNewItems > recentItems.length
+        ? ` (최근 ${recentItems.length}개 / 전체 ${totalNewItems}개)`
+        : '';
+
+      await sendDiscordEmbed(
+        `NotebookLM 팟캐스트 소스 (${totalNewItems}개)`,
+        `아래 URL을 NotebookLM에 붙여넣으세요${countNote}:\n\n${urlList}`,
+      );
+    } catch (err) {
+      console.error('[cron/curation] discord notification failed', err);
     }
   }
 
