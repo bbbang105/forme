@@ -40,6 +40,7 @@ export function CurationSearch({ value, onChange }: CurationSearchProps) {
         value={local}
         onChange={(e) => handleChange(e.target.value)}
         placeholder="제목이나 내용으로 검색..."
+        aria-label="큐레이션 검색"
         className={cn(
           'w-full h-10 pl-9 pr-9 rounded-lg border border-border bg-background',
           'text-base placeholder:text-muted-foreground',

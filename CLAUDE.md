@@ -62,13 +62,16 @@ pnpm db:push          # 스키마 직접 push (dev용)
 - 큐레이션 정렬: status=read 탭에서 readAt DESC 정렬 (최근 읽은 순)
 - 큐레이션 삭제: 단건 삭제 (AlertDialog 확인) + 일괄 삭제 (체크박스 선택, 100개 청크), ownership은 curationSources join으로 검증
 - 큐레이션 북마크 메모: InlineMemo 컴포넌트 (북마크 탭 전용, 500자, key prop으로 외부 상태 동기화)
-- 큐레이션 UX: 스와이프 액션 (우→읽음, 좌→삭제), 컴팩트뷰 토글 (localStorage), 키보드 네비 (j/k/o/b, contenteditable 감지)
+- 큐레이션 UX: 스와이프 액션 (우→읽음, 좌→삭제), 컴팩트뷰 토글 (localStorage), 키보드 네비 (j/k/o/b, DOM 직접 포커스링 — useRef + data-curation-feed 스코프)
 - 메모 캐싱: 에디터 뒤로가기 시 `router.refresh()` + MemoList initialMemos props 동기화
 - 게이미피케이션: 출석 스트릭, 데일리 미션 (큐레이션 5개/팟캐스트 10분/투두 완료), 하이브리드 데이터 (전용 테이블 + 기존 데이터 계산)
 - 외부 API: Open-Meteo (서울 날씨, 서버 컴포넌트 fetch, revalidate 3600)
 - 팟캐스트 플레이어: `usePlayer()` (상태/컨트롤) + `usePlayerTime()` (currentTime/duration) 컨텍스트 분리
 - DB 커넥션: `max: 1` (Supabase Transaction Pooler가 실제 풀 관리, 서버리스 최적)
-- 성능: `serverExternalPackages`로 서버 전용 패키지 번들 제외, AVIF 이미지 포맷, 병렬 쿼리 (`Promise.all`), SW LRU 캐시 (오디오 50개, 정적 100개), SW HTML/RSC network-first (4초 타임아웃 + 캐시 폴백)
+- 성능: `serverExternalPackages`로 서버 전용 패키지 번들 제외, AVIF 이미지 포맷, 병렬 쿼리 (`Promise.all`), SW LRU 캐시 (오디오 50개, 정적 100개), SW HTML/RSC network-first (4초 타임아웃 + 캐시 폴백), 리스트 아이템 `React.memo` (CurationCard, CurationListRow, EpisodeCard, MemoCard)
+- 에러 바운더리: 모든 (main) 페이지에 `error.tsx` 배치 (calendar, curation, memo, podcast), `error` prop 로깅 + 제네릭 메시지만 표출
+- 접근성: 탭바 `aria-current="page"`, 검색 input `aria-label`, 이벤트 폼 색상 버튼 `focus-visible:ring-2` + `aria-label`
+- 아이콘 통일: 대시보드/팟캐스트 이모지 → lucide-react 아이콘 (Newspaper, Headphones, CheckSquare, Flame, Mic, FileText)
 - SSRF 방어: `lib/url-safety.ts` — IPv4/IPv6 사설 대역, IPv4-mapped IPv6, ULA(fc00::/7), Link-Local(fe80::/10) 차단
 - 컴포넌트 분리: 대형 컴포넌트 → 하위 컴포넌트 추출 (source-card, crawl-settings-form, calendar-header, recurrence-form, feed-filter-bar, tag-input)
 - 자동저장 훅: `hooks/use-auto-save.ts` — saveFnRef 패턴, Promise 기반 동시 저장 방어, detach() API
@@ -113,6 +116,7 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/app/api/podcast/episodes/route.ts` | 팟캐스트 에피소드 CRUD |
 | `packages/web/src/app/api/push/subscribe/route.ts` | 푸시 구독 등록/해제/조회 |
 | `packages/web/src/components/features/podcast/player-context.tsx` | 팟캐스트 플레이어 (PlayerContext + PlayerTimeContext 분리, localStorage 이어듣기, 청취시간 DB 동기화) |
+| `packages/web/src/components/features/podcast/episode-card.tsx` | 에피소드 카드 (React.memo, 재생/일시정지, 메뉴) |
 | `packages/web/src/components/features/memo/memo-editor-lazy.tsx` | MemoEditor 지연 로딩 래퍼 (next/dynamic, ssr: false) |
 | `packages/web/src/components/features/curation/mini-card-thumbnail.tsx` | 대시보드 큐레이션 썸네일 (클라이언트 onError 폴백) |
 | `packages/web/public/sw.js` | Service Worker (PWA + 푸시 + 전략별 캐싱 + 오디오 오프라인 + LRU trimCache) |
@@ -150,7 +154,7 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/lib/weather.ts` | 서울 날씨 유틸 (Open-Meteo API, 1시간 캐시) |
 | `packages/web/src/lib/actions/activity.ts` | 게이미피케이션 Server Actions (출석/스트릭/미션 통계, Promise.all 병렬 쿼리) |
 | `packages/web/src/components/features/dashboard/weather-widget.tsx` | 서울 날씨 위젯 (서버 컴포넌트, WMO 픽토그램) |
-| `packages/web/src/components/features/dashboard/daily-missions.tsx` | 데일리 미션 카드 (프로그레스 바, 스트릭 표시) |
+| `packages/web/src/components/features/dashboard/daily-missions.tsx` | 데일리 미션 카드 (lucide 아이콘, 프로그레스 바, 스트릭 표시) |
 | `packages/web/src/components/features/dashboard/attendance-recorder.tsx` | 출석 기록 (클라이언트, 방문 시 자동 호출) |
 | `packages/web/src/components/features/curation/source-card.tsx` | 소스 카드 (DnD, 즐겨찾기, 활성/비활성 토글) |
 | `packages/web/src/components/features/curation/crawl-settings-form.tsx` | 크롤 설정 폼 (기간 선택, 수집 시작) |

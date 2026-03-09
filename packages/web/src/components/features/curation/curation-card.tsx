@@ -2,7 +2,7 @@
 
 import {memo, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import Image from 'next/image';
-import {Bookmark, Check, MessageSquare, Trash2} from 'lucide-react';
+import {Bookmark, Check, FileText, MessageSquare, Trash2} from 'lucide-react';
 import {cn} from '@/lib/utils';
 import {formatRelativeDate, getArticleGradient, getCategoryStyle,} from '@/lib/curation-utils';
 import {Checkbox} from '@/components/ui/checkbox';
@@ -65,7 +65,7 @@ function Thumbnail({
           className
         )}
       >
-        <span className="text-2xl select-none opacity-60">📄</span>
+        <FileText className="h-6 w-6 text-muted-foreground/50" />
       </div>
     );
   }
@@ -176,7 +176,7 @@ function InlineMemo({
         maxLength={500}
         rows={2}
         placeholder="메모를 입력하세요..."
-        className="w-full text-base sm:text-xs px-2.5 py-1.5 rounded-md bg-muted/50 border border-primary/30 text-foreground placeholder:text-muted-foreground/50 resize-none focus:outline-none focus:ring-1 focus:ring-primary/40"
+        className="w-full text-base sm:text-sm px-2.5 py-1.5 rounded-md bg-muted/50 border border-primary/30 text-foreground placeholder:text-muted-foreground/50 resize-none focus:outline-none focus:ring-1 focus:ring-primary/40"
       />
       <div className="flex items-center justify-between mt-1">
         <span className="text-[10px] text-muted-foreground/50">{value.length}/500</span>
@@ -596,6 +596,7 @@ export const CurationListRow = memo(function CurationListRow({
         {/* Inline memo (bookmark tab only) */}
         {showMemo && !selectMode && onMemoChange && (
           <InlineMemo
+            key={item.memo ?? ''}
             itemId={item.id}
             initialMemo={item.memo}
             onMemoChange={onMemoChange}

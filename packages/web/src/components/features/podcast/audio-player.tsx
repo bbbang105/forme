@@ -1,7 +1,7 @@
 'use client';
 
 import {useCallback} from 'react';
-import {ChevronDown, Loader2, Pause, Play, SkipBack, SkipForward, Volume2, VolumeX, X,} from 'lucide-react';
+import {ChevronDown, Loader2, Mic, Pause, Play, SkipBack, SkipForward, Volume2, VolumeX, X,} from 'lucide-react';
 import {cn} from '@/lib/utils';
 import {usePlayer, usePlayerTime} from './player-context';
 import {Button} from '@/components/ui/button';
@@ -76,7 +76,7 @@ export function AudioPlayer({ onCollapse }: AudioPlayerProps) {
             </Button>
           )}
           <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-            <span className="text-xl">🎙️</span>
+            <Mic className="h-6 w-6 text-primary" />
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold truncate">{episode.title}</p>

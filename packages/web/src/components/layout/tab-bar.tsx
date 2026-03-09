@@ -32,6 +32,7 @@ export function TabBar() {
             <Link
               key={href}
               href={href}
+              aria-current={isActive ? 'page' : undefined}
               className={cn(
                 'flex flex-col items-center justify-center gap-1 flex-1 h-full',
                 'transition-all duration-150',

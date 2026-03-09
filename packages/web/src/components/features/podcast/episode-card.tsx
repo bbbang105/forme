@@ -1,6 +1,6 @@
 'use client';
 
-import {useState} from 'react';
+import {memo, useState} from 'react';
 import {Clock, HardDrive, MoreHorizontal, Pause, Pencil, Play, Trash2} from 'lucide-react';
 import {cn} from '@/lib/utils';
 import {Button} from '@/components/ui/button';
@@ -35,7 +35,7 @@ function formatDate(iso: string): string {
   return `${y}년 ${m}월 ${d}일`;
 }
 
-export function EpisodeCard({ episode, onEdit, onDelete }: EpisodeCardProps) {
+export const EpisodeCard = memo(function EpisodeCard({ episode, onEdit, onDelete }: EpisodeCardProps) {
   const { episode: currentEpisode, isPlaying, isRestored, play, togglePlay } = usePlayer();
   const { currentTime: playerTime } = usePlayerTime();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -165,4 +165,4 @@ export function EpisodeCard({ episode, onEdit, onDelete }: EpisodeCardProps) {
       </div>
     </div>
   );
-}
+});
