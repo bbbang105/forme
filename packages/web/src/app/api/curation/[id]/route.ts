@@ -135,6 +135,13 @@ export const PATCH = withTracing('PATCH /api/curation/[id]', async (request, ctx
     );
   }
 
+  if (memo !== undefined && memo !== null && typeof memo !== 'string') {
+    return NextResponse.json(
+      { error: 'memo must be a string or null' },
+      { status: 400 }
+    );
+  }
+
   try {
     // ── Verify ownership ──
     // curation_items has no user_id directly; ownership flows through curation_sources

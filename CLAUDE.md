@@ -60,6 +60,9 @@ pnpm db:push          # 스키마 직접 push (dev용)
 - 모바일 PWA: viewport `maximumScale: 1, userScalable: false`, 모든 input/textarea/select `text-base`(16px) 이상 (iOS 자동 줌 방지), 크롬 스타일 pull-to-refresh (`overscroll-behavior-y: contain` + DOM 직접 조작 + 컨텐츠 translateY + 인라인 SVG 인디케이터 + `window.location.reload()`)
 - Safari PWA 대응: Dialog `flex flex-col` + `inset-y-0 my-auto` 센터링 (grid+translate 금지), `body[data-scroll-locked]`에서 `overscroll-behavior-y: auto` 해제, pull-to-refresh에서 다이얼로그 열림 감지 스킵
 - 큐레이션 정렬: status=read 탭에서 readAt DESC 정렬 (최근 읽은 순)
+- 큐레이션 삭제: 단건 삭제 (AlertDialog 확인) + 일괄 삭제 (체크박스 선택, 100개 청크), ownership은 curationSources join으로 검증
+- 큐레이션 북마크 메모: InlineMemo 컴포넌트 (북마크 탭 전용, 500자, key prop으로 외부 상태 동기화)
+- 큐레이션 UX: 스와이프 액션 (우→읽음, 좌→삭제), 컴팩트뷰 토글 (localStorage), 키보드 네비 (j/k/o/b, contenteditable 감지)
 - 메모 캐싱: 에디터 뒤로가기 시 `router.refresh()` + MemoList initialMemos props 동기화
 - 게이미피케이션: 출석 스트릭, 데일리 미션 (큐레이션 5개/팟캐스트 10분/투두 완료), 하이브리드 데이터 (전용 테이블 + 기존 데이터 계산)
 - 외부 API: Open-Meteo (서울 날씨, 서버 컴포넌트 fetch, revalidate 3600)
@@ -153,6 +156,9 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/components/features/curation/crawl-settings-form.tsx` | 크롤 설정 폼 (기간 선택, 수집 시작) |
 | `packages/web/src/components/features/curation/feed-filter-bar.tsx` | 피드 필터 바 (검색, 즐겨찾기 소스, 카테고리/상태 필터, 정렬) |
 | `packages/web/src/components/features/curation/mini-card-link.tsx` | 대시보드 큐레이션 클릭 시 읽음 처리 래퍼 |
+| `packages/web/src/app/api/curation/[id]/route.ts` | 큐레이션 아이템 PATCH (읽음/북마크/메모) + DELETE (단건 삭제, ownership join 검증) |
+| `packages/web/src/app/api/curation/bulk-delete/route.ts` | 큐레이션 일괄 삭제 (POST, max 100개, UUID 전수 검증) |
+| `packages/web/src/hooks/use-swipe-action.ts` | 터치 스와이프 제스처 훅 (axis-lock, damped swipe, 타이머 정리) |
 
 ## 인증 구조
 

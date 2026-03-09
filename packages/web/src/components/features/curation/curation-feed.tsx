@@ -2,16 +2,18 @@
 
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useRouter, useSearchParams} from 'next/navigation';
-import {CheckSquare, Newspaper, Trash2, X} from 'lucide-react';
+import {CheckSquare, LayoutGrid, LayoutList, Newspaper, Trash2, X} from 'lucide-react';
+import {cn} from '@/lib/utils';
 import {Skeleton} from '@/components/ui/skeleton';
 import {Button} from '@/components/ui/button';
 import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogHeader,
-  AlertDialogTitle,
+    AlertDialog,
+    AlertDialogCancel,
+    AlertDialogAction,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogHeader,
+    AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import {CurationCard, type CurationItemData, CurationListRow} from './curation-card';
 import {type StatusFilter} from './curation-filters';
@@ -55,6 +57,18 @@ export function CurationFeed() {
   const [categories, setCategories] = useState<string[]>([]);
   const [hasSources, setHasSources] = useState(true);
   const [favoriteSources, setFavoriteSources] = useState<{ id: string; name: string }[]>([]);
+
+  // View density
+  const [compact, setCompact] = useState(() => {
+    try { return localStorage.getItem('forme-curation-compact') === 'true'; } catch { return false; }
+  });
+  const toggleCompact = useCallback(() => {
+    setCompact((prev) => {
+      const next = !prev;
+      try { localStorage.setItem('forme-curation-compact', String(next)); } catch { /* noop */ }
+      return next;
+    });
+  }, []);
 
   // Selection & delete state
   const [selectMode, setSelectMode] = useState(false);
@@ -344,6 +358,57 @@ export function CurationFeed() {
     setSelectedIds(new Set());
   }, []);
 
+  // ── Keyboard navigation ──
+
+  const [focusIndex, setFocusIndex] = useState(-1);
+  const focusIndexRef = useRef(focusIndex);
+  useEffect(() => { focusIndexRef.current = focusIndex; }, [focusIndex]);
+
+  // Reset focus on filter/data change
+  useEffect(() => { setFocusIndex(-1); }, [category, status, search, tagsParam, sort, sourceId]);
+
+  useEffect(() => {
+    if (selectMode || loading || items.length === 0) return;
+
+    function handleKeyDown(e: KeyboardEvent) {
+      // Skip if user is typing in an input or editable element
+      const el = e.target as HTMLElement;
+      const tag = el?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el?.isContentEditable) return;
+
+      const idx = focusIndexRef.current;
+
+      if (e.key === 'j' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        const next = Math.min(idx + 1, items.length - 1);
+        setFocusIndex(next);
+        scrollToItem(next);
+      } else if (e.key === 'k' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        const prev = Math.max(idx - 1, 0);
+        setFocusIndex(prev);
+        scrollToItem(prev);
+      } else if (e.key === 'o' || e.key === 'Enter') {
+        if (idx >= 0 && idx < items.length) {
+          if (!items[idx].isRead) handleMarkRead(items[idx].id);
+          window.open(items[idx].url, '_blank', 'noopener,noreferrer');
+        }
+      } else if (e.key === 'b') {
+        if (idx >= 0 && idx < items.length) {
+          handleToggleBookmark(items[idx].id, !items[idx].isBookmarked);
+        }
+      }
+    }
+
+    function scrollToItem(index: number) {
+      const el = document.querySelector(`[data-curation-index="${index}"]`);
+      el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectMode, loading, items, handleMarkRead, handleToggleBookmark]);
+
   const handleCrawlComplete = useCallback(() => {
     fetchCategories();
     fetchItems(null, false);
@@ -385,7 +450,17 @@ export function CurationFeed() {
           <h2 className="text-lg font-semibold">큐레이션</h2>
           <p className="text-xs text-muted-foreground mt-0.5">관심 있는 RSS 피드를 구독하고 한곳에서 읽어보세요</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          {/* Compact/Card toggle — mobile/tablet only */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 lg:hidden"
+            onClick={toggleCompact}
+            aria-label={compact ? '카드 뷰' : '컴팩트 뷰'}
+          >
+            {compact ? <LayoutGrid className="h-4 w-4" /> : <LayoutList className="h-4 w-4" />}
+          </Button>
           {!selectMode ? (
             <Button
               variant="outline"
@@ -477,38 +552,52 @@ export function CurationFeed() {
       ) : (
         <>
           {/* Card grid (mobile/tablet) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:hidden gap-4">
-            {items.map((item) => (
-              <CurationCard
+          <div className={cn(
+            'lg:hidden',
+            compact ? 'flex flex-col gap-2' : 'grid grid-cols-1 sm:grid-cols-2 gap-4'
+          )}>
+            {items.map((item, i) => (
+              <div
                 key={item.id}
-                item={item}
-                onToggleBookmark={handleToggleBookmark}
-                onMarkRead={handleMarkRead}
-                onDelete={handleDeleteRequest}
-                onMemoChange={handleMemoChange}
-                showMemo={isBookmarkTab}
-                selectMode={selectMode}
-                selected={selectedIds.has(item.id)}
-                onToggleSelect={toggleSelect}
-              />
+                data-curation-index={i}
+                className={cn(focusIndex === i && 'ring-2 ring-primary/50 rounded-xl')}
+              >
+                <CurationCard
+                  item={item}
+                  onToggleBookmark={handleToggleBookmark}
+                  onMarkRead={handleMarkRead}
+                  onDelete={handleDeleteRequest}
+                  onMemoChange={handleMemoChange}
+                  showMemo={isBookmarkTab}
+                  selectMode={selectMode}
+                  selected={selectedIds.has(item.id)}
+                  onToggleSelect={toggleSelect}
+                  compact={compact}
+                />
+              </div>
             ))}
           </div>
 
           {/* List view (desktop) */}
           <div className="hidden lg:block divide-y divide-border/60">
-            {items.map((item) => (
-              <CurationListRow
+            {items.map((item, i) => (
+              <div
                 key={item.id}
-                item={item}
-                onToggleBookmark={handleToggleBookmark}
-                onMarkRead={handleMarkRead}
-                onDelete={handleDeleteRequest}
-                onMemoChange={handleMemoChange}
-                showMemo={isBookmarkTab}
-                selectMode={selectMode}
-                selected={selectedIds.has(item.id)}
-                onToggleSelect={toggleSelect}
-              />
+                data-curation-index={i}
+                className={cn(focusIndex === i && 'ring-2 ring-primary/50 rounded-lg')}
+              >
+                <CurationListRow
+                  item={item}
+                  onToggleBookmark={handleToggleBookmark}
+                  onMarkRead={handleMarkRead}
+                  onDelete={handleDeleteRequest}
+                  onMemoChange={handleMemoChange}
+                  showMemo={isBookmarkTab}
+                  selectMode={selectMode}
+                  selected={selectedIds.has(item.id)}
+                  onToggleSelect={toggleSelect}
+                />
+              </div>
             ))}
           </div>
 
@@ -536,14 +625,16 @@ export function CurationFeed() {
           </AlertDialogHeader>
           <div className="flex justify-end gap-2 mt-2">
             <AlertDialogCancel>취소</AlertDialogCancel>
-            <Button
-              variant="destructive"
-              size="sm"
-              disabled={deleting}
-              onClick={handleDeleteConfirm}
-            >
-              삭제
-            </Button>
+            <AlertDialogAction asChild>
+              <Button
+                variant="destructive"
+                size="sm"
+                disabled={deleting}
+                onClick={handleDeleteConfirm}
+              >
+                삭제
+              </Button>
+            </AlertDialogAction>
           </div>
         </AlertDialogContent>
       </AlertDialog>
@@ -559,14 +650,16 @@ export function CurationFeed() {
           </AlertDialogHeader>
           <div className="flex justify-end gap-2 mt-2">
             <AlertDialogCancel>취소</AlertDialogCancel>
-            <Button
-              variant="destructive"
-              size="sm"
-              disabled={deleting}
-              onClick={handleBulkDeleteConfirm}
-            >
-              {selectedIds.size}개 삭제
-            </Button>
+            <AlertDialogAction asChild>
+              <Button
+                variant="destructive"
+                size="sm"
+                disabled={deleting}
+                onClick={handleBulkDeleteConfirm}
+              >
+                {selectedIds.size}개 삭제
+              </Button>
+            </AlertDialogAction>
           </div>
         </AlertDialogContent>
       </AlertDialog>
