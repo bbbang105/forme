@@ -32,7 +32,7 @@ export function ListSkeleton({
       className={cn('space-y-3', className)}
       role="status"
       aria-label="목록 불러오는 중"
-      aria-busy="true"
+      aria-busy={true}
     >
       {Array.from({ length: count }, (_, i) => (
         <div key={i} className="flex items-start gap-3 p-3 rounded-xl border border-border/60">
