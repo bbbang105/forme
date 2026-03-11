@@ -73,7 +73,7 @@ function Thumbnail({
   return (
     <Image
       src={src}
-      alt=""
+      alt={title}
       width={480}
       height={270}
       unoptimized
@@ -292,8 +292,10 @@ export const CurationCard = memo(function CurationCard({
             )}
           >
             {selectMode && (
-              <div className="flex items-center shrink-0 pt-1">
-                <Checkbox checked={selected} onCheckedChange={() => onToggleSelect?.(item.id)} className="h-5 w-5 border-2" />
+              <div className="flex items-center shrink-0">
+                <div className="flex items-center justify-center min-h-[44px] min-w-[44px]">
+                  <Checkbox checked={selected} onCheckedChange={() => onToggleSelect?.(item.id)} className="h-5 w-5 border-2" />
+                </div>
               </div>
             )}
             <div className="w-[80px] h-[52px] shrink-0 rounded-md overflow-hidden bg-muted">
@@ -359,7 +361,7 @@ export const CurationCard = memo(function CurationCard({
         >
           {/* Select checkbox */}
           {selectMode && (
-            <div className="absolute top-2 left-2 z-10">
+            <div className="absolute top-0 left-0 z-10 flex items-center justify-center min-h-[44px] min-w-[44px]">
               <Checkbox
                 checked={selected}
                 onCheckedChange={() => onToggleSelect?.(item.id)}
@@ -527,7 +529,7 @@ export const CurationListRow = memo(function CurationListRow({
     >
       {/* Checkbox */}
       {selectMode && (
-        <div className="flex items-center shrink-0 pt-2">
+        <div className="flex items-center justify-center shrink-0 min-h-[44px] min-w-[44px]">
           <Checkbox
             checked={selected}
             onCheckedChange={() => onToggleSelect?.(item.id)}

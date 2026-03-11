@@ -135,11 +135,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     } catch { /* ignore corrupted data */ }
   }, []);
 
-  // Save progress + beforeunload (merged — no refs needed)
-  useEffect(() => {
-    if (!episode || isRestored) return;
+  // saveFnRef pattern: keep the save closure up-to-date without
+  // re-registering interval/event-listeners on every dependency change.
+  const saveFnRef = useRef<() => void>(() => { /* noop until populated */ });
 
-    const save = () => {
+  useEffect(() => {
+    saveFnRef.current = () => {
       const audio = audioRef.current;
       if (!audio || !audio.currentTime) return;
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
@@ -149,19 +150,29 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         volume,
       }));
     };
+  }, [episode, playbackRate, volume]);
 
-    save();
-    const interval = setInterval(save, 3000);
+  // Save progress + beforeunload — registers once, delegates to saveFnRef
+  useEffect(() => {
+    if (!episode || isRestored) return;
+
+    saveFnRef.current();
+
+    const stableSave = () => saveFnRef.current();
+
+    const interval = setInterval(stableSave, 3000);
     const audio = audioRef.current;
-    audio?.addEventListener('pause', save);
-    window.addEventListener('beforeunload', save);
+    audio?.addEventListener('pause', stableSave);
+    window.addEventListener('beforeunload', stableSave);
 
     return () => {
       clearInterval(interval);
-      audio?.removeEventListener('pause', save);
-      window.removeEventListener('beforeunload', save);
+      audio?.removeEventListener('pause', stableSave);
+      window.removeEventListener('beforeunload', stableSave);
     };
-  }, [episode, isRestored, playbackRate, volume]);
+  // episode and isRestored are the only values that should re-register listeners;
+  // saveFnRef.current is intentionally not included (ref access is stable)
+  }, [episode, isRestored]);
 
   // Sync podcast listening time to DB for gamification (every 10s while playing)
   useEffect(() => {

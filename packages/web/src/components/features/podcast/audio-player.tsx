@@ -3,17 +3,11 @@
 import {useCallback} from 'react';
 import {ChevronDown, Loader2, Mic, Pause, Play, SkipBack, SkipForward, Volume2, VolumeX, X,} from 'lucide-react';
 import {cn} from '@/lib/utils';
+import {formatTime} from '@/lib/format-time';
 import {usePlayer, usePlayerTime} from './player-context';
 import {Button} from '@/components/ui/button';
 
 const PLAYBACK_RATES = [0.5, 1, 1.25, 1.5, 2] as const;
-
-function formatTime(seconds: number): string {
-  if (!isFinite(seconds) || isNaN(seconds)) return '0:00';
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${s.toString().padStart(2, '0')}`;
-}
 
 interface AudioPlayerProps {
   onCollapse?: () => void;

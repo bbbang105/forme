@@ -123,6 +123,15 @@ export function EpisodeList({ newEpisode }: EpisodeListProps) {
     }
   }, [newEpisode]);
 
+  // Stable memoized callbacks — defined before early returns to satisfy Rules of Hooks
+  const handleEdit = useCallback((ep: Episode) => {
+    setEditTarget(ep);
+  }, []);
+
+  const handleDelete = useCallback((ep: Episode) => {
+    setDeleteTarget(ep);
+  }, []);
+
   if (loading) {
     return <EpisodeListSkeleton />;
   }
@@ -142,8 +151,8 @@ export function EpisodeList({ newEpisode }: EpisodeListProps) {
           <EpisodeCard
             key={ep.id}
             episode={ep}
-            onEdit={setEditTarget}
-            onDelete={setDeleteTarget}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
           />
         ))}
       </div>

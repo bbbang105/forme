@@ -32,6 +32,27 @@ const SourceManager = dynamic(
 
 const PAGE_SIZE = 12;
 
+/** Shared helper — builds the query string for /api/curation and fetchItems */
+function buildFeedParams(opts: {
+  category: string;
+  status: StatusFilter;
+  search: string;
+  tagsParam: string;
+  sort: SortMode;
+  sourceId: string;
+  cursor?: string | null;
+}): URLSearchParams {
+  const params = new URLSearchParams();
+  if (opts.category) params.set('category', opts.category);
+  if (opts.status) params.set('status', opts.status);
+  if (opts.search) params.set('search', opts.search);
+  if (opts.tagsParam) params.set('tags', opts.tagsParam);
+  if (opts.sort !== 'latest') params.set('sort', opts.sort);
+  if (opts.sourceId) params.set('sourceId', opts.sourceId);
+  if (opts.cursor) params.set('cursor', opts.cursor);
+  return params;
+}
+
 export function CurationFeed() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -107,7 +128,6 @@ export function CurationFeed() {
       sort?: SortMode;
       sourceId?: string;
     }) => {
-      const params = new URLSearchParams();
       const newCategory = updates.category ?? category;
       const newStatus = updates.status ?? status;
       const newSearch = updates.search ?? search;
@@ -115,12 +135,17 @@ export function CurationFeed() {
       const newSort = updates.sort ?? sort;
       const newSourceId = updates.sourceId ?? sourceId;
 
-      if (newCategory) params.set('category', newCategory);
-      if (newStatus && newStatus !== 'unread') params.set('status', newStatus);
-      if (newSearch) params.set('search', newSearch);
-      if (newTags.length > 0) params.set('tags', newTags.join(','));
-      if (newSort !== 'latest') params.set('sort', newSort);
-      if (newSourceId) params.set('sourceId', newSourceId);
+      const params = buildFeedParams({
+        category: newCategory,
+        status: newStatus,
+        search: newSearch,
+        tagsParam: newTags.join(','),
+        sort: newSort,
+        sourceId: newSourceId,
+      });
+      // status 'unread' is the default, don't include in URL
+      if (newStatus === 'unread') params.delete('status');
+
       const qs = params.toString();
       router.push(`/curation${qs ? `?${qs}` : ''}`, { scroll: false });
     },
@@ -132,14 +157,7 @@ export function CurationFeed() {
     async (cursorArg: string | null, append: boolean) => {
       if (!append) setLoading(true);
 
-      const params = new URLSearchParams();
-      if (category) params.set('category', category);
-      if (status) params.set('status', status);
-      if (search) params.set('search', search);
-      if (tagsParam) params.set('tags', tagsParam);
-      if (sort !== 'latest') params.set('sort', sort);
-      if (sourceId) params.set('sourceId', sourceId);
-      if (cursorArg) params.set('cursor', cursorArg);
+      const params = buildFeedParams({ category, status, search, tagsParam, sort, sourceId, cursor: cursorArg });
       params.set('limit', String(PAGE_SIZE));
 
       try {
@@ -361,6 +379,14 @@ export function CurationFeed() {
   // ── Keyboard navigation (DOM-based focus to avoid re-renders) ──
 
   const focusIndexRef = useRef(-1);
+  // Keep latest items/handlers in refs so the keydown listener never goes stale
+  const itemsRef = useRef(items);
+  const handleMarkReadRef = useRef(handleMarkRead);
+  const handleToggleBookmarkRef = useRef(handleToggleBookmark);
+
+  useEffect(() => { itemsRef.current = items; }, [items]);
+  useEffect(() => { handleMarkReadRef.current = handleMarkRead; }, [handleMarkRead]);
+  useEffect(() => { handleToggleBookmarkRef.current = handleToggleBookmark; }, [handleToggleBookmark]);
 
   // Reset focus on filter/data change
   useEffect(() => {
@@ -374,7 +400,7 @@ export function CurationFeed() {
   }, [category, status, search, tagsParam, sort, sourceId]);
 
   useEffect(() => {
-    if (selectMode || loading || items.length === 0) return;
+    if (selectMode || loading) return;
 
     function applyFocusRing(index: number) {
       const feed = document.querySelector('[data-curation-feed]');
@@ -399,11 +425,14 @@ export function CurationFeed() {
       const tag = el?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || tag === 'BUTTON' || el?.isContentEditable || el?.closest('[role="dialog"]')) return;
 
+      const currentItems = itemsRef.current;
+      if (currentItems.length === 0) return;
+
       const idx = focusIndexRef.current;
 
       if (e.key === 'j' || e.key === 'ArrowDown') {
         e.preventDefault();
-        const next = Math.min(idx + 1, items.length - 1);
+        const next = Math.min(idx + 1, currentItems.length - 1);
         focusIndexRef.current = next;
         applyFocusRing(next);
       } else if (e.key === 'k' || e.key === 'ArrowUp') {
@@ -412,20 +441,21 @@ export function CurationFeed() {
         focusIndexRef.current = prev;
         applyFocusRing(prev);
       } else if (e.key === 'o' || e.key === 'Enter') {
-        if (idx >= 0 && idx < items.length) {
-          if (!items[idx].isRead) handleMarkRead(items[idx].id);
-          window.open(items[idx].url, '_blank', 'noopener,noreferrer');
+        if (idx >= 0 && idx < currentItems.length) {
+          if (!currentItems[idx].isRead) handleMarkReadRef.current(currentItems[idx].id);
+          window.open(currentItems[idx].url, '_blank', 'noopener,noreferrer');
         }
       } else if (e.key === 'b') {
-        if (idx >= 0 && idx < items.length) {
-          handleToggleBookmark(items[idx].id, !items[idx].isBookmarked);
+        if (idx >= 0 && idx < currentItems.length) {
+          handleToggleBookmarkRef.current(currentItems[idx].id, !currentItems[idx].isBookmarked);
         }
       }
     }
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectMode, loading, items, handleMarkRead, handleToggleBookmark]);
+  // Only re-register when selectMode or loading changes — items changes are handled via refs
+  }, [selectMode, loading]);
 
   const handleCrawlComplete = useCallback(() => {
     fetchCategories();
