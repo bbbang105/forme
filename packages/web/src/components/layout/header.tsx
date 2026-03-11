@@ -1,6 +1,5 @@
 'use client';
 
-import {useEffect, useState} from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import {useTheme} from 'next-themes';
@@ -9,62 +8,12 @@ import {Button} from '@/components/ui/button';
 import {LogoMark} from '@/components/ui/logo';
 import {cn} from '@/lib/utils';
 
-/**
- * sessionStorage key for the cached avatar URL.
- * sessionStorage is scoped to the browser tab session, so the avatar is
- * fetched once per tab open and reused across client-side navigations
- * (which do NOT trigger a full page reload in Next.js App Router).
- * On a new session or after logout/login the cache is naturally cleared.
- */
-const AVATAR_CACHE_KEY = 'forme-avatar-url';
-
-function getCachedAvatar(): string | null {
-  try {
-    return sessionStorage.getItem(AVATAR_CACHE_KEY);
-  } catch {
-    return null;
-  }
+interface HeaderProps {
+  avatarUrl?: string | null;
 }
 
-function setCachedAvatar(url: string): void {
-  try {
-    sessionStorage.setItem(AVATAR_CACHE_KEY, url);
-  } catch {
-    // sessionStorage unavailable (e.g. private browsing with storage blocked)
-  }
-}
-
-export function Header() {
+export function Header({ avatarUrl }: HeaderProps) {
   const { resolvedTheme, setTheme } = useTheme();
-
-  // 서버/클라이언트 모두 null로 시작해 hydration mismatch 방지.
-  // useEffect에서 fetch로 복원, sessionStorage는 캐시 레이어.
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const cached = getCachedAvatar();
-    if (cached) {
-      // 비동기 콜백으로 래핑하여 lint 규칙 충족
-      Promise.resolve(cached).then((url) => {
-        if (!cancelled) setAvatarUrl(url);
-      });
-      return () => { cancelled = true; };
-    }
-
-    fetch('/api/profile')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (!cancelled && data?.avatarUrl) {
-          setCachedAvatar(data.avatarUrl);
-          setAvatarUrl(data.avatarUrl);
-        }
-      })
-      .catch(() => {});
-
-    return () => { cancelled = true; };
-  }, []);
 
   return (
     <header
@@ -93,7 +42,7 @@ export function Header() {
           </Button>
           <Link
             href="/profile"
-            className="h-9 w-9 rounded-full overflow-hidden flex items-center justify-center hover:opacity-80 transition-opacity"
+            className="h-9 w-9 rounded-full overflow-hidden flex items-center justify-center hover:opacity-80 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             aria-label="프로필"
           >
             {avatarUrl ? (

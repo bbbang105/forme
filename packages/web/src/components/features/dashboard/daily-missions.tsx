@@ -2,11 +2,25 @@ import { getDailyMissionStats } from '@/lib/actions/activity';
 import { CheckSquare, Flame, Headphones, Newspaper } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-function ProgressBar({ current, target, color }: { current: number; target: number; color: string }) {
+interface ProgressBarProps {
+  current: number;
+  target: number;
+  color: string;
+  label: string;
+}
+
+function ProgressBar({ current, target, color, label }: ProgressBarProps) {
   const pct = Math.min(100, Math.round((current / target) * 100));
 
   return (
-    <div className="h-2 rounded-full bg-muted overflow-hidden">
+    <div
+      role="progressbar"
+      aria-valuenow={current}
+      aria-valuemin={0}
+      aria-valuemax={target}
+      aria-label={label}
+      className="h-2 rounded-full bg-muted overflow-hidden"
+    >
       <div
         className={cn('h-full rounded-full transition-all', color)}
         style={{ width: `${pct}%` }}
@@ -26,7 +40,7 @@ export async function DailyMissions() {
 
   const missions = [
     {
-      icon: <Newspaper className="h-4 w-4 text-blue-500" />,
+      icon: <Newspaper className="h-4 w-4 text-blue-500" aria-hidden="true" />,
       label: '큐레이션 읽기',
       current: stats.curation.today,
       target: stats.curation.target,
@@ -38,7 +52,7 @@ export async function DailyMissions() {
       unit: '개',
     },
     {
-      icon: <Headphones className="h-4 w-4 text-purple-500" />,
+      icon: <Headphones className="h-4 w-4 text-purple-500" aria-hidden="true" />,
       label: '팟캐스트 듣기',
       current: stats.podcast.todaySeconds,
       target: stats.podcast.targetSeconds,
@@ -50,7 +64,7 @@ export async function DailyMissions() {
       unit: '',
     },
     {
-      icon: <CheckSquare className="h-4 w-4 text-green-500" />,
+      icon: <CheckSquare className="h-4 w-4 text-green-500" aria-hidden="true" />,
       label: '투두 완료',
       current: stats.todos.completed,
       target: Math.max(stats.todos.total, 1),
@@ -69,8 +83,8 @@ export async function DailyMissions() {
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold">오늘의 미션</h3>
         {stats.attendance.streak > 0 && (
-          <span className="text-sm font-medium">
-            <Flame className="h-4 w-4 text-orange-500 inline" /> {stats.attendance.streak}일 연속 출석
+          <span className="text-sm font-medium" aria-label={`${stats.attendance.streak}일 연속 출석`}>
+            <Flame className="h-4 w-4 text-orange-500 inline" aria-hidden="true" /> {stats.attendance.streak}일 연속 출석
           </span>
         )}
       </div>
@@ -79,21 +93,31 @@ export async function DailyMissions() {
       <div className="space-y-3">
         {missions.map((m) => {
           const completed = m.current >= m.target;
+          const progressLabel = completed
+            ? `${m.label} 달성`
+            : m.label === '팟캐스트 듣기'
+              ? `${m.label}: ${formatSeconds(m.current)} / ${m.displayTarget}`
+              : `${m.label}: ${m.current}${m.unit} / ${m.displayTarget}${m.unit}`;
           return (
             <div key={m.label} className="space-y-1">
               <div className="flex items-center justify-between text-sm">
                 <span className="flex items-center gap-1.5">
-                  <span>{m.icon}</span>
+                  <span aria-hidden="true">{m.icon}</span>
                   <span className={cn(completed && 'text-muted-foreground line-through')}>
                     {m.label}
                   </span>
                 </span>
-                <span className="text-xs text-muted-foreground">
+                <span className="text-xs text-muted-foreground" aria-hidden="true">
                   {m.displayCurrent} / {m.displayTarget}
                 </span>
               </div>
-              <ProgressBar current={m.current} target={m.target} color={m.color} />
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <ProgressBar
+                current={m.current}
+                target={m.target}
+                color={m.color}
+                label={progressLabel}
+              />
+              <div className="flex items-center justify-between text-xs text-muted-foreground" aria-hidden="true">
                 <span>
                   {completed
                     ? '달성!'

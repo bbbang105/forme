@@ -189,6 +189,35 @@
   display: none;
 }
 
+/* ── Focus-visible utilities ── */
+/* Consistent focus ring for interactive elements.
+   Use .focus-ring on buttons/links that need a standardized focus style. */
+@utility focus-ring {
+  &:focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+}
+
+/* ── prefers-reduced-motion ── */
+/* Respect OS-level "reduce motion" preference by disabling non-essential
+   animations and transitions. Essential state-change transitions (e.g.
+   opacity for visibility) are preserved but shortened. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  html {
+    scroll-behavior: auto;
+  }
+}
+
 /* ── TipTap Editor ── */
 .tiptap {
   outline: none;
