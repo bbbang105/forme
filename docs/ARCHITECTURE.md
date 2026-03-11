@@ -1,6 +1,6 @@
 # forme - 아키텍처 & 기술 선정 이유
 
-> 최종 업데이트: 2026-03-09 (팟캐스트 반자동화 — Discord 웹훅 + NotebookLM 워크플로우)
+> 최종 업데이트: 2026-03-11 (코드 품질 감사 — 성능·접근성·컴포지션 개선)
 
 개인 올인원 PWA. 큐레이션(RSS), 캘린더, 메모(리치 에디터), 팟캐스트를 하나의 앱에 통합.
 모바일 퍼스트, 오프라인 지원, 푸시 알림까지 네이티브 앱 수준의 경험을 웹으로 제공.
@@ -58,7 +58,7 @@ graph TB
   CR4 -->|리마인더| DW
 ```
 
-**핵심 원칙**: Server Components 우선, RLS로 데이터 격리, 서버 측 입력 검증 필수 (`lib/validators.ts` 공유 정규식), 최소한의 클라이언트 상태, 무거운 컴포넌트 지연 로딩, 인터랙션 optimistic updates, 반응형 레이아웃 (모바일 단일컬럼 ↔ 데스크톱 멀티컬럼), Vercel 리전과 DB 리전 코로케이션 (서울). Safari PWA 호환성 우선 (`flex flex-col` Dialog, `overscroll-behavior` 조건부 해제).
+**핵심 원칙**: Server Components 우선, RLS로 데이터 격리, 서버 측 입력 검증 필수 (`lib/validators.ts` 공유 정규식), 최소한의 클라이언트 상태, 무거운 컴포넌트 지연 로딩, 인터랙션 optimistic updates, 반응형 레이아웃 (모바일 단일컬럼 ↔ 데스크톱 멀티컬럼), Vercel 리전과 DB 리전 코로케이션 (서울). Safari PWA 호환성 우선 (`flex flex-col` Dialog, `overscroll-behavior` 조건부 해제). 대형 컴포넌트 → 커스텀 훅/하위 컴포넌트 추출 (useCalendarState, useEditorConfig, DayCell, lane-utils 등). WCAG 2.1 AA 접근성 준수 (터치 타겟 44px, focus-visible, aria-live, prefers-reduced-motion).
 
 ---
 
@@ -187,7 +187,9 @@ flowchart LR
 - **캘린더**: Optimistic updates — 로컬 상태 즉시 반영, 서버 백그라운드 동기화. 데스크톱 2컬럼 (`lg:flex-row` 캘린더 | 상세), 모바일 단일 컬럼. 이벤트 카테고리(아이콘+색상) 지원
 - **큐레이션 UX**: 스와이프 액션 (`useSwipeAction` 훅, axis-lock + 타이머 정리), 컴팩트뷰 토글 (localStorage), 키보드 네비 (j/k/o/b, DOM 직접 포커스링), 일괄 삭제 (100개 청크, 다이얼로그 스피너), 인라인 메모 (북마크 탭, key prop 동기화)
 - **에러 처리**: 모든 (main) 페이지 error.tsx (calendar, curation, memo, podcast) — `error` prop 로깅, 사용자에게 제네릭 메시지만 표출
-- **접근성**: 탭바 `aria-current="page"`, 검색 `aria-label`, 이벤트 폼 색상 `focus-visible:ring-2` + `aria-label`, 버튼 로딩 스피너 (Loader2)
+- **접근성**: 탭바 `aria-current="page"`, 검색 `aria-label`, 이벤트 폼 색상 `focus-visible:ring-2` + `aria-label`, 폼 라벨 `htmlFor`/`id` 연결, 에러 메시지 `role="alert" aria-live="polite"`, 터치 타겟 최소 44x44px, `@utility focus-ring` CSS 유틸리티, `prefers-reduced-motion` 미디어 쿼리, progressbar ARIA 속성
+- **상태 관리 패턴**: 대형 컴포넌트 상태 → 커스텀 훅 추출 (`useCalendarState` 14개 상태, `useEditorConfig` TipTap 확장), `saveFnRef` 패턴으로 stale closure 방지 (player-context, use-auto-save), `useReducer`로 복잡한 상태 관리 (upload-dialog)
+- **공유 유틸**: `lib/format-time.ts` (formatTime, formatDuration), `lib/constants.ts` (앱 전역 상수), `components/ui/list-skeleton.tsx` (목록 스켈레톤)
 
 ---
 
@@ -363,8 +365,8 @@ erDiagram
 | LayoutShell 분리 | PlayerProvider → MiniPlayer만 래핑 | 서버 컴포넌트 활용 극대화 |
 | Dashboard Suspense | 위젯 3개 병렬 스트리밍 | 순차 → 병렬 로딩 |
 | DashboardCuration 서버화 | 클라이언트 → 서버 컴포넌트 전환 | 클라이언트 JS 제거 |
-| 대형 컴포넌트 분리 | source-manager(696→451), memo-editor(536→398), event-form(566→527), curation-feed(490→419) | 유지보수성 + 번들 tree-shaking 개선 |
-| `useAutoSave` 훅 추출 | 자동저장 로직 → saveFnRef 패턴, Promise 동시저장 방어 | 이벤트 리스너 재등록 최소화 |
+| 대형 컴포넌트 분리 | source-manager, calendar-client→useCalendarState, calendar-grid→day-cell+lane-utils, memo-editor→useEditorConfig, memo-toolbar→useImageUpload+LinkInput | 유지보수성 + 번들 tree-shaking 개선 |
+| 커스텀 훅 추출 | useCalendarState(14개 상태), useEditorConfig(TipTap 확장), useImageUpload(이미지 업로드), saveFnRef 패턴 | 이벤트 리스너 재등록 최소화, 관심사 분리 |
 | `@next/bundle-analyzer` | `ANALYZE=true pnpm build`로 번들 프로파일링 | 번들 사이즈 분석 가능 |
 
 ### 렌더링 최적화
@@ -388,7 +390,7 @@ erDiagram
 | Service Worker | network-first | `/api/curation`, `/api/push` |
 | R2 업로드 | `Cache-Control` 헤더 | 오디오 30일 immutable, 이미지 7일 |
 | 인증 | `React.cache` | 요청당 `getUser()` 1회 |
-| Header 아바타 | `sessionStorage` | 세션당 `/api/profile` 1회 |
+| Header 아바타 | 서버사이드 fetch | layout.tsx async → avatarUrl prop (클라이언트 워터폴 제거) |
 
 ### DB 인덱싱
 

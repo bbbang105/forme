@@ -62,7 +62,7 @@ pnpm db:push          # 스키마 직접 push (dev용)
 - 큐레이션 정렬: status=read 탭에서 readAt DESC 정렬 (최근 읽은 순)
 - 큐레이션 삭제: 단건 삭제 (AlertDialog 확인) + 일괄 삭제 (체크박스 선택, 100개 청크), ownership은 curationSources join으로 검증
 - 큐레이션 북마크 메모: InlineMemo 컴포넌트 (북마크 탭 전용, 500자, key prop으로 외부 상태 동기화)
-- 큐레이션 UX: 스와이프 액션 (우→읽음, 좌→삭제), 컴팩트뷰 토글 (localStorage), 키보드 네비 (j/k/o/b, DOM 직접 포커스링 — useRef + data-curation-feed 스코프)
+- 큐레이션 UX: 스와이프 액션 (우→읽음, 좌→삭제), 컴팩트뷰 토글 (localStorage), 키보드 네비 (j/k/o/b, ref 기반 리스너 — 아이템 변경 시 재등록 불필요)
 - 메모 캐싱: 에디터 뒤로가기 시 `router.refresh()` + MemoList initialMemos props 동기화
 - 게이미피케이션: 출석 스트릭, 데일리 미션 (큐레이션 5개/팟캐스트 10분/투두 완료), 하이브리드 데이터 (전용 테이블 + 기존 데이터 계산)
 - 외부 API: Open-Meteo (서울 날씨, 서버 컴포넌트 fetch, revalidate 3600)
@@ -72,11 +72,19 @@ pnpm db:push          # 스키마 직접 push (dev용)
 - DB 커넥션: `max: 1` (Supabase Transaction Pooler가 실제 풀 관리, 서버리스 최적)
 - 성능: `serverExternalPackages`로 서버 전용 패키지 번들 제외, AVIF 이미지 포맷, 병렬 쿼리 (`Promise.all`), SW LRU 캐시 (오디오 50개, 정적 100개), SW HTML/RSC network-first (4초 타임아웃 + 캐시 폴백), 리스트 아이템 `React.memo` (CurationCard, CurationListRow, EpisodeCard, MemoCard)
 - 에러 바운더리: 모든 (main) 페이지에 `error.tsx` 배치 (calendar, curation, memo, podcast), `error` prop 로깅 + 제네릭 메시지만 표출
-- 접근성: 탭바 `aria-current="page"`, 검색 input `aria-label`, 이벤트 폼 색상 버튼 `focus-visible:ring-2` + `aria-label`
+- 접근성: 탭바 `aria-current="page"`, 검색 input `aria-label`, 이벤트 폼 색상 버튼 `focus-visible:ring-2` + `aria-label`, 폼 라벨 `htmlFor`/`id` 연결 필수, 에러 메시지 `role="alert" aria-live="polite"`, 터치 타겟 최소 44x44px (WCAG 2.5.5), 모든 커스텀 버튼 `focus-visible:ring-2`, `@utility focus-ring` CSS 유틸리티, `prefers-reduced-motion` 미디어 쿼리
 - 아이콘 통일: 대시보드/팟캐스트 이모지 → lucide-react 아이콘 (Newspaper, Headphones, CheckSquare, Flame, Mic, FileText)
 - SSRF 방어: `lib/url-safety.ts` — IPv4/IPv6 사설 대역, IPv4-mapped IPv6, ULA(fc00::/7), Link-Local(fe80::/10) 차단
-- 컴포넌트 분리: 대형 컴포넌트 → 하위 컴포넌트 추출 (source-card, crawl-settings-form, calendar-header, recurrence-form, feed-filter-bar, tag-input)
-- 자동저장 훅: `hooks/use-auto-save.ts` — saveFnRef 패턴, Promise 기반 동시 저장 방어, detach() API
+- 컴포넌트 분리: 대형 컴포넌트 → 하위 컴포넌트/훅 추출 (source-card, crawl-settings-form, calendar-header, recurrence-form, feed-filter-bar, tag-input, day-cell, lane-utils, use-calendar-state, use-editor-config, useImageUpload, LinkInput)
+- 자동저장 훅: `hooks/use-auto-save.ts` — saveFnRef 패턴, Promise 기반 동시 저장 방어, detach() API, IME 컴포지션 중 저장 스킵
+- 공유 유틸: `lib/format-time.ts` (formatTime, formatDuration), `lib/constants.ts` (앱 전역 상수 — 페이지네이션, 제한값, SW 재시도 설정)
+- 공유 UI: `components/ui/list-skeleton.tsx` (피드/메모 목록 스켈레톤, role="status" aria-busy)
+- 캘린더 상태 훅: `use-calendar-state.ts` — 14개 상태 + 핸들러 추출, async/await 데이터 페칭
+- 에디터 설정 훅: `use-editor-config.ts` — TipTap 확장 배열 useMemo로 안정적 참조
+- player-context 안전 패턴: saveFnRef로 stale closure 방지, 인터벌/이벤트 리스너 분리
+- upload-dialog 상태: useReducer + 명시적 UploadState/UploadAction 타입
+- header 아바타: 서버사이드 fetch (layout.tsx async → avatarUrl prop), 클라이언트 워터폴 제거
+- SW 등록: 지수 백오프 재시도 (최대 3회, constants.ts 참조)
 - 테스트: Vitest + `vi.hoisted()` Proxy 기반 DB 목 패턴 (`packages/web/src/__tests__/`)
 
 ## 핵심 파일
@@ -84,13 +92,13 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | 파일 | 설명 |
 |------|------|
 | `packages/web/src/proxy.ts` | Next.js 16 proxy (인증 리다이렉트, `/api/cron/` 우회 허용) |
-| `packages/web/src/app/(main)/layout.tsx` | 인증 레이아웃 (LayoutShell + 탭바) |
+| `packages/web/src/app/(main)/layout.tsx` | 인증 레이아웃 (async 서버 컴포넌트, 아바타 서버사이드 fetch, LayoutShell + 탭바) |
 | `packages/web/src/app/(auth)/login/page.tsx` | Discord 로그인 |
 | `packages/web/src/app/auth/callback/route.ts` | OAuth 콜백 (open redirect 방어) |
 | `packages/web/src/lib/supabase/middleware.ts` | 세션 갱신 유틸 |
 | `packages/web/src/lib/supabase/server.ts` | 서버 Supabase 클라이언트 |
 | `packages/web/src/components/layout/tab-bar.tsx` | 하단 탭바 (5탭) |
-| `packages/web/src/components/layout/header.tsx` | 헤더 (forme 로고 + 다크모드 토글) |
+| `packages/web/src/components/layout/header.tsx` | 헤더 (forme 로고 + 다크모드 토글 + 서버 전달 avatarUrl prop) |
 | `packages/web/src/components/ui/logo.tsx` | 레트로 {f} 픽토그램 로고마크 (useId 패턴 ID, 다크모드 대응) |
 | `packages/shared/src/schema/calendar-events.ts` | 캘린더 이벤트 스키마 (반복: recurrenceType/Days/EndDate, excludedDates, reminderSent) |
 | `packages/shared/src/schema/todos.ts` | 투두 스키마 |
@@ -117,7 +125,7 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/app/api/podcast/upload/route.ts` | 팟캐스트 오디오 R2 업로드 |
 | `packages/web/src/app/api/podcast/episodes/route.ts` | 팟캐스트 에피소드 CRUD |
 | `packages/web/src/app/api/push/subscribe/route.ts` | 푸시 구독 등록/해제/조회 |
-| `packages/web/src/components/features/podcast/player-context.tsx` | 팟캐스트 플레이어 (PlayerContext + PlayerTimeContext 분리, localStorage 이어듣기, 청취시간 DB 동기화) |
+| `packages/web/src/components/features/podcast/player-context.tsx` | 팟캐스트 플레이어 (PlayerContext + PlayerTimeContext 분리, saveFnRef 안전 패턴, localStorage 이어듣기, 청취시간 DB 동기화) |
 | `packages/web/src/lib/discord.ts` | Discord 웹훅 전송 유틸 (sendDiscordMessage, sendDiscordEmbed) |
 | `packages/web/src/app/api/cron/podcast-reminder/route.ts` | 팟캐스트 제작 리마인더 (23:00 KST, Discord 알림) |
 | `packages/web/src/components/features/podcast/episode-card.tsx` | 에피소드 카드 (React.memo, 재생/일시정지, 메뉴) |
@@ -127,15 +135,18 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/app/manifest.ts` | PWA 매니페스트 (MetadataRoute) |
 | `packages/web/src/lib/actions/calendar.ts` | 캘린더 이벤트 Server Actions (CRUD + 반복 확장 + excludeRecurringDate/deleteRecurringAfter) |
 | `packages/web/src/lib/actions/todos.ts` | 투두 Server Actions (CRUD + 토글 + DnD 벌크 reorder + 입력 검증) |
-| `packages/web/src/components/features/calendar/calendar-client.tsx` | 캘린더 메인 클라이언트 (월간뷰, 스와이프, optimistic updates, 데스크톱 2컬럼, 밀린 투두 칩) |
-| `packages/web/src/components/features/calendar/calendar-grid.tsx` | 캘린더 그리드 (lane 기반 이벤트 배치, startTime 순 정렬, 컬러 dot, 멀티데이 바 연결) |
+| `packages/web/src/components/features/calendar/calendar-client.tsx` | 캘린더 메인 클라이언트 (useCalendarState 훅, 월간뷰, 스와이프, optimistic updates, 데스크톱 2컬럼) |
+| `packages/web/src/components/features/calendar/use-calendar-state.ts` | 캘린더 상태 훅 (14개 상태 + 이벤트/투두 핸들러, async 데이터 페칭) |
+| `packages/web/src/components/features/calendar/calendar-grid.tsx` | 캘린더 그리드 (DayCell + lane-utils import) |
+| `packages/web/src/components/features/calendar/day-cell.tsx` | 날짜 셀 컴포넌트 (React.memo, ARIA 접근성, 이벤트 dot/lane 렌더링) |
+| `packages/web/src/components/features/calendar/lane-utils.ts` | lane 배치 알고리즘 (greedy lane 할당, startTime 정렬, 멀티데이 바 연결, JSDoc 문서화) |
 | `packages/web/src/components/features/calendar/todo-list.tsx` | 투두 리스트 (DnD 순서변경, optimistic 추가/토글/삭제, 완료 애니메이션, 빈 상태 격려 문구) |
 | `packages/web/src/components/features/calendar/calendar-header.tsx` | 캘린더 헤더 (월 네비게이션, 오늘 버튼) |
 | `packages/web/src/components/features/calendar/event-form.tsx` | 이벤트 폼 (생성/수정/삭제, optimistic 콜백, 종료시간 자동동기화, 모바일 flex 스크롤 레이아웃) |
 | `packages/web/src/components/features/calendar/recurrence-form.tsx` | 반복 일정 설정 UI (매주/격주, 요일 선택, 종료일) |
 | `packages/web/src/components/features/calendar/event-list.tsx` | 이벤트 목록 (선택 날짜별 필터링, 반복 삭제 3옵션 다이얼로그, 빈 상태 격려 문구) |
 | `packages/web/src/components/features/calendar/category-manager.tsx` | 이벤트 카테고리 관리 다이얼로그 |
-| `packages/web/src/components/features/calendar/types.ts` | 캘린더 공유 타입 (CalendarEvent, Todo, EventCategory) |
+| `packages/web/src/components/features/calendar/types.ts` | 캘린더 공유 타입 (CalendarEvent, Todo, EventCategory, EventFormProps discriminated union) |
 | `packages/shared/src/schema/event-categories.ts` | 이벤트 카테고리 스키마 |
 | `packages/web/src/lib/actions/categories.ts` | 카테고리 Server Actions (CRUD) |
 | `packages/web/src/components/features/calendar/dashboard-calendar.tsx` | 대시보드 캘린더 위젯 (오늘 할일 + 다가오는 일정) |
@@ -143,14 +154,15 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/shared/src/schema/memos.ts` | 메모 스키마 (JSONB content + contentText + tags) |
 | `packages/web/src/lib/actions/memos.ts` | 메모 Server Actions (CRUD + 검색 + 고정 + 페이지네이션 + 태그 + TipTap JSON 검증) |
 | `packages/web/src/hooks/use-auto-save.ts` | 자동저장 훅 (debounce, flush on blur/visibility, Promise 동시저장 방어) |
-| `packages/web/src/components/features/memo/memo-editor.tsx` | TipTap 에디터 (useAutoSave 훅, 고정/삭제, 전체화면 fixed 레이아웃) |
+| `packages/web/src/components/features/memo/memo-editor.tsx` | TipTap 에디터 (useEditorConfig + useAutoSave 훅, 고정/삭제, 전체화면 fixed 레이아웃) |
+| `packages/web/src/components/features/memo/use-editor-config.ts` | TipTap 확장 설정 훅 (useMemo 안정 참조, 12언어 코드 하이라이트) |
 | `packages/web/src/components/features/memo/tag-input.tsx` | 태그 입력 컴포넌트 (추가/삭제, MAX_TAGS=5) |
-| `packages/web/src/components/features/memo/memo-toolbar.tsx` | 에디터 서식 툴바 (B/I/U/S, H1-H3, 리스트, 체크리스트, 링크, 이미지, 인라인코드, 코드블록) |
+| `packages/web/src/components/features/memo/memo-toolbar.tsx` | 에디터 서식 툴바 (useImageUpload 훅 + LinkInput 분리, B/I/U/S, H1-H3, 리스트, 체크리스트, 링크, 이미지, 인라인코드, 코드블록) |
 | `packages/web/src/components/features/memo/image-block.tsx` | 커스텀 이미지 확장 (React NodeView: 리사이즈, 삭제 버튼, 캡션) |
 | `packages/web/src/components/features/memo/image-drop-plugin.ts` | 이미지 드래그앤드롭/붙여넣기 업로드 ProseMirror 플러그인 |
 | `packages/web/src/components/features/memo/code-block-view.tsx` | 코드블록 React NodeView (언어 셀렉터 드롭다운, 15개 언어) |
 | `packages/web/src/components/features/memo/memo-list.tsx` | 메모 목록 (서버 검색, 하이라이트, 정렬, 태그 필터, 페이지네이션) |
-| `packages/web/src/components/features/memo/memo-card.tsx` | 메모 카드 (제목+날짜+미리보기, React.memo) |
+| `packages/web/src/components/features/memo/memo-card.tsx` | 메모 카드 (제목+날짜+미리보기, React.memo, 메모이즈드 RegExp 하이라이트) |
 | `packages/web/src/components/features/memo/dashboard-memo.tsx` | 대시보드 최근 메모 위젯 (에러 폴백) |
 | `packages/web/src/components/features/memo/task-list-sort.ts` | ProseMirror 플러그인 (체크된 아이템 하단 자동정렬) |
 | `packages/web/src/app/api/memo/image/route.ts` | 메모 이미지 R2 업로드 API (5MB, JPEG/PNG/GIF/WebP) |
@@ -166,7 +178,11 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/components/features/curation/mini-card-link.tsx` | 대시보드 큐레이션 클릭 시 읽음 처리 래퍼 |
 | `packages/web/src/app/api/curation/[id]/route.ts` | 큐레이션 아이템 PATCH (읽음/북마크/메모) + DELETE (단건 삭제, ownership join 검증) |
 | `packages/web/src/app/api/curation/bulk-delete/route.ts` | 큐레이션 일괄 삭제 (POST, max 100개, UUID 전수 검증) |
-| `packages/web/src/hooks/use-swipe-action.ts` | 터치 스와이프 제스처 훅 (axis-lock, damped swipe, 타이머 정리) |
+| `packages/web/src/hooks/use-swipe-action.ts` | 터치 스와이프 제스처 훅 (axis-lock, damped swipe, ref 기반 콜백, 타이머 cleanup) |
+| `packages/web/src/lib/format-time.ts` | 공유 시간 포맷 유틸 (formatTime, formatDuration) |
+| `packages/web/src/lib/constants.ts` | 앱 전역 상수 (페이지네이션, 제한값, SW 재시도 설정) |
+| `packages/web/src/components/ui/list-skeleton.tsx` | 공유 목록 스켈레톤 (role="status", aria-busy, count/showThumbnail props) |
+| `packages/web/src/components/sw-register.tsx` | Service Worker 등록 (지수 백오프 재시도 최대 3회) |
 
 ## 인증 구조
 
