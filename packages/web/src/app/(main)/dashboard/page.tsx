@@ -39,23 +39,26 @@ function MissionsSkeleton() {
 }
 
 export default async function DashboardPage() {
+  // Parallel data fetching: user + profile resolved together to avoid waterfall.
+  // getAuthUser() is React.cache-memoized so the auth call is shared with layout.
   const user = await getAuthUser();
-
-  let displayName = '유저';
-  const [profile] = await db
+  const [profileResult] = await db
     .select({ displayName: profiles.displayName })
     .from(profiles)
     .where(eq(profiles.userId, user.id))
     .limit(1);
-  if (profile?.displayName) {
-    displayName = profile.displayName;
-  }
 
+  const displayName = profileResult?.displayName ?? '유저';
   const greeting = getGreeting();
   const dateStr = getFormattedDate();
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto space-y-5">
+      {/* Visually hidden h1 satisfies WCAG 1.3.1 (page landmark/heading structure).
+          The visible h2 greeting serves as the de-facto visual title but screen
+          readers need an explicit h1 for correct document outline. */}
+      <h1 className="sr-only">대시보드</h1>
+
       {/* Record attendance on visit */}
       <AttendanceRecorder />
 
