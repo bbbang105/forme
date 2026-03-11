@@ -2,40 +2,14 @@
 
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {useRouter} from 'next/navigation';
-import {EditorContent, ReactNodeViewRenderer, useEditor} from '@tiptap/react';
-import StarterKit from '@tiptap/starter-kit';
-import UnderlineExt from '@tiptap/extension-underline';
-import TaskList from '@tiptap/extension-task-list';
-import TaskItem from '@tiptap/extension-task-item';
-import LinkExt from '@tiptap/extension-link';
-import {ImageBlock} from './image-block';
-import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
-import {createLowlight} from 'lowlight';
-import javascript from 'highlight.js/lib/languages/javascript';
-import typescript from 'highlight.js/lib/languages/typescript';
-import python from 'highlight.js/lib/languages/python';
-import css from 'highlight.js/lib/languages/css';
-import html from 'highlight.js/lib/languages/xml';
-import json from 'highlight.js/lib/languages/json';
-import bash from 'highlight.js/lib/languages/bash';
-import sql from 'highlight.js/lib/languages/sql';
-import markdown from 'highlight.js/lib/languages/markdown';
-import yaml from 'highlight.js/lib/languages/yaml';
-import java from 'highlight.js/lib/languages/java';
-import go from 'highlight.js/lib/languages/go';
-import Placeholder from '@tiptap/extension-placeholder';
-import CharacterCount from '@tiptap/extension-character-count';
-import {CodeBlockView} from './code-block-view';
-import {TaskListSort} from './task-list-sort';
-import {CollapsibleHeading} from './collapsible-heading';
-import {Extension} from '@tiptap/core';
-import {createImageDropPlugin} from './image-drop-plugin';
+import {EditorContent, useEditor} from '@tiptap/react';
 import {ArrowLeft, Check, Pin, RotateCcw, Trash2} from 'lucide-react';
 import {deleteMemo, toggleMemoPin, updateMemo} from '@/lib/actions/memos';
 import {MemoToolbar} from './memo-toolbar';
 import {TagInput} from './tag-input';
 import {cn} from '@/lib/utils';
 import {useAutoSave} from '@/hooks/use-auto-save';
+import {useEditorConfig} from './use-editor-config';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -47,24 +21,6 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-
-const lowlight = createLowlight();
-lowlight.register('javascript', javascript);
-lowlight.register('js', javascript);
-lowlight.register('typescript', typescript);
-lowlight.register('ts', typescript);
-lowlight.register('python', python);
-lowlight.register('css', css);
-lowlight.register('html', html);
-lowlight.register('xml', html);
-lowlight.register('json', json);
-lowlight.register('bash', bash);
-lowlight.register('shell', bash);
-lowlight.register('sql', sql);
-lowlight.register('markdown', markdown);
-lowlight.register('yaml', yaml);
-lowlight.register('java', java);
-lowlight.register('go', go);
 
 interface MemoEditorProps {
   memo: {
@@ -81,131 +37,12 @@ export function MemoEditor({ memo }: MemoEditorProps) {
   const [title, setTitle] = useState(memo.title ?? '');
   const [isPinned, setIsPinned] = useState(memo.isPinned);
   const [tags, setTags] = useState<string[]>(memo.tags ?? []);
-  const editorRef = useRef<ReturnType<typeof useEditor>>(null);
+
+  // Stable extension config — avoids reinitializing the editor on every render
+  const extensions = useEditorConfig();
 
   const editor = useEditor({
-    extensions: [
-      StarterKit.configure({
-        heading: false,    // replaced by CollapsibleHeading
-        link: false,       // configured separately below
-        underline: false,  // configured separately below
-        codeBlock: false,  // replaced by CodeBlockLowlight
-      }),
-      CodeBlockLowlight.extend({
-        addNodeView() {
-          return ReactNodeViewRenderer(CodeBlockView);
-        },
-        addKeyboardShortcuts() {
-          return {
-            ...this.parent?.(),
-            // Cmd/Ctrl+A: select only within code block
-            'Mod-a': ({editor}) => {
-              const {$from} = editor.state.selection;
-              const codeBlock = $from.node($from.depth);
-              if (codeBlock?.type.name === 'codeBlock') {
-                const start = $from.start($from.depth);
-                const end = start + codeBlock.content.size;
-                editor.commands.setTextSelection({from: start, to: end});
-                return true;
-              }
-              return false;
-            },
-            // Enter on empty last line or Mod+Enter -> exit code block
-            Enter: ({editor}) => {
-              const {$from} = editor.state.selection;
-              if ($from.parent.type.name !== 'codeBlock') return false;
-              const text = $from.parent.textContent;
-              const lines = text.split('\n');
-              const isAtEnd = $from.parentOffset === text.length;
-              // Triple Enter: last 2 lines empty + currently at end
-              if (isAtEnd && lines.length >= 3 && lines[lines.length - 1] === '' && lines[lines.length - 2] === '') {
-                // Remove the trailing empty lines and exit
-                const start = $from.start($from.depth);
-                const trimmed = lines.slice(0, -2).join('\n');
-                editor.chain()
-                  .command(({tr}) => {
-                    tr.replaceWith(start, start + text.length, editor.state.schema.text(trimmed || ' '));
-                    return true;
-                  })
-                  .exitCode()
-                  .run();
-                return true;
-              }
-              return false;
-            },
-            'Mod-Enter': ({editor}) => {
-              const {$from} = editor.state.selection;
-              if ($from.parent.type.name !== 'codeBlock') return false;
-              return editor.commands.exitCode();
-            },
-            // ArrowDown at last line -> exit
-            ArrowDown: ({editor}) => {
-              const {$from, empty} = editor.state.selection;
-              if (!empty || $from.parent.type.name !== 'codeBlock') return false;
-              const text = $from.parent.textContent;
-              const isAtEnd = $from.parentOffset === text.length;
-              const lastNewline = text.lastIndexOf('\n');
-              const isOnLastLine = $from.parentOffset > lastNewline;
-              if (isAtEnd || isOnLastLine) {
-                // Check if this is the last node in the doc
-                const after = $from.after($from.depth);
-                if (after >= editor.state.doc.content.size) {
-                  return editor.commands.exitCode();
-                }
-              }
-              return false;
-            },
-          };
-        },
-      }).configure({
-        lowlight,
-        defaultLanguage: null,
-      }),
-      UnderlineExt,
-      TaskList,
-      TaskItem.extend({
-        addAttributes() {
-          return {
-            checked: {
-              default: false,
-              keepOnSplit: false,
-              parseHTML: (element: HTMLElement) => element.getAttribute('data-checked') === 'true',
-              renderHTML: (attributes: Record<string, unknown>) => ({
-                'data-checked': attributes.checked,
-              }),
-            },
-            taskId: {
-              default: null,
-              parseHTML: (element: HTMLElement) => element.getAttribute('data-task-id'),
-              renderHTML: (attributes: Record<string, unknown>) => {
-                if (!attributes.taskId) return {};
-                return {'data-task-id': attributes.taskId};
-              },
-            },
-          };
-        },
-      }).configure({nested: true}),
-      TaskListSort,
-      LinkExt.configure({
-        openOnClick: true,
-        protocols: ['http', 'https', 'mailto'],
-        HTMLAttributes: {
-          class: 'text-primary underline',
-          rel: 'noopener noreferrer',
-          target: '_blank',
-        },
-      }),
-      ImageBlock,
-      CollapsibleHeading.configure({ levels: [1, 2, 3] }),
-      Placeholder.configure({ placeholder: '내용을 입력하세요...' }),
-      CharacterCount,
-      Extension.create({
-        name: 'imageDropUpload',
-        addProseMirrorPlugins() {
-          return [createImageDropPlugin()];
-        },
-      }),
-    ],
+    extensions,
     // Deep clone to strip ProseMirror null-prototype objects & RSC references
     content: (memo.content && typeof memo.content === 'object' && Object.keys(memo.content as Record<string, unknown>).length > 0)
       ? JSON.parse(JSON.stringify(memo.content))
@@ -213,8 +50,10 @@ export function MemoEditor({ memo }: MemoEditorProps) {
     immediatelyRender: false,
   });
 
-  // Keep a ref to editor for use in saveFn callback
-  editorRef.current = editor;
+  // Keep a stable ref to the current editor instance so saveFn does not
+  // close over a stale value (avoids needing editor in saveFn deps).
+  const editorRef = useRef(editor);
+  useEffect(() => { editorRef.current = editor; }, [editor]);
 
   const saveFn = useCallback(async (): Promise<boolean> => {
     const ed = editorRef.current;
@@ -278,15 +117,13 @@ export function MemoEditor({ memo }: MemoEditorProps) {
   }, [tags, scheduleSave]);
 
   const handleBack = useCallback(async () => {
-    // Detach listeners to prevent duplicate save during navigation
     detach();
 
-    // Delete empty memo
     if (!title.trim() && (!editor || editor.isEmpty)) {
       await deleteMemo(memo.id);
     } else {
       const ok = await save();
-      if (!ok) return; // Stay on page so user can retry
+      if (!ok) return;
     }
 
     router.refresh();
@@ -310,7 +147,8 @@ export function MemoEditor({ memo }: MemoEditorProps) {
       <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-background shrink-0">
         <button
           onClick={handleBack}
-          className="flex items-center gap-1 text-sm text-primary -ml-1 p-1"
+          aria-label="메모 목록으로 돌아가기"
+          className="flex items-center gap-1 text-sm text-primary -ml-1 p-1 min-w-[44px] min-h-[44px] focus-visible:ring-2 focus-visible:ring-ring rounded"
         >
           <ArrowLeft className="h-5 w-5" />
           <span className="hidden sm:inline">메모</span>
@@ -318,7 +156,11 @@ export function MemoEditor({ memo }: MemoEditorProps) {
 
         <div className="flex items-center gap-1">
           {(saving || saved || saveError) && (
-            <span className={cn('text-xs mr-2 flex items-center gap-1', saveError ? 'text-destructive' : 'text-muted-foreground')}>
+            <span
+              role="status"
+              aria-live="polite"
+              className={cn('text-xs mr-2 flex items-center gap-1', saveError ? 'text-destructive' : 'text-muted-foreground')}
+            >
               {saving ? '저장 중...' : saveError ? (
                 <button onClick={save} className="flex items-center gap-1 hover:underline">
                   <RotateCcw className="h-3 w-3" />저장 실패 · 재시도
@@ -328,7 +170,7 @@ export function MemoEditor({ memo }: MemoEditorProps) {
           )}
           <button
             onClick={handleTogglePin}
-            className="p-2 rounded-md hover:bg-accent transition-colors min-w-[40px] min-h-[40px] flex items-center justify-center"
+            className="p-2 rounded-md hover:bg-accent transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center focus-visible:ring-2 focus-visible:ring-ring"
             aria-label={isPinned ? '고정 해제' : '고정'}
             aria-pressed={isPinned}
           >
@@ -337,7 +179,7 @@ export function MemoEditor({ memo }: MemoEditorProps) {
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <button
-                className="p-2 rounded-md hover:bg-accent transition-colors text-muted-foreground hover:text-destructive min-w-[40px] min-h-[40px] flex items-center justify-center"
+                className="p-2 rounded-md hover:bg-accent transition-colors text-muted-foreground hover:text-destructive min-w-[44px] min-h-[44px] flex items-center justify-center focus-visible:ring-2 focus-visible:ring-ring"
                 aria-label="삭제"
               >
                 <Trash2 className="h-5 w-5" />
@@ -366,13 +208,15 @@ export function MemoEditor({ memo }: MemoEditorProps) {
 
       {/* Editor area */}
       <div className="flex-1 overflow-y-auto px-4 py-4 pb-[env(safe-area-inset-bottom)]">
+        <label htmlFor="memo-title" className="sr-only">메모 제목</label>
         <input
+          id="memo-title"
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="제목"
           maxLength={200}
-          className="w-full text-2xl font-bold bg-transparent outline-none placeholder:text-muted-foreground/50 mb-3"
+          className="w-full text-2xl font-bold bg-transparent outline-none placeholder:text-muted-foreground/50 mb-3 focus-visible:ring-0"
         />
 
         {/* Tag input area */}

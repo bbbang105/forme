@@ -24,13 +24,11 @@ import {
 import {cn} from '@/lib/utils';
 import {useCallback, useRef, useState} from 'react';
 
-interface MemoToolbarProps {
-  editor: Editor | null;
-}
+// ---------------------------------------------------------------------------
+// Image upload hook
+// ---------------------------------------------------------------------------
 
-export function MemoToolbar({ editor }: MemoToolbarProps) {
-  const [showLinkInput, setShowLinkInput] = useState(false);
-  const [linkUrl, setLinkUrl] = useState('');
+function useImageUpload(editor: Editor | null) {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -38,7 +36,6 @@ export function MemoToolbar({ editor }: MemoToolbarProps) {
     if (!editor) return;
     const file = e.target.files?.[0];
     if (!fileInputRef.current) return;
-    // Reset input so the same file can be re-selected if needed
     fileInputRef.current.value = '';
     if (!file) return;
 
@@ -74,64 +71,117 @@ export function MemoToolbar({ editor }: MemoToolbarProps) {
     }
   }, [editor]);
 
-  const handleLinkSubmit = useCallback(() => {
+  const triggerFileSelect = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  return { uploading, fileInputRef, handleImageFileChange, triggerFileSelect };
+}
+
+// ---------------------------------------------------------------------------
+// Link input sub-component
+// ---------------------------------------------------------------------------
+
+interface LinkInputProps {
+  initialUrl: string;
+  onSubmit: (url: string) => void;
+  onCancel: () => void;
+}
+
+function LinkInput({ initialUrl, onSubmit, onCancel }: LinkInputProps) {
+  const [linkUrl, setLinkUrl] = useState(initialUrl);
+
+  const handleSubmit = () => onSubmit(linkUrl);
+
+  return (
+    <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-background shrink-0">
+      <label htmlFor="toolbar-link-url" className="sr-only">링크 URL 입력</label>
+      <input
+        id="toolbar-link-url"
+        type="url"
+        value={linkUrl}
+        onChange={(e) => setLinkUrl(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') handleSubmit();
+          if (e.key === 'Escape') onCancel();
+        }}
+        placeholder="URL을 입력하세요..."
+        className="flex-1 text-sm bg-transparent outline-none placeholder:text-muted-foreground"
+        autoFocus
+      />
+      <button
+        type="button"
+        onClick={handleSubmit}
+        className="text-xs font-medium text-primary px-2 py-1 min-h-[44px] flex items-center focus-visible:ring-2 focus-visible:ring-ring rounded"
+        aria-label="링크 확인"
+      >
+        확인
+      </button>
+      <button
+        type="button"
+        onClick={onCancel}
+        className="text-xs text-muted-foreground px-2 py-1 min-h-[44px] flex items-center focus-visible:ring-2 focus-visible:ring-ring rounded"
+        aria-label="링크 취소"
+      >
+        취소
+      </button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// MemoToolbar — main export
+// ---------------------------------------------------------------------------
+
+interface MemoToolbarProps {
+  editor: Editor | null;
+}
+
+export function MemoToolbar({ editor }: MemoToolbarProps) {
+  const [showLinkInput, setShowLinkInput] = useState(false);
+  const [currentLinkUrl, setCurrentLinkUrl] = useState('');
+  const { uploading, fileInputRef, handleImageFileChange, triggerFileSelect } = useImageUpload(editor);
+
+  const handleLinkSubmit = useCallback((url: string) => {
     if (!editor) return;
-    let url = linkUrl.trim();
-    if (!url) {
+    let resolved = url.trim();
+    if (!resolved) {
       editor.chain().focus().extendMarkRange('link').unsetLink().run();
     } else {
-      if (!/^https?:\/\//i.test(url) && !/^mailto:/i.test(url)) {
-        url = `https://${url}`;
+      if (!/^https?:\/\//i.test(resolved) && !/^mailto:/i.test(resolved)) {
+        resolved = `https://${resolved}`;
       }
-      // Validate URL protocol
       try {
-        const parsed = new URL(url);
+        const parsed = new URL(resolved);
         if (!['http:', 'https:', 'mailto:'].includes(parsed.protocol)) {
-          setLinkUrl('');
           setShowLinkInput(false);
           return;
         }
       } catch {
-        setLinkUrl('');
         setShowLinkInput(false);
         return;
       }
-      editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
+      editor.chain().focus().extendMarkRange('link').setLink({ href: resolved }).run();
     }
-    setLinkUrl('');
     setShowLinkInput(false);
-  }, [editor, linkUrl]);
+  }, [editor]);
+
+  const handleLinkOpen = useCallback(() => {
+    if (!editor) return;
+    const currentUrl = editor.getAttributes('link').href ?? '';
+    setCurrentLinkUrl(currentUrl);
+    setShowLinkInput(true);
+  }, [editor]);
 
   if (!editor) return null;
 
   if (showLinkInput) {
     return (
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-background shrink-0">
-        <input
-          type="url"
-          value={linkUrl}
-          onChange={(e) => setLinkUrl(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') handleLinkSubmit();
-            if (e.key === 'Escape') setShowLinkInput(false);
-          }}
-          placeholder="URL을 입력하세요..."
-          className="flex-1 text-sm bg-transparent outline-none placeholder:text-muted-foreground"
-          autoFocus
-        />
-        <button
-          onClick={handleLinkSubmit}
-          className="text-xs font-medium text-primary px-2 py-1"
-        >
-          확인
-        </button>
-        <button
-          onClick={() => setShowLinkInput(false)}
-          className="text-xs text-muted-foreground px-2 py-1"
-        >
-          취소
-        </button>
-      </div>
+      <LinkInput
+        initialUrl={currentLinkUrl}
+        onSubmit={handleLinkSubmit}
+        onCancel={() => setShowLinkInput(false)}
+      />
     );
   }
 
@@ -145,6 +195,8 @@ export function MemoToolbar({ editor }: MemoToolbarProps) {
         aria-hidden="true"
         onChange={handleImageFileChange}
       />
+
+      {/* Text formatting */}
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleBold().run()}
         active={editor.isActive('bold')}
@@ -176,6 +228,7 @@ export function MemoToolbar({ editor }: MemoToolbarProps) {
 
       <ToolbarDivider />
 
+      {/* Headings */}
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
         active={editor.isActive('heading', { level: 1 })}
@@ -200,6 +253,7 @@ export function MemoToolbar({ editor }: MemoToolbarProps) {
 
       <ToolbarDivider />
 
+      {/* Lists */}
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleBulletList().run()}
         active={editor.isActive('bulletList')}
@@ -224,6 +278,7 @@ export function MemoToolbar({ editor }: MemoToolbarProps) {
 
       <ToolbarDivider />
 
+      {/* Blocks & media */}
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleBlockquote().run()}
         active={editor.isActive('blockquote')}
@@ -232,18 +287,14 @@ export function MemoToolbar({ editor }: MemoToolbarProps) {
         <Quote className="h-4 w-4" />
       </ToolbarButton>
       <ToolbarButton
-        onClick={() => {
-          const currentUrl = editor.getAttributes('link').href ?? '';
-          setLinkUrl(currentUrl);
-          setShowLinkInput(true);
-        }}
+        onClick={handleLinkOpen}
         active={editor.isActive('link')}
         aria-label="링크"
       >
         <Link className="h-4 w-4" />
       </ToolbarButton>
       <ToolbarButton
-        onClick={() => fileInputRef.current?.click()}
+        onClick={triggerFileSelect}
         disabled={uploading}
         aria-label="이미지 삽입"
       >
@@ -255,6 +306,7 @@ export function MemoToolbar({ editor }: MemoToolbarProps) {
 
       <ToolbarDivider />
 
+      {/* Code */}
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleCode().run()}
         active={editor.isActive('code')}
@@ -272,6 +324,7 @@ export function MemoToolbar({ editor }: MemoToolbarProps) {
 
       <ToolbarDivider />
 
+      {/* History */}
       <ToolbarButton
         onClick={() => editor.chain().focus().undo().run()}
         disabled={!editor.can().undo()}
@@ -290,6 +343,10 @@ export function MemoToolbar({ editor }: MemoToolbarProps) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
+
 function ToolbarButton({
   active,
   disabled,
@@ -301,6 +358,7 @@ function ToolbarButton({
       type="button"
       className={cn(
         'p-2 rounded-md transition-colors shrink-0',
+        'focus-visible:ring-2 focus-visible:ring-ring',
         active
           ? 'bg-accent text-accent-foreground'
           : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
@@ -315,5 +373,5 @@ function ToolbarButton({
 }
 
 function ToolbarDivider() {
-  return <div className="w-px h-5 bg-border mx-0.5 shrink-0" />;
+  return <div className="w-px h-5 bg-border mx-0.5 shrink-0" aria-hidden="true" />;
 }

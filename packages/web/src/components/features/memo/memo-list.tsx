@@ -55,11 +55,21 @@ export function MemoList({ initialMemos, initialHasMore, initialNextOffset }: Me
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
   const sortRef = useRef<HTMLDivElement>(null);
 
-  // initialMemos가 변경되면 (서버에서 새 데이터 전달 시) state 동기화
+  // initialMemos 변경 시 state 동기화 — 검색/로드모어 중에는 덮어쓰지 않음
+  // 로컬 편집(검색/loadMore)이 활성화된 동안에는 서버 데이터로 덮어쓰지 않는다.
+  // key-based reset: 부모가 key를 변경하면 컴포넌트가 재마운트되어 state가 초기화된다.
+  const initializedRef = useRef(false);
   useEffect(() => {
+    if (!initializedRef.current) {
+      initializedRef.current = true;
+      return;
+    }
+    // 검색 중이거나 추가 로드 중이면 서버 데이터로 덮어쓰지 않음
+    if (searchQuery.trim() || isLoadingMore) return;
     setMemos(initialMemos);
     setHasMore(initialHasMore);
     setNextOffset(initialNextOffset);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialMemos, initialHasMore, initialNextOffset]);
 
   // Close sort menu on outside click
