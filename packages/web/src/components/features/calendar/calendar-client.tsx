@@ -1,7 +1,7 @@
 'use client';
 
-import {useCallback, useEffect, useMemo, useRef, useState, useTransition} from 'react';
-import {addMonths, endOfMonth, format, startOfMonth, subMonths} from 'date-fns';
+import {useEffect, useMemo, useState} from 'react';
+import {format} from 'date-fns';
 import {ko} from 'date-fns/locale';
 import {CalendarDays, Circle, Plus} from 'lucide-react';
 import {Button} from '@/components/ui/button';
@@ -11,240 +11,68 @@ import dynamic from 'next/dynamic';
 import {CalendarGrid} from './calendar-grid';
 import {TodoList} from './todo-list';
 import {EventList} from './event-list';
-import type {CalendarEvent, EventCategory, Todo} from './types';
-import {
-    deleteCalendarEvent,
-    deleteRecurringAfter,
-    excludeRecurringDate,
-    getCalendarEvents,
-    toggleCalendarEvent
-} from '@/lib/actions/calendar';
-import {getCategories} from '@/lib/actions/categories';
-import {getTodosByDateRange, toggleTodo, updateTodo} from '@/lib/actions/todos';
 import {useSwipe} from '@/hooks/use-swipe';
 import {CalendarHeader} from './calendar-header';
+import {useCalendarState} from './use-calendar-state';
 
-const EventForm = dynamic(() => import('./event-form').then(m => m.EventForm), {ssr: false});
+const EventForm = dynamic(() => import('./event-form').then(m => m.EventForm), {
+  ssr: false,
+  loading: () => null,
+});
 const CategoryManager = dynamic(() => import('./category-manager').then(m => m.CategoryManager), {ssr: false});
 
-const EMPTY_DAY_MESSAGES = ['오늘은 여유로운 하루!', '한가한 하루네요', '일정이 없는 날이에요', '자유로운 하루를 보내세요', '쉬어가는 하루'];
+// ─── Constants ────────────────────────────────────────────────────────────────
+export const EMPTY_DAY_MESSAGES = [
+  '오늘은 여유로운 하루!',
+  '한가한 하루네요',
+  '일정이 없는 날이에요',
+  '자유로운 하루를 보내세요',
+  '쉬어가는 하루',
+];
 
 export function CalendarClient() {
-  const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState(new Date());
-  const [events, setEvents] = useState<CalendarEvent[]>([]);
-  const [todos, setTodos] = useState<Todo[]>([]);
-  const [showEventForm, setShowEventForm] = useState(false);
-  const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
-  const [categories, setCategories] = useState<EventCategory[]>([]);
-  const [showCategoryManager, setShowCategoryManager] = useState(false);
-  const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isFetching, startFetching] = useTransition();
+  const {
+    currentMonth,
+    selectedDate,
+    events,
+    todos,
+    categories,
+    showEventForm,
+    editingEvent,
+    showCategoryManager,
+    slideDirection,
+    isLoading,
+    isFetching,
+    setCategories,
+    setShowEventForm,
+    setEditingEvent,
+    setShowCategoryManager,
+    handlePrevMonth,
+    handleNextMonth,
+    handleToday,
+    handleSelectDate,
+    handleEditEvent,
+    handleAddEvent,
+    handleTodoToggle,
+    handleTodoCreate,
+    handleTodoCreated,
+    handleTodoDelete,
+    handleTodoUpdate,
+    handleTodoReorder,
+    handleMoveToToday,
+    handleOverdueToggle,
+    handleEventCreate,
+    handleEventUpdate,
+    handleEventDelete,
+    handleEventDeleteDirect,
+    handleEventToggle,
+    handleExcludeDate,
+    handleDeleteAfter,
+  } = useCalendarState();
 
   const selectedDateStr = format(selectedDate, 'yyyy-MM-dd');
 
-  const fetchData = useCallback(() => {
-    const month = format(currentMonth, 'yyyy-MM');
-    const start = startOfMonth(currentMonth);
-    const end = endOfMonth(currentMonth);
-
-    // Pad date range for events that span month boundaries
-    const paddedStart = new Date(start);
-    paddedStart.setDate(paddedStart.getDate() - 7);
-    const paddedEnd = new Date(end);
-    paddedEnd.setDate(paddedEnd.getDate() + 7);
-
-    return Promise.all([
-      getCalendarEvents(month),
-      getTodosByDateRange(
-        format(paddedStart, 'yyyy-MM-dd'),
-        format(paddedEnd, 'yyyy-MM-dd')
-      ),
-      getCategories(),
-    ]).then(([eventsData, todosData, categoriesData]) => {
-      setEvents(eventsData as CalendarEvent[]);
-      setTodos(todosData as Todo[]);
-      setCategories(categoriesData as EventCategory[]);
-      setIsLoading(false);
-    });
-  }, [currentMonth]);
-
-  useEffect(() => {
-    startFetching(() => {
-      fetchData();
-    });
-  }, [fetchData]);
-
-  const slideTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-
-  const handlePrevMonth = useCallback(() => {
-    setSlideDirection('right');
-    setCurrentMonth((m) => subMonths(m, 1));
-    clearTimeout(slideTimerRef.current);
-    slideTimerRef.current = setTimeout(() => setSlideDirection(null), 200);
-  }, []);
-
-  const handleNextMonth = useCallback(() => {
-    setSlideDirection('left');
-    setCurrentMonth((m) => addMonths(m, 1));
-    clearTimeout(slideTimerRef.current);
-    slideTimerRef.current = setTimeout(() => setSlideDirection(null), 200);
-  }, []);
-
-  useEffect(() => () => clearTimeout(slideTimerRef.current), []);
-
-  const handleToday = useCallback(() => {
-    const today = new Date();
-    setCurrentMonth(today);
-    setSelectedDate(today);
-  }, []);
-
-  const handleSelectDate = useCallback((date: Date) => {
-    setSelectedDate(date);
-    if (format(date, 'yyyy-MM') !== format(currentMonth, 'yyyy-MM')) {
-      setCurrentMonth(date);
-    }
-  }, [currentMonth]);
-
-  const handleEditEvent = useCallback((event: CalendarEvent) => {
-    setEditingEvent(event);
-    setShowEventForm(true);
-  }, []);
-
-  const handleAddEvent = useCallback(() => {
-    setEditingEvent(null);
-    setShowEventForm(true);
-  }, []);
-
-  // ─── Optimistic todo callbacks ────────────────────────────────────────────
-
-  const handleTodoToggle = useCallback((todoId: string, isCompleted: boolean) => {
-    // Update local state immediately for instant feedback
-    setTodos((prev) =>
-      prev.map((t) => (t.id === todoId ? { ...t, isCompleted } : t))
-    );
-  }, []);
-
-  const handleTodoCreate = useCallback((todo: Todo) => {
-    setTodos((prev) => [...prev, todo]);
-  }, []);
-
-  // Replace temp id produced by optimistic insert with the real DB row
-  const handleTodoCreated = useCallback((tempId: string, created: Todo) => {
-    setTodos((prev) =>
-      prev.map((t) => (t.id === tempId ? created : t))
-    );
-  }, []);
-
-  const handleTodoDelete = useCallback((todoId: string) => {
-    setTodos((prev) => prev.filter((t) => t.id !== todoId));
-  }, []);
-
-  const handleTodoUpdate = useCallback((todoId: string, content: string) => {
-    setTodos((prev) =>
-      prev.map((t) => (t.id === todoId ? { ...t, content } : t))
-    );
-  }, []);
-
-  const handleTodoReorder = useCallback((reordered: Todo[]) => {
-    setTodos((prev) => {
-      const reorderedIds = new Set(reordered.map((t) => t.id));
-      const others = prev.filter((t) => !reorderedIds.has(t.id));
-      return [...others, ...reordered];
-    });
-  }, []);
-
-
-  const handleTodoDateChange = useCallback((todoId: string, newDate: string) => {
-    setTodos((prev) =>
-      prev.map((t) => (t.id === todoId ? { ...t, date: newDate } : t))
-    );
-  }, []);
-
-  const handleMoveToToday = useCallback((todoId: string) => {
-    const today = format(new Date(), 'yyyy-MM-dd');
-    handleTodoDateChange(todoId, today);
-    startFetching(async () => {
-      try {
-        await updateTodo(todoId, { date: today });
-      } catch {
-        // rollback handled by next fetch
-        fetchData();
-      }
-    });
-  }, [handleTodoDateChange, fetchData]);
-
-  const handleOverdueToggle = useCallback((todoId: string) => {
-    // Optimistically mark as completed
-    handleTodoToggle(todoId, true);
-    startFetching(async () => {
-      try {
-        await toggleTodo(todoId);
-      } catch {
-        // rollback
-        handleTodoToggle(todoId, false);
-      }
-    });
-  }, [handleTodoToggle]);
-
-  // ─── Optimistic event callbacks ───────────────────────────────────────────
-
-  const handleEventCreate = useCallback((event: CalendarEvent) => {
-    setEvents((prev) => [...prev, event]);
-  }, []);
-
-  const handleEventUpdate = useCallback((updated: CalendarEvent) => {
-    setEvents((prev) =>
-      prev.map((e) => (e.id === updated.id ? updated : e))
-    );
-  }, []);
-
-  const handleEventDelete = useCallback((eventId: string) => {
-    setEvents((prev) => prev.filter((e) => e.id !== eventId));
-  }, []);
-
-  const handleEventDeleteDirect = useCallback((eventId: string) => {
-    setEvents((prev) => prev.filter((e) => e.id !== eventId));
-    deleteCalendarEvent(eventId).catch(() => {
-      // Refetch on failure to restore
-      fetchData();
-    });
-  }, [fetchData]);
-
-  const handleEventToggle = useCallback((eventId: string, isCompleted: boolean) => {
-    const match = (e: CalendarEvent) => e.id === eventId || e._originalId === eventId;
-    setEvents((prev) =>
-      prev.map((e) => (match(e) ? { ...e, isCompleted } : e))
-    );
-    toggleCalendarEvent(eventId).catch(() => {
-      setEvents((prev) =>
-        prev.map((e) => (match(e) ? { ...e, isCompleted: !isCompleted } : e))
-      );
-    });
-  }, []);
-
-  const handleExcludeDate = useCallback(async (eventId: string, dateStr: string) => {
-    // Optimistic: remove only that instance
-    setEvents((prev) => prev.filter((e) => !(e._originalId === eventId && e._instanceDate === dateStr)));
-    try {
-      await excludeRecurringDate(eventId, dateStr);
-    } catch {
-      fetchData();
-    }
-  }, [fetchData]);
-
-  const handleDeleteAfter = useCallback(async (eventId: string, dateStr: string) => {
-    // Optimistic: remove all instances on or after that date
-    setEvents((prev) => prev.filter((e) => !(e._originalId === eventId && e._instanceDate && e._instanceDate >= dateStr)));
-    try {
-      await deleteRecurringAfter(eventId, dateStr);
-    } catch {
-      fetchData();
-    }
-  }, [fetchData]);
-
-  // ─── Touch swipe for month navigation ────────────────────────────────────
+  // ─── Touch swipe for month navigation ──────────────────────────────────────
 
   const swipeHandlers = useSwipe({
     onSwipeLeft: handleNextMonth,
@@ -252,11 +80,10 @@ export function CalendarClient() {
     threshold: 60,
   });
 
-  // ─── Keyboard navigation (Google Calendar style) ──────────────────────────
+  // ─── Keyboard navigation (Google Calendar style) ────────────────────────────
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't capture keys when dialog/input is focused
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.closest('[role="dialog"]')) {
         return;
@@ -265,47 +92,19 @@ export function CalendarClient() {
       switch (e.key) {
         case 'ArrowLeft':
           e.preventDefault();
-          setSelectedDate((d) => {
-            const prev = new Date(d);
-            prev.setDate(prev.getDate() - 1);
-            if (format(prev, 'yyyy-MM') !== format(currentMonth, 'yyyy-MM')) {
-              setCurrentMonth(prev);
-            }
-            return prev;
-          });
+          handleSelectDate(new Date(selectedDate.getTime() - 86400000));
           break;
         case 'ArrowRight':
           e.preventDefault();
-          setSelectedDate((d) => {
-            const next = new Date(d);
-            next.setDate(next.getDate() + 1);
-            if (format(next, 'yyyy-MM') !== format(currentMonth, 'yyyy-MM')) {
-              setCurrentMonth(next);
-            }
-            return next;
-          });
+          handleSelectDate(new Date(selectedDate.getTime() + 86400000));
           break;
         case 'ArrowUp':
           e.preventDefault();
-          setSelectedDate((d) => {
-            const prev = new Date(d);
-            prev.setDate(prev.getDate() - 7);
-            if (format(prev, 'yyyy-MM') !== format(currentMonth, 'yyyy-MM')) {
-              setCurrentMonth(prev);
-            }
-            return prev;
-          });
+          handleSelectDate(new Date(selectedDate.getTime() - 7 * 86400000));
           break;
         case 'ArrowDown':
           e.preventDefault();
-          setSelectedDate((d) => {
-            const next = new Date(d);
-            next.setDate(next.getDate() + 7);
-            if (format(next, 'yyyy-MM') !== format(currentMonth, 'yyyy-MM')) {
-              setCurrentMonth(next);
-            }
-            return next;
-          });
+          handleSelectDate(new Date(selectedDate.getTime() + 7 * 86400000));
           break;
         case 't':
         case 'T':
@@ -316,9 +115,9 @@ export function CalendarClient() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentMonth, handleToday]);
+  }, [selectedDate, handleSelectDate, handleToday]);
 
-  // ─── Derived state ────────────────────────────────────────────────────────
+  // ─── Derived state ─────────────────────────────────────────────────────────
 
   const todayStr = format(new Date(), 'yyyy-MM-dd');
   const overdueTodos = useMemo(
@@ -490,7 +289,14 @@ export function CalendarClient() {
           {/* Progress bar */}
           {totalCount > 0 && (
             <div className="mx-1 mb-3">
-              <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+              <div
+                className="h-1.5 bg-muted rounded-full overflow-hidden"
+                role="progressbar"
+                aria-valuenow={completedCount}
+                aria-valuemin={0}
+                aria-valuemax={totalCount}
+                aria-label={`할 일 진행률: ${completedCount}/${totalCount}`}
+              >
                 <div
                   className="h-full bg-primary rounded-full transition-all duration-500 ease-out"
                   style={{ width: `${(completedCount / totalCount) * 100}%` }}
@@ -549,14 +355,14 @@ export function CalendarClient() {
   );
 }
 
-// ─── Overdue Todo Chip ──────────────────────────────────────────────────────
+// ─── Overdue Todo Chip ────────────────────────────────────────────────────────
 
 function OverdueTodoChip({
   todos,
   onMoveToToday,
   onToggle,
 }: {
-  todos: Todo[];
+  todos: import('./types').Todo[];
   onMoveToToday: (id: string) => void;
   onToggle: (id: string) => void;
 }) {
@@ -566,9 +372,11 @@ function OverdueTodoChip({
     <div className="mb-2">
       <button
         onClick={() => setIsOpen(!isOpen)}
+        aria-expanded={isOpen}
+        aria-label={`밀린 할 일 ${todos.length}개 - 클릭하여 ${isOpen ? '닫기' : '열기'}`}
         className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/25 transition-colors"
       >
-        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" aria-hidden="true" />
         밀린 할 일 {todos.length}개
       </button>
 
@@ -581,7 +389,8 @@ function OverdueTodoChip({
             >
               <button
                 onClick={() => onToggle(todo.id)}
-                className="shrink-0"
+                aria-label={`${todo.content} 완료 처리`}
+                className="shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center focus-visible:ring-2 focus-visible:ring-ring rounded"
               >
                 <Circle className="h-4 w-4 text-muted-foreground/40 hover:text-muted-foreground/60" />
               </button>
@@ -591,7 +400,8 @@ function OverdueTodoChip({
               <span className="flex-1 text-sm truncate">{todo.content}</span>
               <button
                 onClick={() => onMoveToToday(todo.id)}
-                className="shrink-0 text-xs text-primary hover:text-primary/80 font-medium px-2 py-0.5 rounded hover:bg-primary/10 transition-colors"
+                aria-label={`${todo.content} 오늘로 이동`}
+                className="shrink-0 text-xs text-primary hover:text-primary/80 font-medium px-2 py-0.5 rounded hover:bg-primary/10 transition-colors focus-visible:ring-2 focus-visible:ring-ring min-h-[44px] flex items-center"
               >
                 오늘로
               </button>

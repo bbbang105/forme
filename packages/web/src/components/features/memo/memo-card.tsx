@@ -38,10 +38,10 @@ function formatRelativeDate(date: Date): string {
   return '방금';
 }
 
-function highlightText(text: string, query: string): ReactNode {
-  if (!query) return text;
-  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const parts = text.split(new RegExp(`(${escaped})`, 'gi'));
+/** Highlights matching text using a pre-compiled regex to avoid re-creating it per call. */
+function highlightTextWithRegex(text: string, query: string, regex: RegExp | null): ReactNode {
+  if (!query || !regex) return text;
+  const parts = text.split(regex);
   if (parts.length === 1) return text;
   return parts.map((part, i) =>
     part.toLowerCase() === query.toLowerCase()
@@ -54,8 +54,16 @@ export const MemoCard = memo(function MemoCard({ memo, highlight = '' }: MemoCar
   const displayTitle = memo.title?.trim() || '제목 없음';
   const preview = memo.contentText.slice(0, 100);
 
-  const titleNode = useMemo(() => highlightText(displayTitle, highlight), [displayTitle, highlight]);
-  const previewNode = useMemo(() => highlightText(preview, highlight), [preview, highlight]);
+  // Memoize the compiled RegExp separately so it is created once per highlight value change
+  // rather than inside each highlightText call (which would re-create the regex every render).
+  const highlightRegex = useMemo(() => {
+    if (!highlight) return null;
+    const escaped = highlight.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`(${escaped})`, 'gi');
+  }, [highlight]);
+
+  const titleNode = useMemo(() => highlightTextWithRegex(displayTitle, highlight, highlightRegex), [displayTitle, highlight, highlightRegex]);
+  const previewNode = useMemo(() => highlightTextWithRegex(preview, highlight, highlightRegex), [preview, highlight, highlightRegex]);
 
   return (
     <Link

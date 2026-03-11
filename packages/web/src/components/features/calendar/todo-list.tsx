@@ -173,9 +173,11 @@ export function TodoList({
         <button
           onClick={handleAdd}
           disabled={isPending || !newContent.trim()}
+          aria-label="할 일 추가"
           className={cn(
-            'flex items-center justify-center w-9 h-9 rounded-md transition-colors',
+            'flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-md transition-colors',
             'bg-primary text-primary-foreground hover:bg-primary/90',
+            'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
             'disabled:opacity-50 disabled:pointer-events-none'
           )}
         >
@@ -358,20 +360,22 @@ const TodoItem = forwardRef<HTMLDivElement, TodoItemProps>(function TodoItem(
       {/* Drag handle — always visible for incomplete, hidden for completed */}
       {dragHandleProps ? (
         <button
-          className="shrink-0 p-0.5 rounded text-muted-foreground/30 hover:text-muted-foreground/60 cursor-grab active:cursor-grabbing touch-none"
-          aria-label="드래그하여 순서 변경"
+          className="shrink-0 p-1.5 rounded text-muted-foreground/30 hover:text-muted-foreground/60 cursor-grab active:cursor-grabbing touch-none focus-visible:ring-2 focus-visible:ring-ring min-w-[44px] min-h-[44px] flex items-center justify-center"
+          aria-label="드래그하여 순서 변경 (키보드: Space로 잡기, 방향키로 이동, Space/Enter로 놓기)"
           {...dragHandleProps}
         >
           <GripVertical className="h-4 w-4" />
         </button>
       ) : (
-        <div className="w-5 shrink-0" />
+        <div className="w-11 shrink-0" />
       )}
 
       <button
         onClick={() => onToggle(todo.id, todo.isCompleted)}
         disabled={isPending}
-        className="shrink-0 transition-transform active:scale-95"
+        aria-label={todo.isCompleted ? `${todo.content} 완료 취소` : `${todo.content} 완료 처리`}
+        aria-pressed={todo.isCompleted}
+        className="shrink-0 transition-transform active:scale-95 min-w-[44px] min-h-[44px] flex items-center justify-center focus-visible:ring-2 focus-visible:ring-ring rounded"
       >
         {todo.isCompleted
           ? <CheckCircle2 className="h-[18px] w-[18px] text-primary animate-check-bounce" />
@@ -404,14 +408,16 @@ const TodoItem = forwardRef<HTMLDivElement, TodoItemProps>(function TodoItem(
           <button
             onClick={() => { setEditContent(todo.content); setIsEditing(true); }}
             disabled={isPending || isEditing}
-            className="p-1 rounded hover:bg-muted/50 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+            aria-label={`${todo.content} 수정`}
+            className="p-1.5 rounded hover:bg-muted/50 text-muted-foreground/50 hover:text-muted-foreground transition-colors focus-visible:ring-2 focus-visible:ring-ring min-w-[44px] min-h-[44px] flex items-center justify-center"
           >
             <Pencil className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={() => setShowDeleteConfirm(true)}
             disabled={isPending}
-            className="p-1 rounded hover:bg-destructive/10 text-destructive/50 hover:text-destructive transition-colors"
+            aria-label={`${todo.content} 삭제`}
+            className="p-1.5 rounded hover:bg-destructive/10 text-destructive/50 hover:text-destructive transition-colors focus-visible:ring-2 focus-visible:ring-ring min-w-[44px] min-h-[44px] flex items-center justify-center"
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>

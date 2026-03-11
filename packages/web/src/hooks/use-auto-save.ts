@@ -89,6 +89,8 @@ export function useAutoSave({
   // Flush pending save on blur / page hide / beforeunload
   useEffect(() => {
     const handleFlush = () => {
+      // Do not flush during active IME composition (Korean input etc.)
+      if (composingRef.current) return;
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       save();
     };

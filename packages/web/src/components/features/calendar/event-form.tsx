@@ -241,22 +241,29 @@ function EventFormContent({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-3 px-6 pb-6 overflow-y-auto min-h-0 flex-1">
+        <form onSubmit={handleSubmit} className="space-y-3 px-6 pb-6 overflow-y-auto min-h-0 flex-1" aria-label={isEditing ? '일정 수정 폼' : '새 일정 폼'}>
           {error && (
-            <p className="text-sm text-destructive bg-destructive/10 px-3 py-2 rounded-md">
+            <p
+              role="alert"
+              aria-live="polite"
+              className="text-sm text-destructive bg-destructive/10 px-3 py-2 rounded-md"
+            >
               {error}
             </p>
           )}
 
           {/* 제목 */}
           <div className="space-y-2">
+            <Label htmlFor="event-title" className="sr-only">일정 제목</Label>
             <Input
+              id="event-title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="일정 제목을 입력하세요"
               maxLength={200}
               required
               autoFocus
+              aria-required="true"
               className="text-base font-medium border-0 border-b border-border rounded-none px-0 focus-visible:ring-0 focus-visible:border-primary"
             />
           </div>
@@ -305,12 +312,12 @@ function EventFormContent({
           {/* 종일 + 반복 토글 (한 줄) */}
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <Label className="text-sm">종일</Label>
-              <Switch checked={isAllDay} onCheckedChange={setIsAllDay} />
+              <Label htmlFor="event-all-day" className="text-sm">종일</Label>
+              <Switch id="event-all-day" checked={isAllDay} onCheckedChange={setIsAllDay} />
             </div>
             <div className="flex items-center gap-2">
-              <Label className="text-sm">반복</Label>
-              <Switch checked={isRecurring} onCheckedChange={setIsRecurring} />
+              <Label htmlFor="event-recurring" className="text-sm">반복</Label>
+              <Switch id="event-recurring" checked={isRecurring} onCheckedChange={setIsRecurring} />
             </div>
           </div>
 
@@ -333,10 +340,11 @@ function EventFormContent({
           {/* 날짜 */}
           <div className={cn('gap-3', isRecurring ? 'grid grid-cols-1' : 'grid grid-cols-2')}>
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">
+              <Label htmlFor="event-start-date" className="text-xs text-muted-foreground">
                 {isRecurring ? '시작일 (반복 기준일)' : '시작일'}
               </Label>
               <Input
+                id="event-start-date"
                 type="date"
                 value={startDate}
                 onChange={(e) => {
@@ -344,18 +352,21 @@ function EventFormContent({
                   if (!isRecurring && e.target.value > endDate) setEndDate(e.target.value);
                 }}
                 required
+                aria-required="true"
                 className="text-sm"
               />
             </div>
             {!isRecurring && (
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">종료일</Label>
+                <Label htmlFor="event-end-date" className="text-xs text-muted-foreground">종료일</Label>
                 <Input
+                  id="event-end-date"
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
                   min={startDate}
                   required
+                  aria-required="true"
                   className="text-sm"
                 />
               </div>
@@ -366,8 +377,9 @@ function EventFormContent({
           {!isAllDay && (
             <div className="grid grid-cols-2 gap-3 animate-fade-in">
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">시작 시간</Label>
+                <Label htmlFor="event-start-time" className="text-xs text-muted-foreground">시작 시간</Label>
                 <Input
+                  id="event-start-time"
                   type="text"
                   inputMode="numeric"
                   placeholder="09:00"
@@ -389,8 +401,9 @@ function EventFormContent({
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">종료 시간</Label>
+                <Label htmlFor="event-end-time" className="text-xs text-muted-foreground">종료 시간</Label>
                 <Input
+                  id="event-end-time"
                   type="text"
                   inputMode="numeric"
                   placeholder="10:00"
@@ -404,11 +417,12 @@ function EventFormContent({
 
           {/* 장소 */}
           <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground flex items-center gap-1">
-              <MapPin className="h-3 w-3" />
+            <Label htmlFor="event-location" className="text-xs text-muted-foreground flex items-center gap-1">
+              <MapPin className="h-3 w-3" aria-hidden="true" />
               장소
             </Label>
             <Input
+              id="event-location"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
               placeholder="장소를 입력하세요 (선택)"
@@ -439,13 +453,15 @@ function EventFormContent({
 
           {/* 메모 */}
           <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">메모 (선택)</Label>
+            <Label htmlFor="event-description" className="text-xs text-muted-foreground">메모 (선택)</Label>
             <textarea
+              id="event-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="간단한 메모..."
               rows={1}
               maxLength={2000}
+              aria-label="일정 메모"
               className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
             />
           </div>

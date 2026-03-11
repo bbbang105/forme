@@ -1,9 +1,11 @@
 'use client';
 
+import {useEffect} from 'react';
 import {StickyNote} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 
-export default function MemoError({ reset }: { reset: () => void }) {
+export default function MemoError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  useEffect(() => { console.error(error); }, [error]);
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 text-center">
       <div className="w-12 h-12 rounded-2xl bg-destructive/10 flex items-center justify-center mb-4">
