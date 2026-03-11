@@ -1,6 +1,6 @@
 'use client';
 
-import {useCallback, useRef, useState} from 'react';
+import {useCallback, useReducer, useRef} from 'react';
 import {CheckCircle2, FileAudio, Loader2, Upload, X} from 'lucide-react';
 import {cn} from '@/lib/utils';
 import {Button} from '@/components/ui/button';
@@ -18,6 +18,59 @@ interface UploadDialogProps {
 
 type Step = 'idle' | 'uploading' | 'creating' | 'done' | 'error';
 
+interface UploadState {
+  file: File | null;
+  isDragging: boolean;
+  title: string;
+  description: string;
+  step: Step;
+  uploadProgress: number;
+  errorMsg: string;
+}
+
+type UploadAction =
+  | { type: 'SET_FILE'; file: File | null }
+  | { type: 'SET_DRAGGING'; isDragging: boolean }
+  | { type: 'SET_TITLE'; title: string }
+  | { type: 'SET_DESCRIPTION'; description: string }
+  | { type: 'SET_STEP'; step: Step }
+  | { type: 'SET_PROGRESS'; progress: number }
+  | { type: 'SET_ERROR'; errorMsg: string }
+  | { type: 'RESET' };
+
+const initialState: UploadState = {
+  file: null,
+  isDragging: false,
+  title: '',
+  description: '',
+  step: 'idle',
+  uploadProgress: 0,
+  errorMsg: '',
+};
+
+function uploadReducer(state: UploadState, action: UploadAction): UploadState {
+  switch (action.type) {
+    case 'SET_FILE':
+      return { ...state, file: action.file };
+    case 'SET_DRAGGING':
+      return { ...state, isDragging: action.isDragging };
+    case 'SET_TITLE':
+      return { ...state, title: action.title };
+    case 'SET_DESCRIPTION':
+      return { ...state, description: action.description };
+    case 'SET_STEP':
+      return { ...state, step: action.step };
+    case 'SET_PROGRESS':
+      return { ...state, uploadProgress: action.progress };
+    case 'SET_ERROR':
+      return { ...state, errorMsg: action.errorMsg };
+    case 'RESET':
+      return initialState;
+    default:
+      return state;
+  }
+}
+
 function formatBytes(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
@@ -25,21 +78,13 @@ function formatBytes(bytes: number): string {
 
 export function UploadDialog({ open, onOpenChange, onSuccess }: UploadDialogProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [file, setFile] = useState<File | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [step, setStep] = useState<Step>('idle');
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [errorMsg, setErrorMsg] = useState('');
+  const [state, dispatch] = useReducer(uploadReducer, initialState);
+  const { file, isDragging, title, description, step, uploadProgress, errorMsg } = state;
+  // Ref to track progress for the simulated interval (avoids stale closure)
+  const progressRef = useRef(0);
 
   const reset = useCallback(() => {
-    setFile(null);
-    setTitle('');
-    setDescription('');
-    setStep('idle');
-    setUploadProgress(0);
-    setErrorMsg('');
+    dispatch({ type: 'RESET' });
   }, []);
 
   const handleClose = useCallback(() => {
@@ -61,15 +106,15 @@ export function UploadDialog({ open, onOpenChange, onSuccess }: UploadDialogProp
   const applyFile = useCallback((f: File) => {
     const err = validateFile(f);
     if (err) {
-      setErrorMsg(err);
+      dispatch({ type: 'SET_ERROR', errorMsg: err });
       return;
     }
-    setErrorMsg('');
-    setFile(f);
+    dispatch({ type: 'SET_ERROR', errorMsg: '' });
+    dispatch({ type: 'SET_FILE', file: f });
     // Auto-fill title from filename (remove extension)
     if (!title) {
       const name = f.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
-      setTitle(name);
+      dispatch({ type: 'SET_TITLE', title: name });
     }
   }, [title]);
 
@@ -81,7 +126,7 @@ export function UploadDialog({ open, onOpenChange, onSuccess }: UploadDialogProp
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
-      setIsDragging(false);
+      dispatch({ type: 'SET_DRAGGING', isDragging: false });
       const f = e.dataTransfer.files[0];
       if (f) applyFile(f);
     },
@@ -90,17 +135,18 @@ export function UploadDialog({ open, onOpenChange, onSuccess }: UploadDialogProp
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
-    setIsDragging(true);
+    dispatch({ type: 'SET_DRAGGING', isDragging: true });
   };
 
-  const handleDragLeave = () => setIsDragging(false);
+  const handleDragLeave = () => dispatch({ type: 'SET_DRAGGING', isDragging: false });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!file || !title.trim()) return;
 
-    setStep('uploading');
-    setUploadProgress(0);
+    progressRef.current = 0;
+    dispatch({ type: 'SET_STEP', step: 'uploading' });
+    dispatch({ type: 'SET_PROGRESS', progress: 0 });
 
     let progressInterval: ReturnType<typeof setInterval> | null = null;
     try {
@@ -110,7 +156,9 @@ export function UploadDialog({ open, onOpenChange, onSuccess }: UploadDialogProp
 
       // Simulate progress during upload (XHR would give real progress)
       progressInterval = setInterval(() => {
-        setUploadProgress((prev) => Math.min(prev + 5, 85));
+        const next = Math.min(progressRef.current + 5, 85);
+        progressRef.current = next;
+        dispatch({ type: 'SET_PROGRESS', progress: next });
       }, 300);
 
       const uploadRes = await fetch('/api/podcast/upload', {
@@ -120,7 +168,8 @@ export function UploadDialog({ open, onOpenChange, onSuccess }: UploadDialogProp
 
       clearInterval(progressInterval);
       progressInterval = null;
-      setUploadProgress(95);
+      progressRef.current = 95;
+      dispatch({ type: 'SET_PROGRESS', progress: 95 });
 
       if (!uploadRes.ok) {
         const err = await uploadRes.json().catch(() => ({ error: '업로드 실패' }));
@@ -130,7 +179,7 @@ export function UploadDialog({ open, onOpenChange, onSuccess }: UploadDialogProp
       const { audioUrl, fileSize } = await uploadRes.json();
 
       // Create episode record
-      setStep('creating');
+      dispatch({ type: 'SET_STEP', step: 'creating' });
 
       const createRes = await fetch('/api/podcast/episodes', {
         method: 'POST',
@@ -149,16 +198,17 @@ export function UploadDialog({ open, onOpenChange, onSuccess }: UploadDialogProp
       }
 
       const episode = await createRes.json();
-      setUploadProgress(100);
-      setStep('done');
+      progressRef.current = 100;
+      dispatch({ type: 'SET_PROGRESS', progress: 100 });
+      dispatch({ type: 'SET_STEP', step: 'done' });
 
       setTimeout(() => {
         onSuccess(episode);
         handleClose();
       }, 800);
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.');
-      setStep('error');
+      dispatch({ type: 'SET_ERROR', errorMsg: err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.' });
+      dispatch({ type: 'SET_STEP', step: 'error' });
     } finally {
       if (progressInterval) clearInterval(progressInterval);
     }
@@ -218,7 +268,7 @@ export function UploadDialog({ open, onOpenChange, onSuccess }: UploadDialogProp
                   {!isSubmitting && (
                     <button
                       type="button"
-                      onClick={() => { setFile(null); setTitle(''); }}
+                      onClick={() => { dispatch({ type: 'SET_FILE', file: null }); dispatch({ type: 'SET_TITLE', title: '' }); }}
                       className="p-1 rounded-md text-muted-foreground hover:text-foreground transition-colors shrink-0"
                       aria-label="파일 제거"
                     >
@@ -248,10 +298,17 @@ export function UploadDialog({ open, onOpenChange, onSuccess }: UploadDialogProp
           {isSubmitting && (
             <div className="space-y-1.5">
               <div className="flex justify-between text-xs text-muted-foreground">
-                <span>{step === 'uploading' ? '업로드 중...' : '에피소드 생성 중...'}</span>
+                <span aria-live="polite">{step === 'uploading' ? '업로드 중...' : '에피소드 생성 중...'}</span>
                 <span>{uploadProgress}%</span>
               </div>
-              <div className="h-1.5 rounded-full bg-border overflow-hidden">
+              <div
+                role="progressbar"
+                aria-valuenow={uploadProgress}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label="업로드 진행률"
+                className="h-1.5 rounded-full bg-border overflow-hidden"
+              >
                 <div
                   className="h-full bg-primary rounded-full transition-all duration-300"
                   style={{ width: `${uploadProgress}%` }}
@@ -269,14 +326,7 @@ export function UploadDialog({ open, onOpenChange, onSuccess }: UploadDialogProp
           )}
 
           {/* Error */}
-          {step === 'error' && errorMsg && (
-            <div className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">
-              {errorMsg}
-            </div>
-          )}
-
-          {/* Validation error */}
-          {step === 'idle' && errorMsg && (
+          {(step === 'error' || step === 'idle') && errorMsg && (
             <div className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">
               {errorMsg}
             </div>
@@ -288,7 +338,7 @@ export function UploadDialog({ open, onOpenChange, onSuccess }: UploadDialogProp
             <Input
               id="ep-title"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) => dispatch({ type: 'SET_TITLE', title: e.target.value })}
               placeholder="에피소드 제목을 입력하세요"
               disabled={isSubmitting}
               required
@@ -301,7 +351,7 @@ export function UploadDialog({ open, onOpenChange, onSuccess }: UploadDialogProp
             <textarea
               id="ep-desc"
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={(e) => dispatch({ type: 'SET_DESCRIPTION', description: e.target.value })}
               placeholder="에피소드에 대한 간단한 설명..."
               disabled={isSubmitting}
               rows={3}

@@ -9,7 +9,10 @@ import type {Episode} from '@/components/features/podcast/player-context';
 
 const UploadDialog = dynamic(
   () => import('@/components/features/podcast/upload-dialog').then((m) => m.UploadDialog),
-  { ssr: false }
+  {
+    ssr: false,
+    loading: () => null,
+  }
 );
 
 export default function PodcastPage() {

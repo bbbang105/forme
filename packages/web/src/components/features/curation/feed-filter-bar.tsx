@@ -105,7 +105,7 @@ export function FeedFilterBar({
   );
 }
 
-function SortButton({
+export function SortButton({
   active,
   onClick,
   icon,

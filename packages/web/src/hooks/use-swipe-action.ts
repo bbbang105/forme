@@ -1,4 +1,4 @@
-import {useCallback, useRef} from 'react';
+import {useCallback, useEffect, useRef} from 'react';
 
 interface UseSwipeActionOptions {
   /** Minimum distance (px) to trigger an action */
@@ -27,8 +27,25 @@ export function useSwipeAction({
   const locked = useRef(false); // true = horizontal swipe confirmed
   const swipeTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Store callbacks in refs to avoid stale closures without requiring re-registration
+  const onSwipeLeftRef = useRef(onSwipeLeft);
+  const onSwipeRightRef = useRef(onSwipeRight);
+  useEffect(() => { onSwipeLeftRef.current = onSwipeLeft; }, [onSwipeLeft]);
+  useEffect(() => { onSwipeRightRef.current = onSwipeRight; }, [onSwipeRight]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (swipeTimeout.current !== null) {
+        clearTimeout(swipeTimeout.current);
+        swipeTimeout.current = null;
+      }
+    };
+  }, []);
+
   const onTouchStart = useCallback((e: React.TouchEvent) => {
     const touch = e.touches[0];
+    if (!touch) return;
     startX.current = touch.clientX;
     startY.current = touch.clientY;
     currentX.current = 0;
@@ -38,6 +55,7 @@ export function useSwipeAction({
 
   const onTouchMove = useCallback((e: React.TouchEvent) => {
     const touch = e.touches[0];
+    if (!touch) return;
     const dx = touch.clientX - startX.current;
     const dy = touch.clientY - startY.current;
 
@@ -77,13 +95,14 @@ export function useSwipeAction({
       const direction = currentX.current > 0 ? 1 : -1;
       el.style.transform = `translateX(${direction * (threshold + 20)}px)`;
 
-      if (swipeTimeout.current) clearTimeout(swipeTimeout.current);
+      if (swipeTimeout.current !== null) clearTimeout(swipeTimeout.current);
       swipeTimeout.current = setTimeout(() => {
-        if (!containerRef.current) return;
-        containerRef.current.style.transition = 'transform 200ms ease-out';
-        containerRef.current.style.transform = 'translateX(0)';
-        if (direction > 0) onSwipeRight?.();
-        else onSwipeLeft?.();
+        if (containerRef.current) {
+          containerRef.current.style.transition = 'transform 200ms ease-out';
+          containerRef.current.style.transform = 'translateX(0)';
+        }
+        if (direction > 0) onSwipeRightRef.current?.();
+        else onSwipeLeftRef.current?.();
         swipeTimeout.current = null;
       }, 150);
     } else {
@@ -93,7 +112,7 @@ export function useSwipeAction({
     swiping.current = false;
     locked.current = false;
     currentX.current = 0;
-  }, [threshold, onSwipeLeft, onSwipeRight]);
+  }, [threshold]);
 
   return {
     containerRef,
