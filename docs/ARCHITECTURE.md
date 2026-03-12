@@ -1,8 +1,8 @@
 # forme - 아키텍처 & 기술 선정 이유
 
-> 최종 업데이트: 2026-03-12 (리마인더 5분 주기, safeCompare 강화, AlertDialog 통일, 북마크 컬렉션)
+> 최종 업데이트: 2026-03-13 (유튜브 북마크 컬렉션, Shorts 필터, SSRF/videoId 검증 강화, 접근성 aria-hidden)
 
-개인 올인원 PWA. 큐레이션(RSS), 캘린더, 메모(리치 에디터), 팟캐스트를 하나의 앱에 통합.
+개인 올인원 PWA. 큐레이션(RSS), 캘린더, 메모(리치 에디터), 팟캐스트, 유튜브 요약을 하나의 앱에 통합.
 모바일 퍼스트, 오프라인 지원, 푸시 알림까지 네이티브 앱 수준의 경험을 웹으로 제공.
 
 ---
@@ -39,6 +39,8 @@ graph TB
     RSS[RSS Feeds<br/>큐레이션 소스]
     DC[Discord OAuth]
     DW[Discord Webhook<br/>팟캐스트 알림]
+    GM[Gemini 2.5 Flash-Lite<br/>영상 요약 AI]
+    YT[YouTube<br/>RSS + 자막 + Data API v3]
   end
 
   RC -->|Server Actions| SA
@@ -56,6 +58,8 @@ graph TB
   CR2 -->|verifyCronSecret| API
   CR3 -->|verifyCronSecret| API
   CR4 -->|리마인더| DW
+  API -->|자막 추출| YT
+  API -->|JSON 모드 요약| GM
 ```
 
 **핵심 원칙**: Server Components 우선, RLS로 데이터 격리, 서버 측 입력 검증 필수 (`lib/validators.ts` 공유 정규식), 최소한의 클라이언트 상태, 무거운 컴포넌트 지연 로딩, 인터랙션 optimistic updates, 반응형 레이아웃 (모바일 단일컬럼 ↔ 데스크톱 멀티컬럼), Vercel 리전과 DB 리전 코로케이션 (서울). Safari PWA 호환성 우선 (`flex flex-col` Dialog, `overscroll-behavior` 조건부 해제). 대형 컴포넌트 → 커스텀 훅/하위 컴포넌트 추출 (useCalendarState, useEditorConfig, DayCell, lane-utils 등). WCAG 2.1 AA 접근성 준수 (터치 타겟 44px, focus-visible, aria-live, prefers-reduced-motion).
@@ -186,9 +190,10 @@ flowchart LR
 - **인증**: `React.cache` 기반 `getAuthUser()` — 동일 요청 내 중복 인증 제거
 - **캘린더**: Optimistic updates — 로컬 상태 즉시 반영, 서버 백그라운드 동기화. 데스크톱 2컬럼 (`lg:flex-row` 캘린더 | 상세), 모바일 단일 컬럼. 이벤트 카테고리(아이콘+색상) 지원
 - **큐레이션 UX**: 스와이프 액션 (`useSwipeAction` 훅, axis-lock + 타이머 정리), 키보드 네비 (j/k/o/b, DOM 직접 포커스링), 일괄 삭제 (100개 청크, 다이얼로그 스피너), 인라인 메모 (북마크 탭, key prop 동기화), 북마크 컬렉션 (DnD 정렬, 색상 태그, 컬렉션별 필터)
+- **유튜브 요약**: 수집과 요약 분리 — RSS로 무료 수집 (videoId 중복 스킵, YouTube Data API v3로 duration 조회 → Shorts/2분 미만 필터) → 선택적 Gemini 요약 (싱글톤 패턴, 자막 추출 → description 폴백, summarySource 플래그). SSE 스트리밍 요약 (api/curation/crawl 패턴), 마크다운 렌더러 `next/dynamic` 지연 로딩, 북마크 컬렉션 (DnD 순서변경 + 피커 바텀시트 + 피드 칩 필터), optimistic updates + 에러 롤백, 자막 URL SSRF 방어
 - **크롤링 중복 방지**: 크로스소스 제목 dedup — 동일 유저의 기존 아이템 제목과 비교 후 중복 스킵 (curationSources join, 100개 청크 조회)
-- **에러 처리**: 모든 (main) 페이지 error.tsx (calendar, curation, memo, podcast) — `error` prop 로깅, 사용자에게 제네릭 메시지만 표출
-- **접근성**: 탭바 `aria-current="page"`, 검색 `aria-label`, 이벤트 폼 색상 `focus-visible:ring-2` + `aria-label`, 폼 라벨 `htmlFor`/`id` 연결, 에러 메시지 `role="alert" aria-live="polite"`, 터치 타겟 최소 44x44px, `@utility focus-ring` CSS 유틸리티, `prefers-reduced-motion` 미디어 쿼리, progressbar ARIA 속성
+- **에러 처리**: 모든 (main) 페이지 error.tsx (calendar, curation, memo, podcast, video) — `error` prop 로깅, 사용자에게 제네릭 메시지만 표출
+- **접근성**: 탭바 `aria-current="page"`, 검색 `aria-label`, 이벤트 폼 색상 `focus-visible:ring-2` + `aria-label`, 폼 라벨 `htmlFor`/`id` 연결, 에러 메시지 `role="alert" aria-live="polite"`, 터치 타겟 최소 44x44px, `@utility focus-ring` CSS 유틸리티, `prefers-reduced-motion` 미디어 쿼리, progressbar ARIA 속성, 장식 아이콘 `aria-hidden="true"` (라벨 있는 버튼 내부 lucide 아이콘)
 - **상태 관리 패턴**: 대형 컴포넌트 상태 → 커스텀 훅 추출 (`useCalendarState` 14개 상태, `useEditorConfig` TipTap 확장), `saveFnRef` 패턴으로 stale closure 방지 (player-context, use-auto-save), `useReducer`로 복잡한 상태 관리 (upload-dialog)
 - **공유 유틸**: `lib/format-time.ts` (formatTime, formatDuration), `lib/constants.ts` (앱 전역 상수), `components/ui/list-skeleton.tsx` (목록 스켈레톤)
 
@@ -294,12 +299,48 @@ erDiagram
     boolean isActive
   }
 
+  video_sources {
+    uuid id PK
+    uuid userId
+    text channelId UK
+    text channelTitle
+    text handle
+    text thumbnailUrl
+  }
+
+  video_items {
+    uuid id PK
+    uuid sourceId FK
+    uuid collectionId FK
+    uuid userId
+    text videoId UK
+    text title
+    text summary
+    varchar status
+    varchar summarySource
+    boolean isBookmarked
+    boolean isRead
+    text memo
+    integer duration
+    timestamp publishedAt
+  }
+
+  video_bookmark_collections {
+    uuid id PK
+    uuid userId
+    varchar name
+    varchar color
+    integer sortOrder
+  }
+
   curation_sources ||--o{ curation_items : "1:N sourceId"
   bookmark_collections ||--o{ curation_items : "1:N collectionId"
   event_categories ||--o{ calendar_events : "1:N categoryId"
+  video_sources ||--o{ video_items : "1:N sourceId"
+  video_bookmark_collections ||--o{ video_items : "1:N collectionId"
 ```
 
-**11개 테이블**, 모든 테이블에 `userId` + RLS. `memos.content`는 TipTap JSON (JSONB), `contentText`는 검색용 평문 인덱스.
+**14개 테이블**, 모든 테이블에 `userId` + RLS. `memos.content`는 TipTap JSON (JSONB), `contentText`는 검색용 평문 인덱스.
 
 ---
 
@@ -320,6 +361,11 @@ erDiagram
 | POST | `/api/podcast/upload` | 팟캐스트 오디오 R2 업로드 (200MB) |
 | GET | `/api/cron/podcast-reminder` | 23시 KST 팟캐스트 제작 Discord 리마인더 (verifyCronSecret 인증) |
 | GET/POST/DELETE | `/api/push/subscribe` | 푸시 구독 관리 |
+| GET/POST/DELETE | `/api/video/sources` | 유튜브 채널 소스 CRUD (@handle + /channel/ URL 지원) |
+| POST | `/api/video/collect` | RSS 영상 수집 SSE (기간 필터, videoId 중복 스킵, Shorts 2분 미만 필터, max 50 소스) |
+| POST | `/api/video/summarize` | 영상 요약 SSE (자막 추출 → Gemini → DB, 최대 3개 배치) |
+| GET | `/api/video/items` | 영상 피드 목록 (status/tag/collection 필터, 커서 페이지네이션, summarizing 타임아웃 리커버리) |
+| PATCH/DELETE | `/api/video/[id]` | 영상 아이템 읽음/북마크/메모/컬렉션 업데이트 + 삭제 (userId 검증) |
 
 ---
 
@@ -330,10 +376,10 @@ erDiagram
 | 인증 | Discord OAuth + Supabase Auth |
 | 인가 | PostgreSQL RLS (`auth.uid() = user_id`) |
 | 입력 검증 | `lib/validators.ts` 공유 정규식 + Server Action/API에서 날짜, 색상, URL, 길이, UUID 형식 검증. 인라인 정규식 금지 |
-| UUID 검증 | 모든 CRUD 함수의 id 파라미터에 UUID_REGEX 적용 (calendar, todos, memos, categories, curation, podcast) |
+| UUID 검증 | 모든 CRUD 함수의 id 파라미터에 UUID_REGEX 적용 (calendar, todos, memos, categories, curation, podcast, video) |
 | API 핸들러 순서 | 인증(auth) → 입력 검증(UUID 등) → 비즈니스 로직 (인증 전 입력 검증 금지) |
 | Cron 인증 | `verifyCronSecret()` + `getAllUserIds()` 멀티유저 패턴 — constant-time `safeCompare` (길이 무관 타이밍 공격 방어), profiles 테이블 100명 cap + 5분 TTL 캐시, 응답에 내부 상세 미노출 |
-| 네트워크 | SSRF 방어 (`isSafeUrl` — IPv4/IPv6 사설, IPv4-mapped IPv6, ULA, Link-Local 차단), HTTPS 강제 |
+| 네트워크 | SSRF 방어 (`isSafeUrl` — IPv4/IPv6 사설, IPv4-mapped IPv6, ULA, Link-Local 차단, 자막 URL 포함), HTTPS 강제, videoId/channelId 정규식 검증 |
 | 헤더 | CSP, HSTS, X-Frame-Options, Permissions-Policy |
 | 리다이렉트 | `ALLOWED_PATHS` 화이트리스트 |
 | 업로드 | MIME 검증, 크기 제한, 안전한 키 생성 |
@@ -385,7 +431,7 @@ erDiagram
 | 전략 | 대상 | 효과 |
 |------|------|------|
 | PlayerContext 분리 | `usePlayer()` (상태) + `usePlayerTime()` (시간) | 4Hz 전체 리렌더 → 시간 UI만 |
-| `React.memo` | CurationCard, CurationListRow, EpisodeCard, MemoCard | 필터/재생 변경 시 무관한 카드 리렌더 방지 |
+| `React.memo` | CurationCard, CurationListRow, EpisodeCard, MemoCard, VideoCard | 필터/재생 변경 시 무관한 카드 리렌더 방지 |
 | DOM 직접 포커스링 | CurationFeed 키보드 네비 | focusIndex `useRef` + `data-curation-feed` 스코프 → j/k 키 리렌더 제거 |
 | `useCallback` | CalendarClient 핸들러 (handleSelectDate 등) | WeekRow React.memo 정상 작동 |
 | 중복 Auth 제거 | Dashboard 컴포넌트 → `getAuthUser()` 통일 | 요청당 auth 3회 → 1회 |
@@ -417,6 +463,10 @@ erDiagram
 | `bookmark_collections` | `(userId, sortOrder)` 복합 | 사용자별 컬렉션 정렬 조회 |
 | `user_daily_activity` | `(userId, date)` 복합 | 스트릭 계산 날짜 정렬 |
 | `memos` | `tags` GIN | 태그 배열 검색 |
+| `video_items` | `(sourceId, videoId)` unique | 영상 중복 방지 |
+| `video_items` | `(userId, status)` 복합 | 상태별 피드 필터 |
+| `video_items` | `(collectionId)` | 컬렉션별 필터 |
+| `video_bookmark_collections` | `(userId, sortOrder)` 복합 | 사용자별 컬렉션 정렬 조회 |
 
 ### 트레이싱
 
@@ -452,6 +502,11 @@ erDiagram
 | @dnd-kit/sortable | 10.0.0 | 정렬 DnD |
 | @dnd-kit/modifiers | 9.0.0 | DnD 축 제한 |
 | @next/bundle-analyzer | 16.1.6 | 번들 분석 |
+| @google/generative-ai | latest | Gemini AI 영상 요약 |
+| (커스텀 Innertube) | — | YouTube 자막 추출 (youtube-transcript 대체, lib/youtube-transcript.ts) |
+| react-markdown | latest | 마크다운 렌더링 |
+| remark-gfm | latest | GFM 마크다운 확장 |
+| rehype-highlight | latest | 코드블록 구문 하이라이팅 |
 | typescript | 5.9.3 | 타입 체크 |
 | node | >=22.0.0 | 런타임 |
 | pnpm | >=9.0.0 | 패키지 매니저 |

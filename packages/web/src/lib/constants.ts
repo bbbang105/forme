@@ -35,3 +35,11 @@ export const PROFILE_INTERESTS_MAX = 6;
 export const SW_MAX_REGISTRATION_RETRIES = 3;
 /** Base delay (ms) between SW registration retries (exponential backoff). */
 export const SW_RETRY_BASE_DELAY_MS = 1000;
+
+// ── Video Summary ───────────────────────────────────────────────────────────
+/** Maximum number of videos that can be summarized in a single batch. */
+export const VIDEO_SUMMARIZE_BATCH_MAX = 5;
+/** Number of items per page in the video feed. */
+export const VIDEO_FEED_PAGE_SIZE = 20;
+/** Timeout (ms) after which a "summarizing" item is reset to "collected". */
+export const VIDEO_SUMMARIZING_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes

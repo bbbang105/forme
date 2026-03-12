@@ -9,3 +9,6 @@ export * from './push-subscriptions';
 export * from './memos';
 export * from './user-daily-activity';
 export * from './bookmark-collections';
+export * from './video-sources';
+export * from './video-items';
+export * from './video-bookmark-collections';
