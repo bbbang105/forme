@@ -55,8 +55,8 @@ pnpm db:push          # 스키마 직접 push (dev용)
 - 무거운 컴포넌트: `next/dynamic` + `ssr: false`로 지연 로딩 (TipTap, DnD Kit, EventForm, CategoryManager 등)
 - 캘린더 인터랙션: Optimistic updates 패턴, 데스크톱 2컬럼 (`lg:flex-row`), lane 기반 이벤트 배치 (hazel-admin 스타일, greedy lane 할당 + startTime 순 정렬 + 멀티데이 바 연결), 삭제 시 AlertDialog 확인 모달, 반복 일정 (매주/격주 + 요일 선택, excludedDates로 개별 삭제, recurrenceEndDate로 이후 삭제)
 - 투두: DnD 드래그 순서변경 (@dnd-kit, GripVertical 핸들, 모바일 항상 표시), 밀린 투두 칩 (date < 오늘 && 미완료 → amber 칩 + "오늘로" 이동), 완료 애니메이션 (check-bounce), 빈 상태 격려 문구
-- Cron 인증: `lib/cron-auth.ts` — `verifyCronSecret()` (timingSafeEqual) + `getAllUserIds()` (profiles 테이블, 100명 cap) 멀티유저 패턴, 모든 cron 라우트에서 사용. 레거시 `verifyCronAuth()` (단일유저) 호환 유지
-- 푸시 알림 Cron: 데일리 요약 (08:00 KST, 일정+투두 카운트), 일정 리마인더 (15분 간격, startTime 45~75분 전 윈도우, reminderSent 플래그)
+- Cron 인증: `lib/cron-auth.ts` — `verifyCronSecret()` (timingSafeEqual, 길이 무관 constant-time 비교) + `getAllUserIds()` (profiles 테이블, 100명 cap, 5분 TTL 캐시) 멀티유저 패턴, 모든 cron 라우트에서 사용. 레거시 `verifyCronAuth()` (단일유저) 호환 유지
+- 푸시 알림 Cron: 데일리 요약 (08:00 KST, 일정+투두 카운트), 일정 리마인더 (5분 간격, 현재~1시간 이내 윈도우, 자정 경계 대응, biweekly 격주 검증, reminderSent 즉시 업데이트, 유저별 병렬 처리)
 - 모바일 PWA: viewport `maximumScale: 1, userScalable: false`, 모든 input/textarea/select `text-base`(16px) 이상 (iOS 자동 줌 방지), 크롬 스타일 pull-to-refresh (`overscroll-behavior-y: contain` + DOM 직접 조작 + 컨텐츠 translateY + 인라인 SVG 인디케이터 + `window.location.reload()`)
 - Safari PWA 대응: Dialog `flex flex-col` + `inset-y-0 my-auto` 센터링 (grid+translate 금지), `body[data-scroll-locked]`에서 `overscroll-behavior-y: auto` 해제, pull-to-refresh에서 다이얼로그 열림 감지 스킵
 - 큐레이션 정렬: status=read 탭에서 readAt DESC 정렬 (최근 읽은 순)
@@ -119,11 +119,11 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/lib/greetings.ts` | 대시보드 인사 문구 (100개 랜덤) |
 | `packages/web/src/app/api/curation/crawl/route.ts` | SSE 수동 크롤 API |
 | `packages/web/src/app/api/curation/sources/reorder/route.ts` | 즐겨찾기 소스 순서 배치 업데이트 |
-| `packages/web/src/lib/cron-auth.ts` | Cron 인증 유틸 (verifyCronSecret + getAllUserIds 멀티유저, safeCompare, 레거시 verifyCronAuth 호환) |
+| `packages/web/src/lib/cron-auth.ts` | Cron 인증 유틸 (verifyCronSecret + getAllUserIds 멀티유저, constant-time safeCompare, 5분 TTL 캐시, 레거시 verifyCronAuth 호환) |
 | `packages/web/src/app/api/cron/curation/route.ts` | Cron 자동 크롤 + 푸시 알림 (verifyCronSecret 멀티유저 인증, 응답에 내부 상세 미노출) |
 | `packages/web/src/app/api/cron/calendar-daily/route.ts` | Cron 데일리 요약 푸시 (08:00 KST, 일정+투두 카운트, reminderSent 리셋) |
-| `packages/web/src/app/api/cron/calendar-reminder/route.ts` | 일정 리마인더 푸시 (Supabase pg_cron 15분 호출, 1시간 전 알림, 반복 일정 대응) |
-| `supabase/pg-cron-setup.sql` | Supabase pg_cron + pg_net 설정 SQL (calendar-reminder 15분 스케줄) |
+| `packages/web/src/app/api/cron/calendar-reminder/route.ts` | 일정 리마인더 푸시 (Supabase pg_cron 5분 호출, 현재~1시간 이내 윈도우, 자정 경계 대응, biweekly 검증, GET+POST 지원) |
+| `supabase/pg-cron-setup.sql` | Supabase pg_cron + pg_net 설정 SQL (calendar-reminder 5분 스케줄, 플레이스홀더 가드) |
 | `packages/web/src/app/api/podcast/upload/route.ts` | 팟캐스트 오디오 R2 업로드 |
 | `packages/web/src/app/api/podcast/episodes/route.ts` | 팟캐스트 에피소드 CRUD |
 | `packages/web/src/app/api/push/subscribe/route.ts` | 푸시 구독 등록/해제/조회 |

@@ -8,9 +8,11 @@ import {Label} from '@/components/ui/label';
 import {Switch} from '@/components/ui/switch';
 import {
     AlertDialog,
+    AlertDialogAction,
     AlertDialogCancel,
     AlertDialogContent,
     AlertDialogDescription,
+    AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
@@ -209,8 +211,10 @@ function EventFormContent({
       try {
         await deleteCalendarEvent(targetId);
         onEventDelete(targetId);
+        setShowDeleteConfirm(false);
         onOpenChange(false);
       } catch (err) {
+        setShowDeleteConfirm(false);
         setError(err instanceof Error ? err.message : '삭제에 실패했습니다');
       }
     });
@@ -510,47 +514,43 @@ function EventFormContent({
             {isRecurringInstance ? (
               <>
                 <div className="flex flex-col gap-2 py-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
+                  <AlertDialogAction
                     onClick={handleExcludeDate}
                     disabled={isPending}
+                    className="bg-background text-foreground border border-input hover:bg-accent hover:text-accent-foreground"
                   >
                     이 일정만 삭제
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
+                  </AlertDialogAction>
+                  <AlertDialogAction
                     onClick={handleDeleteAfterDate}
                     disabled={isPending}
+                    className="bg-background text-foreground border border-input hover:bg-accent hover:text-accent-foreground"
                   >
                     이후 모든 일정 삭제
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
+                  </AlertDialogAction>
+                  <AlertDialogAction
                     onClick={handleDeleteAll}
                     disabled={isPending}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
                     모든 반복 일정 삭제
-                  </Button>
+                  </AlertDialogAction>
                 </div>
                 <div className="flex justify-end">
                   <AlertDialogCancel>취소</AlertDialogCancel>
                 </div>
               </>
             ) : (
-              <div className="flex justify-end gap-2 mt-2">
+              <AlertDialogFooter>
                 <AlertDialogCancel>취소</AlertDialogCancel>
-                <Button
-                  variant="destructive"
-                  size="sm"
+                <AlertDialogAction
                   onClick={handleDeleteAll}
                   disabled={isPending}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 >
                   삭제
-                </Button>
-              </div>
+                </AlertDialogAction>
+              </AlertDialogFooter>
             )}
           </AlertDialogContent>
         </AlertDialog>
