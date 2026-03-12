@@ -74,8 +74,8 @@ export const GET = withTracing('GET /api/cron/calendar-daily', async (request) =
 
     try {
       await sendPushToUser(userId, {
-        title: `오늘 ${parts.join(', ')}가 있어요`,
-        body: '캘린더에서 확인해보세요!',
+        title: `☀️ 오늘 ${parts.join(', ')}가 있어요`,
+        body: '📋 캘린더에서 확인해보세요!',
         tag: 'calendar-daily',
         url: '/calendar',
       });
