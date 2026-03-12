@@ -6,13 +6,14 @@ import {CheckCircle2, Circle, MapPin, Pencil, Trash2} from 'lucide-react';
 import {cn} from '@/lib/utils';
 import {
     AlertDialog,
+    AlertDialogAction,
     AlertDialogCancel,
     AlertDialogContent,
     AlertDialogDescription,
+    AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import {Button} from '@/components/ui/button';
 import type {CalendarEvent, EventCategory} from './types';
 
 interface EventListProps {
@@ -161,61 +162,57 @@ export function EventList({ events, selectedDate, categories, onEdit, onDelete, 
           {isRecurringInstance ? (
             <>
               <div className="flex flex-col gap-2 py-2">
-                <Button
-                  variant="outline"
-                  size="sm"
+                <AlertDialogAction
                   onClick={() => {
                     if (deleteTarget?._originalId && deleteTarget?._instanceDate) {
                       onExcludeDate?.(deleteTarget._originalId, deleteTarget._instanceDate);
                     }
                     setDeleteTarget(null);
                   }}
+                  className="bg-background text-foreground border border-input hover:bg-accent hover:text-accent-foreground"
                 >
                   이 일정만 삭제
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
+                </AlertDialogAction>
+                <AlertDialogAction
                   onClick={() => {
                     if (deleteTarget?._originalId && deleteTarget?._instanceDate) {
                       onDeleteAfter?.(deleteTarget._originalId, deleteTarget._instanceDate);
                     }
                     setDeleteTarget(null);
                   }}
+                  className="bg-background text-foreground border border-input hover:bg-accent hover:text-accent-foreground"
                 >
                   이후 모든 일정 삭제
-                </Button>
-                <Button
-                  variant="destructive"
-                  size="sm"
+                </AlertDialogAction>
+                <AlertDialogAction
                   onClick={() => {
                     if (deleteTarget?._originalId) {
                       onDelete(deleteTarget._originalId);
                     }
                     setDeleteTarget(null);
                   }}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 >
                   모든 반복 일정 삭제
-                </Button>
+                </AlertDialogAction>
               </div>
               <div className="flex justify-end">
                 <AlertDialogCancel>취소</AlertDialogCancel>
               </div>
             </>
           ) : (
-            <div className="flex justify-end gap-2 mt-2">
+            <AlertDialogFooter>
               <AlertDialogCancel>취소</AlertDialogCancel>
-              <Button
-                variant="destructive"
-                size="sm"
+              <AlertDialogAction
                 onClick={() => {
                   if (deleteTarget) onDelete(deleteTarget.id);
                   setDeleteTarget(null);
                 }}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
                 삭제
-              </Button>
-            </div>
+              </AlertDialogAction>
+            </AlertDialogFooter>
           )}
         </AlertDialogContent>
       </AlertDialog>

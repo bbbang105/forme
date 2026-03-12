@@ -1,6 +1,6 @@
 # forme - 아키텍처 & 기술 선정 이유
 
-> 최종 업데이트: 2026-03-12 (북마크 컬렉션, 멀티유저 cron, 크롤 제목 dedup)
+> 최종 업데이트: 2026-03-12 (리마인더 5분 주기, safeCompare 강화, AlertDialog 통일, 북마크 컬렉션)
 
 개인 올인원 PWA. 큐레이션(RSS), 캘린더, 메모(리치 에디터), 팟캐스트를 하나의 앱에 통합.
 모바일 퍼스트, 오프라인 지원, 푸시 알림까지 네이티브 앱 수준의 경험을 웹으로 제공.
@@ -29,7 +29,7 @@ graph TB
   subgraph Cron["Scheduled Jobs"]
     CR1[Vercel Cron<br/>curation 크롤 22시]
     CR2[Vercel Cron<br/>calendar-daily 08시]
-    CR3[Supabase pg_cron<br/>calendar-reminder 15분]
+    CR3[Supabase pg_cron<br/>calendar-reminder 5분]
     CR4[Vercel Cron<br/>podcast-reminder 23시]
   end
 
@@ -315,7 +315,7 @@ erDiagram
 | POST | `/api/curation/sources/reorder` | 즐겨찾기 순서 배치 업데이트 |
 | GET | `/api/cron/curation` | Cron 자동 크롤 + 푸시 + Discord NotebookLM URL 전송 (verifyCronSecret 멀티유저 인증, 제목 dedup) |
 | GET | `/api/cron/calendar-daily` | 08시 KST 데일리 요약 푸시 (멀티유저, 일정+투두 카운트) |
-| GET | `/api/cron/calendar-reminder` | 이벤트 45~75분 전 리마인더 (멀티유저, Supabase pg_cron 15분 주기) |
+| GET/POST | `/api/cron/calendar-reminder` | 현재~1시간 이내 일정 리마인더 (멀티유저, Supabase pg_cron 5분 주기, 자정 경계 대응, biweekly 검증, 유저별 병렬 처리) |
 | POST | `/api/memo/image` | 메모 이미지 R2 업로드 (5MB) |
 | POST | `/api/podcast/upload` | 팟캐스트 오디오 R2 업로드 (200MB) |
 | GET | `/api/cron/podcast-reminder` | 23시 KST 팟캐스트 제작 Discord 리마인더 (verifyCronSecret 인증) |
@@ -332,7 +332,7 @@ erDiagram
 | 입력 검증 | `lib/validators.ts` 공유 정규식 + Server Action/API에서 날짜, 색상, URL, 길이, UUID 형식 검증. 인라인 정규식 금지 |
 | UUID 검증 | 모든 CRUD 함수의 id 파라미터에 UUID_REGEX 적용 (calendar, todos, memos, categories, curation, podcast) |
 | API 핸들러 순서 | 인증(auth) → 입력 검증(UUID 등) → 비즈니스 로직 (인증 전 입력 검증 금지) |
-| Cron 인증 | `verifyCronSecret()` + `getAllUserIds()` 멀티유저 패턴 — `timingSafeEqual`로 CRON_SECRET 비교 (타이밍 공격 방어), profiles 테이블 100명 cap, 응답에 내부 상세 미노출 |
+| Cron 인증 | `verifyCronSecret()` + `getAllUserIds()` 멀티유저 패턴 — constant-time `safeCompare` (길이 무관 타이밍 공격 방어), profiles 테이블 100명 cap + 5분 TTL 캐시, 응답에 내부 상세 미노출 |
 | 네트워크 | SSRF 방어 (`isSafeUrl` — IPv4/IPv6 사설, IPv4-mapped IPv6, ULA, Link-Local 차단), HTTPS 강제 |
 | 헤더 | CSP, HSTS, X-Frame-Options, Permissions-Policy |
 | 리다이렉트 | `ALLOWED_PATHS` 화이트리스트 |
