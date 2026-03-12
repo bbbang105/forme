@@ -39,6 +39,7 @@ interface RawItem {
   collectedAt: Date;
   sourceName: string | null;
   memo: string | null;
+  collectionId: string | null;
 }
 
 // ── Serializer ──
@@ -59,6 +60,7 @@ function serializeItem(item: RawItem) {
     collectedAt: item.collectedAt.toISOString(),
     sourceName: item.sourceName ?? null,
     memo: item.memo ?? null,
+    collectionId: item.collectionId ?? null,
   };
 }
 
@@ -101,6 +103,7 @@ export const GET = withTracing('GET /api/curation', async (request) => {
   const tagsParam = searchParams.get('tags')?.trim() || '';
   const sort = searchParams.get('sort')?.trim() || 'latest';
   const sourceId = searchParams.get('sourceId')?.trim() || '';
+  const collectionId = searchParams.get('collectionId')?.trim() || '';
 
   const rawLimit = parseInt(searchParams.get('limit') || String(DEFAULT_LIMIT), 10);
   const limit = isNaN(rawLimit)
@@ -129,6 +132,13 @@ export const GET = withTracing('GET /api/curation', async (request) => {
     );
   }
 
+  if (collectionId && !UUID_REGEX.test(collectionId)) {
+    return NextResponse.json(
+      { error: 'collectionId must be a valid UUID' },
+      { status: 400 }
+    );
+  }
+
   const filterTags = tagsParam
     ? tagsParam.split(',').map((t) => t.trim()).filter(Boolean)
     : [];
@@ -148,6 +158,10 @@ export const GET = withTracing('GET /api/curation', async (request) => {
 
   if (sourceId) {
     filterConditions.push(eq(curationItems.sourceId, sourceId));
+  }
+
+  if (collectionId) {
+    filterConditions.push(eq(curationItems.collectionId, collectionId));
   }
 
   if (status === 'unread') {
@@ -309,6 +323,7 @@ export const GET = withTracing('GET /api/curation', async (request) => {
           collectedAt: curationItems.collectedAt,
           sourceName: curationSources.name,
           memo: curationItems.memo,
+          collectionId: curationItems.collectionId,
           score: scoreExpr!.as('score'),
           sortDate: sortDateExpr.as('sort_date'),
         })
@@ -358,6 +373,7 @@ export const GET = withTracing('GET /api/curation', async (request) => {
         collectedAt: curationItems.collectedAt,
         sourceName: curationSources.name,
         memo: curationItems.memo,
+        collectionId: curationItems.collectionId,
         sortDate: sortDateExpr.as('sort_date'),
       })
       .from(curationItems)

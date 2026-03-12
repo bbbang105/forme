@@ -1,7 +1,7 @@
 /**
  * Shared RSS crawl logic used by both the SSE crawl endpoint and the Vercel Cron job.
  */
-import {and, eq} from 'drizzle-orm';
+import {and, eq, inArray} from 'drizzle-orm';
 import {parseFeed} from 'feedsmith';
 import {curationItems, curationSources, db} from '@forme/shared';
 import {isSafeUrl} from './url-safety';
@@ -140,6 +140,7 @@ interface CrawlSource {
   rssUrl: string;
   category: string;
   tags?: string[];
+  userId: string;
 }
 
 /**
@@ -206,6 +207,38 @@ export async function crawlSource(source: CrawlSource, options?: CrawlOptions): 
         itemsFound: feedItems.length,
         newItemsAdded: 0,
         itemsFilteredOut,
+      };
+    }
+
+    // ── Cross-source title dedup ──
+    // 같은 유저의 다른 소스에서 동일 제목이 이미 존재하면 제외
+    const titles = validItems.map((item) => sanitizeTitle(item.title!));
+    const existingTitles = new Set<string>();
+    // Batch check in chunks of 100
+    for (let i = 0; i < titles.length; i += 100) {
+      const chunk = titles.slice(i, i + 100);
+      const rows = await db
+        .select({ title: curationItems.title })
+        .from(curationItems)
+        .innerJoin(curationSources, eq(curationItems.sourceId, curationSources.id))
+        .where(and(
+          eq(curationSources.userId, source.userId),
+          inArray(curationItems.title, chunk)
+        ));
+      for (const row of rows) existingTitles.add(row.title);
+    }
+    const beforeDedup = validItems.length;
+    validItems = validItems.filter((item) => !existingTitles.has(sanitizeTitle(item.title!)));
+    const dedupFiltered = beforeDedup - validItems.length;
+
+    if (validItems.length === 0) {
+      return {
+        sourceId: source.id,
+        sourceName: source.name,
+        success: true,
+        itemsFound: feedItems.length,
+        newItemsAdded: 0,
+        itemsFilteredOut: itemsFilteredOut + dedupFiltered,
       };
     }
 
@@ -296,5 +329,6 @@ export async function getActiveSourcesForUser(userId: string) {
       rssUrl: s.rssUrl!,
       category: s.category,
       tags: s.tags ?? undefined,
+      userId,
     }));
 }

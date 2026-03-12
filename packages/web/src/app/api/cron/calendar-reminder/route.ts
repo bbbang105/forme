@@ -1,9 +1,9 @@
 import {NextResponse} from 'next/server';
-import {and, eq, gte, lte, isNotNull} from 'drizzle-orm';
-import {db, calendarEvents} from '@forme/shared';
+import {and, eq, gte, isNotNull, lte} from 'drizzle-orm';
+import {calendarEvents, db} from '@forme/shared';
 import {sendPushToUser} from '@/lib/push';
 import {withTracing} from '@/lib/logger';
-import {verifyCronAuth} from '@/lib/cron-auth';
+import {getAllUserIds, verifyCronSecret} from '@/lib/cron-auth';
 
 export const maxDuration = 30;
 
@@ -46,80 +46,74 @@ function getDayOfWeekKST(): number {
 
 /**
  * GET /api/cron/calendar-reminder
- * Vercel Cron: 매 15분 — 1시간 후 시작하는 일정 리마인더 푸시
+ * Cron: 매 15분 — 모든 유저의 1시간 후 시작하는 일정 리마인더 푸시
  */
 export const GET = withTracing('GET /api/cron/calendar-reminder', async (request) => {
-  const auth = verifyCronAuth(request);
+  const auth = verifyCronSecret(request);
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
-  const userId = auth.userId;
 
+  const userIds = await getAllUserIds();
   const today = getTodayKST();
   const currentTime = getCurrentTimeKST();
+  const earliestTime = addMinutes(currentTime, 45);
   const laterTime = addMinutes(currentTime, 75);
   const dayOfWeek = getDayOfWeekKST();
 
-  // 오늘 날짜, 시간 범위 내, 미발송 이벤트 조회
-  const events = await db
-    .select()
-    .from(calendarEvents)
-    .where(
-      and(
-        eq(calendarEvents.userId, userId),
-        eq(calendarEvents.reminderSent, false),
-        isNotNull(calendarEvents.startTime),
-        lte(calendarEvents.startDate, today),
-        gte(calendarEvents.endDate, today),
-        gte(calendarEvents.startTime, currentTime),
-        lte(calendarEvents.startTime, laterTime),
+  let totalSent = 0;
+
+  for (const userId of userIds) {
+    const events = await db
+      .select()
+      .from(calendarEvents)
+      .where(
+        and(
+          eq(calendarEvents.userId, userId),
+          eq(calendarEvents.reminderSent, false),
+          isNotNull(calendarEvents.startTime),
+          lte(calendarEvents.startDate, today),
+          gte(calendarEvents.endDate, today),
+          gte(calendarEvents.startTime, earliestTime),
+          lte(calendarEvents.startTime, laterTime),
+        ),
+      );
+
+    const validEvents = events.filter((event) => {
+      if (event.excludedDates?.includes(today)) return false;
+      if (event.recurrenceType && event.recurrenceDays) {
+        if (!event.recurrenceDays.includes(dayOfWeek)) return false;
+        if (event.recurrenceEndDate && today > event.recurrenceEndDate) return false;
+      }
+      return true;
+    });
+
+    const sentIds: string[] = [];
+
+    for (const event of validEvents) {
+      const body = [event.startTime, event.location].filter(Boolean).join(' @ ');
+      try {
+        await sendPushToUser(userId, {
+          title: `1시간 후: ${event.title}`,
+          body: body || event.startTime || '',
+          tag: `calendar-reminder-${event.id}`,
+          url: '/calendar',
+        });
+        totalSent++;
+        sentIds.push(event.id);
+      } catch (err) {
+        console.error(`[cron/calendar-reminder] push failed for event ${event.id}`, err);
+      }
+    }
+
+    await Promise.allSettled(
+      sentIds.map((id) =>
+        db
+          .update(calendarEvents)
+          .set({ reminderSent: true })
+          .where(eq(calendarEvents.id, id))
       ),
     );
-
-  // 반복 일정 필터링
-  const validEvents = events.filter((event) => {
-    if (event.excludedDates?.includes(today)) return false;
-
-    if (event.recurrenceType && event.recurrenceDays) {
-      if (!event.recurrenceDays.includes(dayOfWeek)) return false;
-      if (event.recurrenceEndDate && today > event.recurrenceEndDate) return false;
-    }
-
-    return true;
-  });
-
-  let sentCount = 0;
-  const sentIds: string[] = [];
-
-  for (const event of validEvents) {
-    const body = [event.startTime, event.location].filter(Boolean).join(' @ ');
-
-    try {
-      await sendPushToUser(userId, {
-        title: `1시간 후: ${event.title}`,
-        body: body || event.startTime || '',
-        tag: `calendar-reminder-${event.id}`,
-        url: '/calendar',
-      });
-      sentCount++;
-      sentIds.push(event.id);
-    } catch (err) {
-      console.error(`[cron/calendar-reminder] push failed for event ${event.id}`, err);
-    }
   }
 
-  // reminderSent 배치 마킹 (에러 격리: 개별 실패해도 나머지 처리)
-  await Promise.allSettled(
-    sentIds.map((id) =>
-      db
-        .update(calendarEvents)
-        .set({ reminderSent: true })
-        .where(eq(calendarEvents.id, id))
-    ),
-  );
-
-  console.info('[cron/calendar-reminder]', {
-    today, currentTime, laterTime,
-    queried: events.length, valid: validEvents.length, sent: sentCount,
-  });
-
+  console.info('[cron/calendar-reminder]', { today, currentTime, laterTime, userCount: userIds.length, totalSent });
   return NextResponse.json({ ok: true });
 });

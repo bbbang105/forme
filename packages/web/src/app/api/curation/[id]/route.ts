@@ -1,6 +1,6 @@
 import {NextResponse} from 'next/server';
 import {createClient} from '@/lib/supabase/server';
-import {curationItems, curationSources, db} from '@forme/shared';
+import {bookmarkCollections, curationItems, curationSources, db} from '@forme/shared';
 import {and, eq} from 'drizzle-orm';
 import {withTracing} from '@/lib/logger';
 import {UUID_REGEX} from '@/lib/validators';
@@ -11,6 +11,7 @@ interface PatchBody {
   isRead?: boolean;
   isBookmarked?: boolean;
   memo?: string | null;
+  collectionId?: string | null;
 }
 
 /**
@@ -110,12 +111,12 @@ export const PATCH = withTracing('PATCH /api/curation/[id]', async (request, ctx
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const { isRead, isBookmarked, memo } = body;
+  const { isRead, isBookmarked, memo, collectionId } = body;
 
   // At least one field must be provided
-  if (isRead === undefined && isBookmarked === undefined && memo === undefined) {
+  if (isRead === undefined && isBookmarked === undefined && memo === undefined && collectionId === undefined) {
     return NextResponse.json(
-      { error: 'At least one of isRead, isBookmarked, or memo must be provided' },
+      { error: 'At least one field must be provided' },
       { status: 400 }
     );
   }
@@ -138,6 +139,13 @@ export const PATCH = withTracing('PATCH /api/curation/[id]', async (request, ctx
   if (memo !== undefined && memo !== null && typeof memo !== 'string') {
     return NextResponse.json(
       { error: 'memo must be a string or null' },
+      { status: 400 }
+    );
+  }
+
+  if (collectionId !== undefined && collectionId !== null && (typeof collectionId !== 'string' || !UUID_REGEX.test(collectionId))) {
+    return NextResponse.json(
+      { error: 'collectionId must be a valid UUID or null' },
       { status: 400 }
     );
   }
@@ -173,6 +181,7 @@ export const PATCH = withTracing('PATCH /api/curation/[id]', async (request, ctx
       isBookmarked: boolean;
       readAt: Date | null;
       memo: string | null;
+      collectionId: string | null;
     }> = {};
 
     if (isRead !== undefined) {
@@ -182,6 +191,21 @@ export const PATCH = withTracing('PATCH /api/curation/[id]', async (request, ctx
     if (isBookmarked !== undefined) updateValues.isBookmarked = isBookmarked;
     if (memo !== undefined) {
       updateValues.memo = memo ? memo.slice(0, 500) : null;
+    }
+    if (collectionId !== undefined) {
+      // 컬렉션 소유권 검증
+      if (collectionId !== null) {
+        const [col] = await db.select({ id: bookmarkCollections.id })
+          .from(bookmarkCollections)
+          .where(and(eq(bookmarkCollections.id, collectionId), eq(bookmarkCollections.userId, user.id)))
+          .limit(1);
+        if (!col) {
+          return NextResponse.json({ error: 'Collection not found' }, { status: 404 });
+        }
+      }
+      updateValues.collectionId = collectionId;
+      // 컬렉션 지정 시 자동 북마크
+      if (collectionId !== null) updateValues.isBookmarked = true;
     }
 
     // ── Update ──
@@ -212,6 +236,7 @@ export const PATCH = withTracing('PATCH /api/curation/[id]', async (request, ctx
       isBookmarked: updated.isBookmarked,
       collectedAt: updated.collectedAt.toISOString(),
       memo: updated.memo ?? null,
+      collectionId: updated.collectionId ?? null,
     });
   } catch (err) {
     console.error(`[PATCH /api/curation/${id}]`, err);
