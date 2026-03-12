@@ -1,5 +1,6 @@
 import {timingSafeEqual} from 'node:crypto';
 import {UUID_REGEX} from '@/lib/validators';
+import {db, profiles} from '@forme/shared';
 
 /** Timing-safe string comparison for cron bearer tokens */
 export function safeCompare(a: string, b: string): boolean {
@@ -8,7 +9,22 @@ export function safeCompare(a: string, b: string): boolean {
 }
 
 /**
- * Verify cron request authentication.
+ * Verify cron request authentication (secret only).
+ * Returns all active user IDs for multi-user cron processing.
+ */
+export function verifyCronSecret(request: Request):
+  | { ok: true }
+  | { ok: false; status: number; error: string } {
+  const authHeader = request.headers.get('authorization');
+  const secret = process.env.CRON_SECRET?.trim();
+  if (!secret || !authHeader || !safeCompare(authHeader, `Bearer ${secret}`)) {
+    return { ok: false, status: 401, error: 'Unauthorized' };
+  }
+  return { ok: true };
+}
+
+/**
+ * Legacy single-user cron auth (backward compatible).
  * Returns userId on success, or an error object on failure.
  */
 export function verifyCronAuth(request: Request):
@@ -26,4 +42,13 @@ export function verifyCronAuth(request: Request):
   }
 
   return { ok: true, userId };
+}
+
+/** Get all active user IDs from profiles table (capped at 100) */
+export async function getAllUserIds(): Promise<string[]> {
+  const rows = await db
+    .select({ userId: profiles.userId })
+    .from(profiles)
+    .limit(100);
+  return rows.map((r) => r.userId);
 }

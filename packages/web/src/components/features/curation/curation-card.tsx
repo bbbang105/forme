@@ -2,7 +2,7 @@
 
 import {memo, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import Image from 'next/image';
-import {Bookmark, Check, FileText, MessageSquare, Trash2} from 'lucide-react';
+import {Bookmark, Check, FileText, FolderOpen, MessageSquare, Trash2} from 'lucide-react';
 import {cn} from '@/lib/utils';
 import {formatRelativeDate, getArticleGradient, getCategoryStyle,} from '@/lib/curation-utils';
 import {Checkbox} from '@/components/ui/checkbox';
@@ -29,6 +29,13 @@ export interface CurationItemData {
   collectedAt: string;
   sourceName: string | null;
   memo: string | null;
+  collectionId: string | null;
+}
+
+export interface CollectionInfo {
+  id: string;
+  name: string;
+  color: string;
 }
 
 interface CurationCardProps {
@@ -37,6 +44,8 @@ interface CurationCardProps {
   onMarkRead: (id: string) => void;
   onDelete?: (id: string) => void;
   onMemoChange?: (id: string, memo: string | null) => void;
+  onCollectionPick?: (id: string) => void;
+  collectionMap?: Map<string, CollectionInfo>;
   showMemo?: boolean;
   selectMode?: boolean;
   selected?: boolean;
@@ -232,12 +241,21 @@ export const CurationCard = memo(function CurationCard({
   onMarkRead,
   onDelete,
   onMemoChange,
+  onCollectionPick,
+  collectionMap,
   showMemo,
   selectMode,
   selected,
   onToggleSelect,
   compact,
 }: CurationCardProps) {
+  const collection = item.collectionId && collectionMap?.get(item.collectionId);
+
+  const handleCollectionPick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onCollectionPick?.(item.id);
+  };
   const catStyle = getCategoryStyle(item.category);
   const dateLabel = formatRelativeDate(item.publishedAt ?? item.collectedAt);
 
@@ -398,6 +416,12 @@ export const CurationCard = memo(function CurationCard({
               >
                 {catStyle.label}
               </span>
+              {collection && (
+                <span className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-muted/60 text-muted-foreground ring-1 ring-inset ring-border/40">
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: collection.color }} />
+                  {collection.name}
+                </span>
+              )}
               {item.tags?.slice(0, 3).map((tag) => (
                 <span
                   key={tag}
@@ -438,6 +462,18 @@ export const CurationCard = memo(function CurationCard({
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
+                  {onCollectionPick && (
+                    <button
+                      onClick={handleCollectionPick}
+                      className={cn(
+                        'p-1.5 rounded-md transition-colors',
+                        item.collectionId ? 'text-primary' : 'text-muted-foreground/40 hover:text-primary'
+                      )}
+                      aria-label="컬렉션 지정"
+                    >
+                      <FolderOpen className="h-4 w-4" />
+                    </button>
+                  )}
                   <button
                     onClick={handleBookmark}
                     className={cn(
@@ -481,6 +517,8 @@ export const CurationListRow = memo(function CurationListRow({
   onMarkRead,
   onDelete,
   onMemoChange,
+  onCollectionPick,
+  collectionMap,
   showMemo,
   selectMode,
   selected,
@@ -488,6 +526,13 @@ export const CurationListRow = memo(function CurationListRow({
 }: CurationCardProps) {
   const catStyle = getCategoryStyle(item.category);
   const dateLabel = formatRelativeDate(item.publishedAt ?? item.collectedAt);
+  const collection = item.collectionId && collectionMap?.get(item.collectionId);
+
+  const handleCollectionPick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onCollectionPick?.(item.id);
+  };
 
   const handleClick = (e: React.MouseEvent) => {
     if (selectMode) {
@@ -575,6 +620,12 @@ export const CurationListRow = memo(function CurationListRow({
           >
             {catStyle.label}
           </span>
+          {collection && (
+            <span className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-muted/60 text-muted-foreground ring-1 ring-inset ring-border/40">
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: collection.color }} />
+              {collection.name}
+            </span>
+          )}
           {item.tags?.slice(0, 3).map((tag) => (
             <span
               key={tag}
@@ -617,6 +668,18 @@ export const CurationListRow = memo(function CurationListRow({
             >
               <Trash2 className="h-4 w-4" />
             </button>
+            {onCollectionPick && (
+              <button
+                onClick={handleCollectionPick}
+                className={cn(
+                  'p-1.5 rounded-md transition-colors',
+                  item.collectionId ? 'text-primary' : 'text-muted-foreground/40 hover:text-primary'
+                )}
+                aria-label="컬렉션 지정"
+              >
+                <FolderOpen className="h-4 w-4" />
+              </button>
+            )}
             <button
               onClick={handleBookmark}
               className={cn(

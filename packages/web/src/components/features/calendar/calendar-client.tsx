@@ -11,7 +11,6 @@ import dynamic from 'next/dynamic';
 import {CalendarGrid} from './calendar-grid';
 import {TodoList} from './todo-list';
 import {EventList} from './event-list';
-import {useSwipe} from '@/hooks/use-swipe';
 import {CalendarHeader} from './calendar-header';
 import {useCalendarState} from './use-calendar-state';
 
@@ -71,14 +70,6 @@ export function CalendarClient() {
   } = useCalendarState();
 
   const selectedDateStr = format(selectedDate, 'yyyy-MM-dd');
-
-  // ─── Touch swipe for month navigation ──────────────────────────────────────
-
-  const swipeHandlers = useSwipe({
-    onSwipeLeft: handleNextMonth,
-    onSwipeRight: handlePrevMonth,
-    threshold: 60,
-  });
 
   // ─── Keyboard navigation (Google Calendar style) ────────────────────────────
 
@@ -210,8 +201,8 @@ export function CalendarClient() {
           onToday={handleToday}
         />
 
-        {/* Calendar grid with swipe support */}
-        <Card className="p-1 sm:p-3 rounded-none sm:rounded-xl border-x-0 sm:border-x overflow-hidden" {...swipeHandlers}>
+        {/* Calendar grid */}
+        <Card className="p-1 sm:p-3 rounded-none sm:rounded-xl border-x-0 sm:border-x overflow-hidden">
           <div
             className={[
               slideDirection === 'left'

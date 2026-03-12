@@ -1,6 +1,6 @@
 # forme - 아키텍처 & 기술 선정 이유
 
-> 최종 업데이트: 2026-03-11 (코드 품질 감사 — 성능·접근성·컴포지션 개선)
+> 최종 업데이트: 2026-03-12 (북마크 컬렉션, 멀티유저 cron, 크롤 제목 dedup)
 
 개인 올인원 PWA. 큐레이션(RSS), 캘린더, 메모(리치 에디터), 팟캐스트를 하나의 앱에 통합.
 모바일 퍼스트, 오프라인 지원, 푸시 알림까지 네이티브 앱 수준의 경험을 웹으로 제공.
@@ -51,10 +51,10 @@ graph TB
   NJ -->|세션 갱신| SB
   DC -->|OAuth 콜백| SB
   SW -->|web-push| API
-  CR1 -->|verifyCronAuth| API
+  CR1 -->|verifyCronSecret| API
   CR1 -->|URL 목록| DW
-  CR2 -->|verifyCronAuth| API
-  CR3 -->|verifyCronAuth| API
+  CR2 -->|verifyCronSecret| API
+  CR3 -->|verifyCronSecret| API
   CR4 -->|리마인더| DW
 ```
 
@@ -185,7 +185,8 @@ flowchart LR
 - **크롤링**: Cron/SSE → feedsmith 파싱 → SSRF 방어 → DB 적재
 - **인증**: `React.cache` 기반 `getAuthUser()` — 동일 요청 내 중복 인증 제거
 - **캘린더**: Optimistic updates — 로컬 상태 즉시 반영, 서버 백그라운드 동기화. 데스크톱 2컬럼 (`lg:flex-row` 캘린더 | 상세), 모바일 단일 컬럼. 이벤트 카테고리(아이콘+색상) 지원
-- **큐레이션 UX**: 스와이프 액션 (`useSwipeAction` 훅, axis-lock + 타이머 정리), 컴팩트뷰 토글 (localStorage), 키보드 네비 (j/k/o/b, DOM 직접 포커스링), 일괄 삭제 (100개 청크, 다이얼로그 스피너), 인라인 메모 (북마크 탭, key prop 동기화)
+- **큐레이션 UX**: 스와이프 액션 (`useSwipeAction` 훅, axis-lock + 타이머 정리), 키보드 네비 (j/k/o/b, DOM 직접 포커스링), 일괄 삭제 (100개 청크, 다이얼로그 스피너), 인라인 메모 (북마크 탭, key prop 동기화), 북마크 컬렉션 (DnD 정렬, 색상 태그, 컬렉션별 필터)
+- **크롤링 중복 방지**: 크로스소스 제목 dedup — 동일 유저의 기존 아이템 제목과 비교 후 중복 스킵 (curationSources join, 100개 청크 조회)
 - **에러 처리**: 모든 (main) 페이지 error.tsx (calendar, curation, memo, podcast) — `error` prop 로깅, 사용자에게 제네릭 메시지만 표출
 - **접근성**: 탭바 `aria-current="page"`, 검색 `aria-label`, 이벤트 폼 색상 `focus-visible:ring-2` + `aria-label`, 폼 라벨 `htmlFor`/`id` 연결, 에러 메시지 `role="alert" aria-live="polite"`, 터치 타겟 최소 44x44px, `@utility focus-ring` CSS 유틸리티, `prefers-reduced-motion` 미디어 쿼리, progressbar ARIA 속성
 - **상태 관리 패턴**: 대형 컴포넌트 상태 → 커스텀 훅 추출 (`useCalendarState` 14개 상태, `useEditorConfig` TipTap 확장), `saveFnRef` 패턴으로 stale closure 방지 (player-context, use-auto-save), `useReducer`로 복잡한 상태 관리 (upload-dialog)
@@ -214,9 +215,18 @@ erDiagram
     integer favoriteOrder
   }
 
+  bookmark_collections {
+    uuid id PK
+    uuid userId
+    varchar name
+    varchar color
+    integer sortOrder
+  }
+
   curation_items {
     uuid id PK
     uuid sourceId FK
+    uuid collectionId FK
     text title
     text url
     timestamp publishedAt
@@ -285,10 +295,11 @@ erDiagram
   }
 
   curation_sources ||--o{ curation_items : "1:N sourceId"
+  bookmark_collections ||--o{ curation_items : "1:N collectionId"
   event_categories ||--o{ calendar_events : "1:N categoryId"
 ```
 
-**10개 테이블**, 모든 테이블에 `userId` + RLS. `memos.content`는 TipTap JSON (JSONB), `contentText`는 검색용 평문 인덱스.
+**11개 테이블**, 모든 테이블에 `userId` + RLS. `memos.content`는 TipTap JSON (JSONB), `contentText`는 검색용 평문 인덱스.
 
 ---
 
@@ -297,17 +308,17 @@ erDiagram
 | Method | Endpoint | 설명 |
 |--------|----------|------|
 | GET | `/api/curation` | 큐레이션 아이템 목록 (커서 페이지네이션, memo 포함) |
-| PATCH | `/api/curation/[id]` | 아이템 읽음/북마크/메모 업데이트 (ownership join 검증) |
+| PATCH | `/api/curation/[id]` | 아이템 읽음/북마크/메모/컬렉션 업데이트 (ownership + 컬렉션 소유권 검증) |
 | DELETE | `/api/curation/[id]` | 아이템 단건 삭제 (ownership join 검증) |
 | POST | `/api/curation/bulk-delete` | 아이템 일괄 삭제 (max 100, UUID 전수 검증) |
 | POST | `/api/curation/crawl` | SSE 수동 크롤 |
 | POST | `/api/curation/sources/reorder` | 즐겨찾기 순서 배치 업데이트 |
-| GET | `/api/cron/curation` | Cron 자동 크롤 + 푸시 + Discord NotebookLM URL 전송 (verifyCronAuth 인증) |
-| GET | `/api/cron/calendar-daily` | 08시 KST 데일리 요약 푸시 (오늘 일정+투두 카운트) |
-| GET | `/api/cron/calendar-reminder` | 이벤트 1시간 전 리마인더 (Supabase pg_cron 15분 주기 호출) |
+| GET | `/api/cron/curation` | Cron 자동 크롤 + 푸시 + Discord NotebookLM URL 전송 (verifyCronSecret 멀티유저 인증, 제목 dedup) |
+| GET | `/api/cron/calendar-daily` | 08시 KST 데일리 요약 푸시 (멀티유저, 일정+투두 카운트) |
+| GET | `/api/cron/calendar-reminder` | 이벤트 45~75분 전 리마인더 (멀티유저, Supabase pg_cron 15분 주기) |
 | POST | `/api/memo/image` | 메모 이미지 R2 업로드 (5MB) |
 | POST | `/api/podcast/upload` | 팟캐스트 오디오 R2 업로드 (200MB) |
-| GET | `/api/cron/podcast-reminder` | 23시 KST 팟캐스트 제작 Discord 리마인더 (verifyCronAuth 인증) |
+| GET | `/api/cron/podcast-reminder` | 23시 KST 팟캐스트 제작 Discord 리마인더 (verifyCronSecret 인증) |
 | GET/POST/DELETE | `/api/push/subscribe` | 푸시 구독 관리 |
 
 ---
@@ -321,7 +332,7 @@ erDiagram
 | 입력 검증 | `lib/validators.ts` 공유 정규식 + Server Action/API에서 날짜, 색상, URL, 길이, UUID 형식 검증. 인라인 정규식 금지 |
 | UUID 검증 | 모든 CRUD 함수의 id 파라미터에 UUID_REGEX 적용 (calendar, todos, memos, categories, curation, podcast) |
 | API 핸들러 순서 | 인증(auth) → 입력 검증(UUID 등) → 비즈니스 로직 (인증 전 입력 검증 금지) |
-| Cron 인증 | `verifyCronAuth()` 공유 유틸 — `timingSafeEqual`로 CRON_SECRET 비교 + UUID 검증 (타이밍 공격 방어), 응답에 내부 상세 미노출 |
+| Cron 인증 | `verifyCronSecret()` + `getAllUserIds()` 멀티유저 패턴 — `timingSafeEqual`로 CRON_SECRET 비교 (타이밍 공격 방어), profiles 테이블 100명 cap, 응답에 내부 상세 미노출 |
 | 네트워크 | SSRF 방어 (`isSafeUrl` — IPv4/IPv6 사설, IPv4-mapped IPv6, ULA, Link-Local 차단), HTTPS 강제 |
 | 헤더 | CSP, HSTS, X-Frame-Options, Permissions-Policy |
 | 리다이렉트 | `ALLOWED_PATHS` 화이트리스트 |
@@ -402,6 +413,8 @@ erDiagram
 | `event_categories` | `(userId, sortOrder)` 복합 | 사용자별 카테고리 정렬 조회 |
 | `curation_items` | `(sourceId, url)` unique | 중복 방지 |
 | `curation_items` | `(sourceId, isRead, isBookmarked, category)` 복합 | 다중 필터 쿼리 최적화 |
+| `curation_items` | `(collectionId)` | 컬렉션별 필터 |
+| `bookmark_collections` | `(userId, sortOrder)` 복합 | 사용자별 컬렉션 정렬 조회 |
 | `user_daily_activity` | `(userId, date)` 복합 | 스트릭 계산 날짜 정렬 |
 | `memos` | `tags` GIN | 태그 배열 검색 |
 

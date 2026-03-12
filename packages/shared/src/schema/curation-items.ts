@@ -1,5 +1,6 @@
 import {boolean, index, pgTable, text, timestamp, uniqueIndex, uuid, varchar} from 'drizzle-orm/pg-core';
 import {curationSources} from './curation-sources';
+import {bookmarkCollections} from './bookmark-collections';
 
 export const curationItems = pgTable('curation_items', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -16,6 +17,7 @@ export const curationItems = pgTable('curation_items', {
   collectedAt: timestamp('collected_at', { withTimezone: true }).notNull().defaultNow(),
   readAt: timestamp('read_at', { withTimezone: true }),
   memo: text('memo'),
+  collectionId: uuid('collection_id').references(() => bookmarkCollections.id, { onDelete: 'set null' }),
 }, (table) => ({
   sourceUrlIdx: uniqueIndex('idx_items_source_url').on(table.sourceId, table.url),
   publishedIdx: index('idx_items_published').on(table.publishedAt),
@@ -23,4 +25,5 @@ export const curationItems = pgTable('curation_items', {
   sourceIdx: index('idx_items_source').on(table.sourceId),
   readAtIdx: index('idx_items_read_at').on(table.readAt),
   filtersIdx: index('idx_items_filters').on(table.sourceId, table.isRead, table.isBookmarked, table.category),
+  collectionIdx: index('idx_items_collection').on(table.collectionId),
 }));

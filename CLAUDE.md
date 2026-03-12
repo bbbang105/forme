@@ -55,14 +55,15 @@ pnpm db:push          # 스키마 직접 push (dev용)
 - 무거운 컴포넌트: `next/dynamic` + `ssr: false`로 지연 로딩 (TipTap, DnD Kit, EventForm, CategoryManager 등)
 - 캘린더 인터랙션: Optimistic updates 패턴, 데스크톱 2컬럼 (`lg:flex-row`), lane 기반 이벤트 배치 (hazel-admin 스타일, greedy lane 할당 + startTime 순 정렬 + 멀티데이 바 연결), 삭제 시 AlertDialog 확인 모달, 반복 일정 (매주/격주 + 요일 선택, excludedDates로 개별 삭제, recurrenceEndDate로 이후 삭제)
 - 투두: DnD 드래그 순서변경 (@dnd-kit, GripVertical 핸들, 모바일 항상 표시), 밀린 투두 칩 (date < 오늘 && 미완료 → amber 칩 + "오늘로" 이동), 완료 애니메이션 (check-bounce), 빈 상태 격려 문구
-- Cron 인증: `lib/cron-auth.ts` — `verifyCronAuth()` 공유 헬퍼 (timingSafeEqual + CRON_USER_ID 검증), 모든 cron 라우트에서 사용
-- 푸시 알림 Cron: 데일리 요약 (08:00 KST, 일정+투두 카운트), 일정 리마인더 (15분 간격, startTime 1시간 전, reminderSent 플래그)
+- Cron 인증: `lib/cron-auth.ts` — `verifyCronSecret()` (timingSafeEqual) + `getAllUserIds()` (profiles 테이블, 100명 cap) 멀티유저 패턴, 모든 cron 라우트에서 사용. 레거시 `verifyCronAuth()` (단일유저) 호환 유지
+- 푸시 알림 Cron: 데일리 요약 (08:00 KST, 일정+투두 카운트), 일정 리마인더 (15분 간격, startTime 45~75분 전 윈도우, reminderSent 플래그)
 - 모바일 PWA: viewport `maximumScale: 1, userScalable: false`, 모든 input/textarea/select `text-base`(16px) 이상 (iOS 자동 줌 방지), 크롬 스타일 pull-to-refresh (`overscroll-behavior-y: contain` + DOM 직접 조작 + 컨텐츠 translateY + 인라인 SVG 인디케이터 + `window.location.reload()`)
 - Safari PWA 대응: Dialog `flex flex-col` + `inset-y-0 my-auto` 센터링 (grid+translate 금지), `body[data-scroll-locked]`에서 `overscroll-behavior-y: auto` 해제, pull-to-refresh에서 다이얼로그 열림 감지 스킵
 - 큐레이션 정렬: status=read 탭에서 readAt DESC 정렬 (최근 읽은 순)
 - 큐레이션 삭제: 단건 삭제 (AlertDialog 확인) + 일괄 삭제 (체크박스 선택, 100개 청크), ownership은 curationSources join으로 검증
 - 큐레이션 북마크 메모: InlineMemo 컴포넌트 (북마크 탭 전용, 500자, key prop으로 외부 상태 동기화)
-- 큐레이션 UX: 스와이프 액션 (우→읽음, 좌→삭제), 컴팩트뷰 토글 (localStorage), 키보드 네비 (j/k/o/b, ref 기반 리스너 — 아이템 변경 시 재등록 불필요)
+- 큐레이션 북마크 컬렉션: bookmark_collections 테이블 (RLS), 컬렉션 CRUD + DnD 순서변경 (@dnd-kit/sortable, GripVertical), 피커 바텀시트, 피드 컬렉션 칩 필터 (북마크 탭 전용), IDOR 방어 (소유권 검증)
+- 큐레이션 UX: 스와이프 액션 (우→읽음, 좌→삭제), 키보드 네비 (j/k/o/b, ref 기반 리스너 — 아이템 변경 시 재등록 불필요)
 - 메모 캐싱: 에디터 뒤로가기 시 `router.refresh()` + MemoList initialMemos props 동기화
 - 게이미피케이션: 출석 스트릭, 데일리 미션 (큐레이션 5개/팟캐스트 10분/투두 완료), 하이브리드 데이터 (전용 테이블 + 기존 데이터 계산)
 - 외부 API: Open-Meteo (서울 날씨, 서버 컴포넌트 fetch, revalidate 3600)
@@ -84,7 +85,8 @@ pnpm db:push          # 스키마 직접 push (dev용)
 - player-context 안전 패턴: saveFnRef로 stale closure 방지, 인터벌/이벤트 리스너 분리
 - upload-dialog 상태: useReducer + 명시적 UploadState/UploadAction 타입
 - header 아바타: 서버사이드 fetch (layout.tsx async → avatarUrl prop), 클라이언트 워터폴 제거
-- SW 등록: 지수 백오프 재시도 (최대 3회, constants.ts 참조)
+- SW 등록: 지수 백오프 재시도 (최대 3회, constants.ts 참조), 푸시 구독 자동 동기화 (syncPushSubscription, sessionStorage 중복 방지)
+- RSS 크롤 중복 방지: 크로스소스 제목 dedup (동일 제목 → DB 미저장, curationSources join으로 유저별 기존 제목 조회)
 - 테스트: Vitest + `vi.hoisted()` Proxy 기반 DB 목 패턴 (`packages/web/src/__tests__/`)
 
 ## 핵심 파일
@@ -104,7 +106,7 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/shared/src/schema/todos.ts` | 투두 스키마 |
 | `packages/shared/src/schema/` | Drizzle DB 스키마 (전체) |
 | `packages/shared/src/db.ts` | DB 싱글톤 (SSL 강제, max:1 서버리스 최적) |
-| `packages/web/src/lib/crawl-feed.ts` | RSS 크롤 (feedsmith, since 필터, SSRF 방어) |
+| `packages/web/src/lib/crawl-feed.ts` | RSS 크롤 (feedsmith, since 필터, SSRF 방어, 크로스소스 제목 dedup) |
 | `packages/web/src/lib/validators.ts` | 공유 검증 정규식 (DATE, HEX_COLOR, UUID, TIME) |
 | `packages/web/src/lib/url-safety.ts` | SSRF 방어 유틸 (IPv4/IPv6/ULA/Link-Local 차단) |
 | `packages/web/src/lib/auth.ts` | 인증 유틸 (React.cache 기반 getAuthUser) |
@@ -117,8 +119,8 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/lib/greetings.ts` | 대시보드 인사 문구 (100개 랜덤) |
 | `packages/web/src/app/api/curation/crawl/route.ts` | SSE 수동 크롤 API |
 | `packages/web/src/app/api/curation/sources/reorder/route.ts` | 즐겨찾기 소스 순서 배치 업데이트 |
-| `packages/web/src/lib/cron-auth.ts` | Cron 공유 인증 유틸 (verifyCronAuth, safeCompare) |
-| `packages/web/src/app/api/cron/curation/route.ts` | Cron 자동 크롤 + 푸시 알림 (verifyCronAuth 인증, 응답에 내부 상세 미노출) |
+| `packages/web/src/lib/cron-auth.ts` | Cron 인증 유틸 (verifyCronSecret + getAllUserIds 멀티유저, safeCompare, 레거시 verifyCronAuth 호환) |
+| `packages/web/src/app/api/cron/curation/route.ts` | Cron 자동 크롤 + 푸시 알림 (verifyCronSecret 멀티유저 인증, 응답에 내부 상세 미노출) |
 | `packages/web/src/app/api/cron/calendar-daily/route.ts` | Cron 데일리 요약 푸시 (08:00 KST, 일정+투두 카운트, reminderSent 리셋) |
 | `packages/web/src/app/api/cron/calendar-reminder/route.ts` | 일정 리마인더 푸시 (Supabase pg_cron 15분 호출, 1시간 전 알림, 반복 일정 대응) |
 | `supabase/pg-cron-setup.sql` | Supabase pg_cron + pg_net 설정 SQL (calendar-reminder 15분 스케줄) |
@@ -135,7 +137,7 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/app/manifest.ts` | PWA 매니페스트 (MetadataRoute) |
 | `packages/web/src/lib/actions/calendar.ts` | 캘린더 이벤트 Server Actions (CRUD + 반복 확장 + excludeRecurringDate/deleteRecurringAfter) |
 | `packages/web/src/lib/actions/todos.ts` | 투두 Server Actions (CRUD + 토글 + DnD 벌크 reorder + 입력 검증) |
-| `packages/web/src/components/features/calendar/calendar-client.tsx` | 캘린더 메인 클라이언트 (useCalendarState 훅, 월간뷰, 스와이프, optimistic updates, 데스크톱 2컬럼) |
+| `packages/web/src/components/features/calendar/calendar-client.tsx` | 캘린더 메인 클라이언트 (useCalendarState 훅, 월간뷰, optimistic updates, 데스크톱 2컬럼) |
 | `packages/web/src/components/features/calendar/use-calendar-state.ts` | 캘린더 상태 훅 (14개 상태 + 이벤트/투두 핸들러, async 데이터 페칭) |
 | `packages/web/src/components/features/calendar/calendar-grid.tsx` | 캘린더 그리드 (DayCell + lane-utils import) |
 | `packages/web/src/components/features/calendar/day-cell.tsx` | 날짜 셀 컴포넌트 (React.memo, ARIA 접근성, 이벤트 dot/lane 렌더링) |
@@ -176,13 +178,17 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/components/features/curation/crawl-settings-form.tsx` | 크롤 설정 폼 (기간 선택, 수집 시작) |
 | `packages/web/src/components/features/curation/feed-filter-bar.tsx` | 피드 필터 바 (검색, 즐겨찾기 소스, 카테고리/상태 필터, 정렬) |
 | `packages/web/src/components/features/curation/mini-card-link.tsx` | 대시보드 큐레이션 클릭 시 읽음 처리 래퍼 |
-| `packages/web/src/app/api/curation/[id]/route.ts` | 큐레이션 아이템 PATCH (읽음/북마크/메모) + DELETE (단건 삭제, ownership join 검증) |
+| `packages/web/src/app/api/curation/[id]/route.ts` | 큐레이션 아이템 PATCH (읽음/북마크/메모/컬렉션) + DELETE (단건 삭제, ownership join 검증) |
 | `packages/web/src/app/api/curation/bulk-delete/route.ts` | 큐레이션 일괄 삭제 (POST, max 100개, UUID 전수 검증) |
 | `packages/web/src/hooks/use-swipe-action.ts` | 터치 스와이프 제스처 훅 (axis-lock, damped swipe, ref 기반 콜백, 타이머 cleanup) |
 | `packages/web/src/lib/format-time.ts` | 공유 시간 포맷 유틸 (formatTime, formatDuration) |
 | `packages/web/src/lib/constants.ts` | 앱 전역 상수 (페이지네이션, 제한값, SW 재시도 설정) |
 | `packages/web/src/components/ui/list-skeleton.tsx` | 공유 목록 스켈레톤 (role="status", aria-busy, count/showThumbnail props) |
-| `packages/web/src/components/sw-register.tsx` | Service Worker 등록 (지수 백오프 재시도 최대 3회) |
+| `packages/shared/src/schema/bookmark-collections.ts` | 북마크 컬렉션 스키마 (id, userId, name, color, sortOrder, RLS) |
+| `packages/web/src/lib/actions/collections.ts` | 컬렉션 Server Actions (CRUD + DnD reorder + assignCollection, 소유권 검증) |
+| `packages/web/src/components/features/curation/collection-manager.tsx` | 컬렉션 관리 다이얼로그 (DnD sortable 순서변경, 색상/이름 편집, 삭제) |
+| `packages/web/src/components/features/curation/collection-picker.tsx` | 컬렉션 선택 바텀시트 (ARIA listbox, 키보드 접근성) |
+| `packages/web/src/components/sw-register.tsx` | Service Worker 등록 (지수 백오프 재시도 최대 3회) + 푸시 구독 자동 동기화 (syncPushSubscription) |
 
 ## 인증 구조
 
@@ -224,6 +230,7 @@ study-admin 스타일: Sky Blue `#0ea5e9` 포인트, Pretendard 폰트, 다크�
 | `docs/plans/26-03-05-performance-optimization.md` | PWA 성능 최적화 (리전, 번들, 렌더링, 워터폴) |
 | `docs/26-03-08-safari-dialog-scroll-fix.md` | Safari 다이얼로그 스크롤 수정 (Chrome vs Safari 차이, 해결책) |
 | `docs/plans/26-03-08-calendar-push-ux-design.md` | 캘린더 푸시알림 + UX 개선 설계 (데일리 요약, 리마인더, 밀린 투두, 애니메이션) |
+| `docs/plans/26-03-12-bookmark-collections.md` | 북마크 컬렉션 기능 설계 (스키마, CRUD, DnD, 피드 필터) |
 
 ## docs 파일명 컨벤션
 

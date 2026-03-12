@@ -175,7 +175,7 @@ export function TodoList({
           disabled={isPending || !newContent.trim()}
           aria-label="할 일 추가"
           className={cn(
-            'flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-md transition-colors',
+            'flex items-center justify-center w-9 h-9 rounded-md transition-colors',
             'bg-primary text-primary-foreground hover:bg-primary/90',
             'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
             'disabled:opacity-50 disabled:pointer-events-none'
@@ -240,31 +240,7 @@ export function TodoList({
         </div>
       )}
 
-      {/* Empty state */}
-      {todos.length === 0 && <TodoEmptyState />}
     </div>
-  );
-}
-
-// ─── Empty state ──────────────────────────────────────────────────────────
-
-const EMPTY_TODO_MESSAGES = [
-  { emoji: '\u{1F389}', text: '오늘은 자유의 날!' },
-  { emoji: '\u2600\uFE0F', text: '할 일 없는 하루도 좋아요' },
-  { emoji: '\u{1F334}', text: '여유로운 하루 보내세요' },
-  { emoji: '\u2728', text: '오늘은 쉬어가는 날' },
-  { emoji: '\u{1F340}', text: '행운 가득한 하루!' },
-];
-
-function TodoEmptyState() {
-  // 날짜 기반 결정적 선택 (렌더 순수성 유지)
-  const message = EMPTY_TODO_MESSAGES[new Date().getDate() % EMPTY_TODO_MESSAGES.length];
-
-  return (
-    <p className="text-sm text-muted-foreground text-center py-4">
-      <span className="mr-1">{message.emoji}</span>
-      {message.text}
-    </p>
   );
 }
 
@@ -360,14 +336,14 @@ const TodoItem = forwardRef<HTMLDivElement, TodoItemProps>(function TodoItem(
       {/* Drag handle — always visible for incomplete, hidden for completed */}
       {dragHandleProps ? (
         <button
-          className="shrink-0 p-1.5 rounded text-muted-foreground/30 hover:text-muted-foreground/60 cursor-grab active:cursor-grabbing touch-none focus-visible:ring-2 focus-visible:ring-ring min-w-[44px] min-h-[44px] flex items-center justify-center"
+          className="shrink-0 p-1 rounded text-muted-foreground/30 hover:text-muted-foreground/60 cursor-grab active:cursor-grabbing touch-none focus-visible:ring-2 focus-visible:ring-ring"
           aria-label="드래그하여 순서 변경 (키보드: Space로 잡기, 방향키로 이동, Space/Enter로 놓기)"
           {...dragHandleProps}
         >
           <GripVertical className="h-4 w-4" />
         </button>
       ) : (
-        <div className="w-11 shrink-0" />
+        <div className="w-6 shrink-0" />
       )}
 
       <button
@@ -375,7 +351,7 @@ const TodoItem = forwardRef<HTMLDivElement, TodoItemProps>(function TodoItem(
         disabled={isPending}
         aria-label={todo.isCompleted ? `${todo.content} 완료 취소` : `${todo.content} 완료 처리`}
         aria-pressed={todo.isCompleted}
-        className="shrink-0 transition-transform active:scale-95 min-w-[44px] min-h-[44px] flex items-center justify-center focus-visible:ring-2 focus-visible:ring-ring rounded"
+        className="shrink-0 transition-transform active:scale-95 p-1 focus-visible:ring-2 focus-visible:ring-ring rounded"
       >
         {todo.isCompleted
           ? <CheckCircle2 className="h-[18px] w-[18px] text-primary animate-check-bounce" />
@@ -409,7 +385,7 @@ const TodoItem = forwardRef<HTMLDivElement, TodoItemProps>(function TodoItem(
             onClick={() => { setEditContent(todo.content); setIsEditing(true); }}
             disabled={isPending || isEditing}
             aria-label={`${todo.content} 수정`}
-            className="p-1.5 rounded hover:bg-muted/50 text-muted-foreground/50 hover:text-muted-foreground transition-colors focus-visible:ring-2 focus-visible:ring-ring min-w-[44px] min-h-[44px] flex items-center justify-center"
+            className="p-1 rounded hover:bg-muted/50 text-muted-foreground/50 hover:text-muted-foreground transition-colors focus-visible:ring-2 focus-visible:ring-ring"
           >
             <Pencil className="h-3.5 w-3.5" />
           </button>
@@ -417,7 +393,7 @@ const TodoItem = forwardRef<HTMLDivElement, TodoItemProps>(function TodoItem(
             onClick={() => setShowDeleteConfirm(true)}
             disabled={isPending}
             aria-label={`${todo.content} 삭제`}
-            className="p-1.5 rounded hover:bg-destructive/10 text-destructive/50 hover:text-destructive transition-colors focus-visible:ring-2 focus-visible:ring-ring min-w-[44px] min-h-[44px] flex items-center justify-center"
+            className="p-1 rounded hover:bg-destructive/10 text-destructive/50 hover:text-destructive transition-colors focus-visible:ring-2 focus-visible:ring-ring"
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>

@@ -2,22 +2,24 @@
 
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useRouter, useSearchParams} from 'next/navigation';
-import {CheckSquare, LayoutGrid, LayoutList, Loader2, Newspaper, Trash2, X} from 'lucide-react';
+import {CheckSquare, Loader2, Newspaper, Settings2, Trash2, X} from 'lucide-react';
 import {cn} from '@/lib/utils';
 import {Skeleton} from '@/components/ui/skeleton';
 import {Button, buttonVariants} from '@/components/ui/button';
 import {
     AlertDialog,
-    AlertDialogCancel,
     AlertDialogAction,
+    AlertDialogCancel,
     AlertDialogContent,
     AlertDialogDescription,
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import {CurationCard, type CurationItemData, CurationListRow} from './curation-card';
+import {type CollectionInfo, CurationCard, type CurationItemData, CurationListRow} from './curation-card';
 import {type StatusFilter} from './curation-filters';
 import {FeedFilterBar, type SortMode} from './feed-filter-bar';
+import {CollectionPicker} from './collection-picker';
+import type {BookmarkCollection} from './collection-manager';
 import dynamic from 'next/dynamic';
 
 const SourceManager = dynamic(
@@ -30,6 +32,11 @@ const SourceManager = dynamic(
   }
 );
 
+const CollectionManager = dynamic(
+  () => import('./collection-manager').then((m) => m.CollectionManager),
+  { ssr: false }
+);
+
 const PAGE_SIZE = 12;
 
 /** Shared helper — builds the query string for /api/curation and fetchItems */
@@ -40,6 +47,7 @@ function buildFeedParams(opts: {
   tagsParam: string;
   sort: SortMode;
   sourceId: string;
+  collectionId?: string;
   cursor?: string | null;
 }): URLSearchParams {
   const params = new URLSearchParams();
@@ -49,6 +57,7 @@ function buildFeedParams(opts: {
   if (opts.tagsParam) params.set('tags', opts.tagsParam);
   if (opts.sort !== 'latest') params.set('sort', opts.sort);
   if (opts.sourceId) params.set('sourceId', opts.sourceId);
+  if (opts.collectionId) params.set('collectionId', opts.collectionId);
   if (opts.cursor) params.set('cursor', opts.cursor);
   return params;
 }
@@ -79,17 +88,19 @@ export function CurationFeed() {
   const [hasSources, setHasSources] = useState(true);
   const [favoriteSources, setFavoriteSources] = useState<{ id: string; name: string }[]>([]);
 
-  // View density
-  const [compact, setCompact] = useState(() => {
-    try { return localStorage.getItem('forme-curation-compact') === 'true'; } catch { return false; }
-  });
-  const toggleCompact = useCallback(() => {
-    setCompact((prev) => {
-      const next = !prev;
-      try { localStorage.setItem('forme-curation-compact', String(next)); } catch { /* noop */ }
-      return next;
-    });
-  }, []);
+  // Collection state
+  const [collections, setCollections] = useState<BookmarkCollection[]>([]);
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string>('');
+  const [collectionPickerTarget, setCollectionPickerTarget] = useState<string | null>(null);
+  const [collectionManagerOpen, setCollectionManagerOpen] = useState(false);
+
+  const collectionMap = useMemo(() => {
+    const map = new Map<string, CollectionInfo>();
+    for (const c of collections) {
+      map.set(c.id, { id: c.id, name: c.name, color: c.color });
+    }
+    return map;
+  }, [collections]);
 
   // Selection & delete state
   const [selectMode, setSelectMode] = useState(false);
@@ -116,7 +127,7 @@ export function CurationFeed() {
   useEffect(() => {
     setSelectMode(false);
     setSelectedIds(new Set());
-  }, [category, status, search, tagsParam, sort, sourceId]);
+  }, [category, status, search, tagsParam, sort, sourceId, selectedCollectionId]);
 
   // URL sync helper
   const updateFilters = useCallback(
@@ -142,6 +153,7 @@ export function CurationFeed() {
         tagsParam: newTags.join(','),
         sort: newSort,
         sourceId: newSourceId,
+        collectionId: selectedCollectionId,
       });
       // status 'unread' is the default, don't include in URL
       if (newStatus === 'unread') params.delete('status');
@@ -149,7 +161,7 @@ export function CurationFeed() {
       const qs = params.toString();
       router.push(`/curation${qs ? `?${qs}` : ''}`, { scroll: false });
     },
-    [router, category, status, search, selectedTags, sort, sourceId]
+    [router, category, status, search, selectedTags, sort, sourceId, selectedCollectionId]
   );
 
   // Fetch items
@@ -157,7 +169,7 @@ export function CurationFeed() {
     async (cursorArg: string | null, append: boolean) => {
       if (!append) setLoading(true);
 
-      const params = buildFeedParams({ category, status, search, tagsParam, sort, sourceId, cursor: cursorArg });
+      const params = buildFeedParams({ category, status, search, tagsParam, sort, sourceId, collectionId: selectedCollectionId, cursor: cursorArg });
       params.set('limit', String(PAGE_SIZE));
 
       try {
@@ -177,7 +189,7 @@ export function CurationFeed() {
         if (!append) setLoading(false);
       }
     },
-    [category, status, search, tagsParam, sort, sourceId]
+    [category, status, search, tagsParam, sort, sourceId, selectedCollectionId]
   );
 
   // Fetch sources for categories + favorites
@@ -193,15 +205,27 @@ export function CurationFeed() {
     );
   }, []);
 
-  // Load categories once on mount
+  // Fetch collections
+  const fetchCollections = useCallback(async () => {
+    try {
+      const { getCollectionsWithCount } = await import('@/lib/actions/collections');
+      const data = await getCollectionsWithCount();
+      setCollections(data);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // Load categories + collections on mount
   useEffect(() => {
     fetchCategories();
-  }, [fetchCategories]);
+    fetchCollections();
+  }, [fetchCategories, fetchCollections]);
 
   // Fetch items on filter changes
   useEffect(() => {
     fetchItems(null, false);
-  }, [category, status, search, tagsParam, sort, sourceId, fetchItems]);
+  }, [category, status, search, tagsParam, sort, sourceId, selectedCollectionId, fetchItems]);
 
   // Infinite scroll
   useEffect(() => {
@@ -281,16 +305,24 @@ export function CurationFeed() {
   // ── Memo handler ──
 
   const handleMemoChange = useCallback(async (id: string, memo: string | null) => {
+    const shouldBookmark = memo !== null;
     setItems((prev) =>
       prev.map((item) =>
-        item.id === id ? { ...item, memo } : item
+        item.id === id
+          ? { ...item, memo, ...(shouldBookmark && !item.isBookmarked ? { isBookmarked: true } : {}) }
+          : item
       )
     );
+
+    const body: Record<string, unknown> = { memo };
+    if (shouldBookmark) {
+      body.isBookmarked = true;
+    }
 
     const res = await fetch(`/api/curation/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ memo }),
+      body: JSON.stringify(body),
     });
 
     if (!res.ok) {
@@ -299,6 +331,39 @@ export function CurationFeed() {
   }, [fetchItems]);
 
   const isBookmarkTab = status === 'bookmarked';
+  const showMemo = status === 'bookmarked' || status === 'read';
+
+  // ── Collection handlers ──
+
+  const handleCollectionPick = useCallback((itemId: string) => {
+    setCollectionPickerTarget(itemId);
+  }, []);
+
+  const handleCollectionSelect = useCallback(async (collectionId: string | null) => {
+    if (!collectionPickerTarget) return;
+    const itemId = collectionPickerTarget;
+
+    // Optimistic update
+    setItems((prev) =>
+      prev.map((item) =>
+        item.id === itemId
+          ? { ...item, collectionId, ...(collectionId !== null ? { isBookmarked: true } : {}) }
+          : item
+      )
+    );
+
+    const res = await fetch(`/api/curation/${itemId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ collectionId }),
+    });
+
+    if (!res.ok) {
+      fetchItems(null, false);
+    }
+    // Refresh collection counts
+    fetchCollections();
+  }, [collectionPickerTarget, fetchItems, fetchCollections]);
 
   // ── Delete handlers ──
 
@@ -397,7 +462,7 @@ export function CurationFeed() {
       prev.classList.remove('ring-2', 'ring-primary/50', 'rounded-xl');
     }
     focusIndexRef.current = -1;
-  }, [category, status, search, tagsParam, sort, sourceId]);
+  }, [category, status, search, tagsParam, sort, sourceId, selectedCollectionId]);
 
   useEffect(() => {
     if (selectMode || loading) return;
@@ -499,16 +564,6 @@ export function CurationFeed() {
           <p className="text-xs text-muted-foreground mt-0.5">관심 있는 RSS 피드를 구독하고 한곳에서 읽어보세요</p>
         </div>
         <div className="flex items-center gap-1.5">
-          {/* Compact/Card toggle — mobile/tablet only */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-9 w-9 lg:hidden"
-            onClick={toggleCompact}
-            aria-label={compact ? '카드 뷰' : '컴팩트 뷰'}
-          >
-            {compact ? <LayoutGrid className="h-4 w-4" /> : <LayoutList className="h-4 w-4" />}
-          </Button>
           {!selectMode ? (
             <Button
               variant="outline"
@@ -577,6 +632,58 @@ export function CurationFeed() {
         favoriteSources={favoriteSources}
       />
 
+      {/* Collection chips (bookmark tab only) */}
+      {isBookmarkTab && (
+        <div className="flex items-center gap-2 mb-4 overflow-x-auto scrollbar-hide pb-0.5">
+          {collections.length > 0 && (
+            <>
+              <button
+                onClick={() => setSelectedCollectionId('')}
+                className={cn(
+                  'shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+                  selectedCollectionId === ''
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+                )}
+              >
+                전체
+              </button>
+              {collections.map((col) => (
+                <button
+                  key={col.id}
+                  onClick={() => setSelectedCollectionId(col.id === selectedCollectionId ? '' : col.id)}
+                  className={cn(
+                    'shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+                    selectedCollectionId === col.id
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+                  )}
+                >
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: col.color }} />
+                  {col.name}
+                  {col.count !== undefined && col.count > 0 && (
+                    <span className="text-[10px] opacity-70">{col.count}</span>
+                  )}
+                </button>
+              ))}
+            </>
+          )}
+          <button
+            onClick={() => setCollectionManagerOpen(true)}
+            className={cn(
+              'shrink-0 flex items-center gap-1.5 rounded-full text-xs font-medium transition-colors',
+              collections.length === 0
+                ? 'px-3 py-1.5 bg-muted/60 text-muted-foreground hover:bg-muted'
+                : 'p-1.5 text-muted-foreground/60 hover:text-foreground hover:bg-muted'
+            )}
+            aria-label="컬렉션 관리"
+          >
+            <Settings2 className="h-3.5 w-3.5" />
+            {collections.length === 0 && <span>컬렉션 만들기</span>}
+          </button>
+        </div>
+      )}
+
       {/* Feed */}
       <div className="min-h-[30vh]" data-curation-feed>
       {loading ? (
@@ -600,10 +707,7 @@ export function CurationFeed() {
       ) : (
         <>
           {/* Card grid (mobile/tablet) */}
-          <div className={cn(
-            'lg:hidden',
-            compact ? 'flex flex-col gap-2' : 'grid grid-cols-1 sm:grid-cols-2 gap-4'
-          )}>
+          <div className="lg:hidden grid grid-cols-1 sm:grid-cols-2 gap-4">
             {items.map((item, i) => (
               <div
                 key={item.id}
@@ -616,11 +720,13 @@ export function CurationFeed() {
                   onMarkRead={handleMarkRead}
                   onDelete={handleDeleteRequest}
                   onMemoChange={handleMemoChange}
-                  showMemo={isBookmarkTab}
+                  onCollectionPick={isBookmarkTab ? handleCollectionPick : undefined}
+                  collectionMap={isBookmarkTab ? collectionMap : undefined}
+                  showMemo={showMemo}
                   selectMode={selectMode}
                   selected={selectedIds.has(item.id)}
                   onToggleSelect={toggleSelect}
-                  compact={compact}
+                  compact={false}
                 />
               </div>
             ))}
@@ -640,7 +746,9 @@ export function CurationFeed() {
                   onMarkRead={handleMarkRead}
                   onDelete={handleDeleteRequest}
                   onMemoChange={handleMemoChange}
-                  showMemo={isBookmarkTab}
+                  onCollectionPick={isBookmarkTab ? handleCollectionPick : undefined}
+                  collectionMap={isBookmarkTab ? collectionMap : undefined}
+                  showMemo={showMemo}
                   selectMode={selectMode}
                   selected={selectedIds.has(item.id)}
                   onToggleSelect={toggleSelect}
@@ -705,6 +813,35 @@ export function CurationFeed() {
           </div>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Collection picker bottom sheet */}
+      <CollectionPicker
+        open={!!collectionPickerTarget}
+        onOpenChange={(open) => { if (!open) setCollectionPickerTarget(null); }}
+        collections={collections}
+        currentCollectionId={
+          collectionPickerTarget
+            ? items.find((i) => i.id === collectionPickerTarget)?.collectionId ?? null
+            : null
+        }
+        onSelect={handleCollectionSelect}
+      />
+
+      {/* Collection manager dialog */}
+      {collectionManagerOpen && (
+        <CollectionManager
+          open={collectionManagerOpen}
+          onOpenChange={setCollectionManagerOpen}
+          collections={collections}
+          onCollectionsChange={(updated) => {
+            setCollections(updated);
+            // If current filter is a deleted collection, reset
+            if (selectedCollectionId && !updated.find((c) => c.id === selectedCollectionId)) {
+              setSelectedCollectionId('');
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
