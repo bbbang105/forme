@@ -58,17 +58,17 @@ export const GET = withTracing('GET /api/cron/curation', async (request) => {
 
     if (totalNewItems > 0) {
       const greetings = [
-        '좋은 아침이에요!',
-        '오늘도 좋은 하루 되세요!',
-        '새로운 소식이 도착했어요!',
-        '오늘의 큐레이션이 준비됐어요!',
+        '☕ 좋은 아침이에요!',
+        '🌅 오늘도 좋은 하루 되세요!',
+        '📬 새로운 소식이 도착했어요!',
+        '✨ 오늘의 큐레이션이 준비됐어요!',
       ];
       const greeting = greetings[Math.floor(Math.random() * greetings.length)]!;
 
       try {
         await sendPushToUser(userId, {
           title: `${greeting} +${totalNewItems}개 새 글`,
-          body: `${summary.totalSources}개 소스에서 새로운 글 ${totalNewItems}개를 찾았어요. 확인해보세요!`,
+          body: `📰 ${summary.totalSources}개 소스에서 ${totalNewItems}개를 찾았어요!`,
           tag: 'curation-crawl',
           url: '/curation',
         });

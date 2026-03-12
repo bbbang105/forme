@@ -154,13 +154,18 @@ async function processUserReminders(
     const [evtH, evtM] = (event.startTime!).split(':').map(Number) as [number, number];
     let diffMin = (evtH * 60 + evtM) - (curH * 60 + curM);
     if (diffMin < 0) diffMin += 24 * 60; // 자정 경계
-    const label = diffMin <= 5 ? '곧 시작' : `${diffMin}분 후`;
+    const label = diffMin <= 5 ? '🔔 곧 시작' : `⏰ ${diffMin}분 후`;
 
-    const body = [event.startTime, event.location].filter(Boolean).join(' @ ');
+    const bodyParts: string[] = [];
+    if (event.startTime) bodyParts.push(`🕐 ${event.startTime}`);
+    if (event.location) bodyParts.push(`📍 ${event.location}`);
+    const body = bodyParts.length > 0
+      ? `${bodyParts.join('  ')} — 준비하세요!`
+      : '잊지 마세요!';
     try {
       await sendPushToUser(userId, {
         title: `${label}: ${event.title}`,
-        body: body || event.startTime || '',
+        body,
         tag: `calendar-reminder-${event.id}`,
         url: '/calendar',
       });
