@@ -23,6 +23,10 @@ pnpm 모노레포: `packages/web` (Next.js 16 PWA) + `packages/shared` (DB 스�
 | 번들 분석 | @next/bundle-analyzer (`ANALYZE=true pnpm build`) |
 | 배포 | Vercel (리전: `icn1` 서울, Hobby 플랜) |
 | 스케줄링 | Vercel Cron (일 1회) + Supabase pg_cron + pg_net (고빈도) |
+| AI 요약 | @google/generative-ai (Gemini 2.5 Flash-Lite, JSON 모드) |
+| 자막 추출 | Innertube API (커스텀 구현) |
+| 영상 메타 | YouTube Data API v3 (duration, Shorts 필터) |
+| 마크다운 렌더링 | react-markdown + remark-gfm + rehype-highlight |
 
 ## 개발 명령어
 
@@ -45,7 +49,7 @@ pnpm db:push          # 스키마 직접 push (dev용)
 - DB 접근 시 RLS 의존 (`auth.uid() = user_id`), 추가 권한 체크 불필요
 - 스타일: Tailwind 유틸리티 클래스, 하드코딩 색상 금지 (CSS 변수 사용)
 - 컴포넌트: shadcn/ui 기반, `components/ui/`에 위치
-- 공유 검증 상수: `lib/validators.ts` (DATE_REGEX, HEX_COLOR_REGEX, UUID_REGEX, TIME_REGEX) — 모든 actions/API에서 import (인라인 정규식 금지)
+- 공유 검증 상수: `lib/validators.ts` (DATE_REGEX, HEX_COLOR_REGEX, UUID_REGEX, TIME_REGEX, YOUTUBE_VIDEO_ID_REGEX, YOUTUBE_CHANNEL_ID_REGEX) — 모든 actions/API에서 import (인라인 정규식 금지)
 - Server Actions 입력 검증: 날짜(YYYY-MM-DD), 색상(#hex), UUID, 길이 제한 등 서버측 검증 필수
 - Server Actions UUID 검증: 모든 CRUD 함수의 id 파라미터에 UUID_REGEX 검증 적용
 - API Route 핸들러 순서: 인증(auth) → 입력 검증(UUID 등) → 비즈니스 로직 (인증 전에 입력 검증하지 않음)
@@ -71,14 +75,14 @@ pnpm db:push          # 스키마 직접 push (dev용)
 - 팟캐스트 반자동화: 큐레이션 cron(22:00 KST) 후 Discord로 NotebookLM용 URL 전송 → 23:00 리마인더 → 수동 NotebookLM 생성 → 앱에서 업로드
 - Discord 웹훅: `lib/discord.ts` — URL 패턴 검증 + 5초 타임아웃 + 에러 내부 흡수
 - DB 커넥션: `max: 1` (Supabase Transaction Pooler가 실제 풀 관리, 서버리스 최적)
-- 성능: `serverExternalPackages`로 서버 전용 패키지 번들 제외, AVIF 이미지 포맷, 병렬 쿼리 (`Promise.all`), SW LRU 캐시 (오디오 50개, 정적 100개), SW HTML/RSC network-first (4초 타임아웃 + 캐시 폴백), 리스트 아이템 `React.memo` (CurationCard, CurationListRow, EpisodeCard, MemoCard)
-- 에러 바운더리: 모든 (main) 페이지에 `error.tsx` 배치 (calendar, curation, memo, podcast), `error` prop 로깅 + 제네릭 메시지만 표출
-- 접근성: 탭바 `aria-current="page"`, 검색 input `aria-label`, 이벤트 폼 색상 버튼 `focus-visible:ring-2` + `aria-label`, 폼 라벨 `htmlFor`/`id` 연결 필수, 에러 메시지 `role="alert" aria-live="polite"`, 터치 타겟 최소 44x44px (WCAG 2.5.5), 모든 커스텀 버튼 `focus-visible:ring-2`, `@utility focus-ring` CSS 유틸리티, `prefers-reduced-motion` 미디어 쿼리
+- 성능: `serverExternalPackages`로 서버 전용 패키지 번들 제외, AVIF 이미지 포맷, 병렬 쿼리 (`Promise.all`), SW LRU 캐시 (오디오 50개, 정적 100개), SW HTML/RSC network-first (4초 타임아웃 + 캐시 폴백), 리스트 아이템 `React.memo` (CurationCard, CurationListRow, EpisodeCard, MemoCard, VideoCard)
+- 에러 바운더리: 모든 (main) 페이지에 `error.tsx` 배치 (calendar, curation, memo, podcast, video), `error` prop 로깅 + 제네릭 메시지만 표출
+- 접근성: 탭바 `aria-current="page"`, 검색 input `aria-label`, 이벤트 폼 색상 버튼 `focus-visible:ring-2` + `aria-label`, 폼 라벨 `htmlFor`/`id` 연결 필수, 에러 메시지 `role="alert" aria-live="polite"`, 터치 타겟 최소 44x44px (WCAG 2.5.5), 모든 커스텀 버튼 `focus-visible:ring-2`, `@utility focus-ring` CSS 유틸리티, `prefers-reduced-motion` 미디어 쿼리, 장식 아이콘 `aria-hidden="true"` (라벨 있는 버튼 내부 아이콘)
 - 아이콘 통일: 대시보드/팟캐스트 이모지 → lucide-react 아이콘 (Newspaper, Headphones, CheckSquare, Flame, Mic, FileText)
 - SSRF 방어: `lib/url-safety.ts` — IPv4/IPv6 사설 대역, IPv4-mapped IPv6, ULA(fc00::/7), Link-Local(fe80::/10) 차단
 - 컴포넌트 분리: 대형 컴포넌트 → 하위 컴포넌트/훅 추출 (source-card, crawl-settings-form, calendar-header, recurrence-form, feed-filter-bar, tag-input, day-cell, lane-utils, use-calendar-state, use-editor-config, useImageUpload, LinkInput)
 - 자동저장 훅: `hooks/use-auto-save.ts` — saveFnRef 패턴, Promise 기반 동시 저장 방어, detach() API, IME 컴포지션 중 저장 스킵
-- 공유 유틸: `lib/format-time.ts` (formatTime, formatDuration), `lib/constants.ts` (앱 전역 상수 — 페이지네이션, 제한값, SW 재시도 설정)
+- 공유 유틸: `lib/format-time.ts` (formatTime, formatDuration), `lib/constants.ts` (앱 전역 상수 — 페이지네이션, 제한값, SW 재시도 설정, VIDEO_FEED_PAGE_SIZE, VIDEO_SUMMARIZE_BATCH_MAX, VIDEO_SUMMARIZING_TIMEOUT_MS)
 - 공유 UI: `components/ui/list-skeleton.tsx` (피드/메모 목록 스켈레톤, role="status" aria-busy)
 - 캘린더 상태 훅: `use-calendar-state.ts` — 14개 상태 + 핸들러 추출, async/await 데이터 페칭
 - 에디터 설정 훅: `use-editor-config.ts` — TipTap 확장 배열 useMemo로 안정적 참조
@@ -87,6 +91,7 @@ pnpm db:push          # 스키마 직접 push (dev용)
 - header 아바타: 서버사이드 fetch (layout.tsx async → avatarUrl prop), 클라이언트 워터폴 제거
 - SW 등록: 지수 백오프 재시도 (최대 3회, constants.ts 참조), 푸시 구독 자동 동기화 (syncPushSubscription, sessionStorage 중복 방지)
 - RSS 크롤 중복 방지: 크로스소스 제목 dedup (동일 제목 → DB 미저장, curationSources join으로 유저별 기존 제목 조회)
+- 유튜브 요약: video_sources (채널 소스) + video_items (수집/요약 영상) + video_bookmark_collections (컬렉션) 테이블, 수집과 요약 분리 (수집: RSS 무료, 요약: Gemini API), @handle URL → 페이지 파싱으로 channelId 추출, youtube.com/channel/ URL도 지원, SSE 스트리밍 요약 (api/curation/crawl 패턴), 자막 추출 실패 시 description 폴백 (summarySource 플래그), 마크다운 렌더러 next/dynamic 지연 로딩, 최대 3개 배치 요약 (VIDEO_SUMMARIZE_BATCH_MAX), YouTube Data API v3로 duration 조회 → Shorts/2분 미만 필터, Gemini 싱글톤 패턴, 자막 URL SSRF 방어 (isSafeUrl), videoId 정규식 검증, 북마크 컬렉션 (DnD 순서변경 + 피커 바텀시트 + 피드 칩 필터), optimistic updates + 에러 롤백
 - 테스트: Vitest + `vi.hoisted()` Proxy 기반 DB 목 패턴 (`packages/web/src/__tests__/`)
 
 ## 핵심 파일
@@ -99,7 +104,7 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/app/auth/callback/route.ts` | OAuth 콜백 (open redirect 방어) |
 | `packages/web/src/lib/supabase/middleware.ts` | 세션 갱신 유틸 |
 | `packages/web/src/lib/supabase/server.ts` | 서버 Supabase 클라이언트 |
-| `packages/web/src/components/layout/tab-bar.tsx` | 하단 탭바 (5탭) |
+| `packages/web/src/components/layout/tab-bar.tsx` | 하단 탭바 (5탭, 홈 제거 + 유튜브 추가) |
 | `packages/web/src/components/layout/header.tsx` | 헤더 (forme 로고 + 다크모드 토글 + 서버 전달 avatarUrl prop) |
 | `packages/web/src/components/ui/logo.tsx` | 레트로 {f} 픽토그램 로고마크 (useId 패턴 ID, 다크모드 대응) |
 | `packages/shared/src/schema/calendar-events.ts` | 캘린더 이벤트 스키마 (반복: recurrenceType/Days/EndDate, excludedDates, reminderSent) |
@@ -107,7 +112,7 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/shared/src/schema/` | Drizzle DB 스키마 (전체) |
 | `packages/shared/src/db.ts` | DB 싱글톤 (SSL 강제, max:1 서버리스 최적) |
 | `packages/web/src/lib/crawl-feed.ts` | RSS 크롤 (feedsmith, since 필터, SSRF 방어, 크로스소스 제목 dedup) |
-| `packages/web/src/lib/validators.ts` | 공유 검증 정규식 (DATE, HEX_COLOR, UUID, TIME) |
+| `packages/web/src/lib/validators.ts` | 공유 검증 정규식 (DATE, HEX_COLOR, UUID, TIME, YOUTUBE_VIDEO_ID, YOUTUBE_CHANNEL_ID) |
 | `packages/web/src/lib/url-safety.ts` | SSRF 방어 유틸 (IPv4/IPv6/ULA/Link-Local 차단) |
 | `packages/web/src/lib/auth.ts` | 인증 유틸 (React.cache 기반 getAuthUser) |
 | `packages/web/src/lib/logger.ts` | 구조화 로거 (withTracing, traceAction, traceQuery) |
@@ -189,6 +194,27 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/components/features/curation/collection-manager.tsx` | 컬렉션 관리 다이얼로그 (DnD sortable 순서변경, 색상/이름 편집, 삭제) |
 | `packages/web/src/components/features/curation/collection-picker.tsx` | 컬렉션 선택 바텀시트 (ARIA listbox, 키보드 접근성) |
 | `packages/web/src/components/sw-register.tsx` | Service Worker 등록 (지수 백오프 재시도 최대 3회) + 푸시 구독 자동 동기화 (syncPushSubscription) |
+| `packages/shared/src/schema/video-sources.ts` | 유튜브 채널 소스 스키마 |
+| `packages/shared/src/schema/video-items.ts` | 유튜브 영상 수집/요약 스키마 (status: collected/summarizing/summarized/failed) |
+| `packages/web/src/lib/gemini.ts` | Gemini AI 요약 유틸 (싱글톤 패턴, JSON 스키마 모드, transcript/description 프롬프트) |
+| `packages/web/src/lib/youtube-transcript.ts` | YouTube 자막 추출 (Innertube API, 언어 폴백 + description 폴백, SSRF 방어, 10초 타임아웃) |
+| `packages/web/src/lib/youtube-api.ts` | YouTube Data API v3 유틸 (fetchVideoDurations, videoId 검증, ISO 8601 duration 파싱) |
+| `packages/web/src/app/api/video/sources/route.ts` | 유튜브 채널 소스 CRUD (@handle + /channel/ URL 지원) |
+| `packages/web/src/app/api/video/collect/route.ts` | RSS 영상 수집 SSE (기간 필터, videoId 중복 스킵, Shorts 2분 미만 필터, max 50 소스) |
+| `packages/web/src/app/api/video/[id]/route.ts` | 영상 아이템 PATCH (읽음/북마크/메모/컬렉션) + DELETE (userId 검증) |
+| `packages/web/src/app/api/video/summarize/route.ts` | 영상 요약 SSE API (자막 추출 → Gemini → DB) |
+| `packages/web/src/app/api/video/items/route.ts` | 영상 피드 목록 (status 필터, 커서 페이지네이션) |
+| `packages/web/src/components/features/video/video-feed.tsx` | 유튜브 피드 메인 (소스관리 + 수집 + 요약 + 무한스크롤, useMemo 최적화, optimistic rollback) |
+| `packages/web/src/components/features/video/video-card.tsx` | 영상 카드 (React.memo, 체크박스/요약 미리보기/인라인 메모) |
+| `packages/web/src/components/features/video/video-source-bar.tsx` | 채널 소스 관리 다이얼로그 (추가/삭제/즐겨찾기/태그) |
+| `packages/web/src/components/features/video/video-collection-manager.tsx` | 비디오 컬렉션 관리 다이얼로그 (DnD sortable 순서변경, 색상/이름 편집, 삭제) |
+| `packages/web/src/components/features/video/video-collection-picker.tsx` | 비디오 컬렉션 선택 바텀시트 (ARIA listbox, 키보드 접근성, 새 컬렉션 인라인 생성) |
+| `packages/web/src/components/features/video/collect-progress.tsx` | 수집 진행 SSE 표시 (role="status" aria-live="polite") |
+| `packages/web/src/components/features/video/markdown-renderer.tsx` | 마크다운 렌더러 (dynamic import, prose 스타일링) |
+| `packages/web/src/app/(main)/video/[id]/page.tsx` | 영상 상세 페이지 (썸네일 + 메타 + 마크다운 요약) |
+| `packages/web/src/lib/actions/video-collections.ts` | 비디오 컬렉션 Server Actions (CRUD + DnD reorder + assignCollection, 소유권 검증) |
+| `packages/shared/src/schema/video-bookmark-collections.ts` | 비디오 북마크 컬렉션 스키마 (id, userId, name, color, sortOrder, RLS) |
+| `supabase/video-rls.sql` | video_sources + video_items + video_bookmark_collections RLS 정책 |
 
 ## 인증 구조
 
@@ -202,7 +228,7 @@ study-admin 스타일: Sky Blue `#0ea5e9` 포인트, Pretendard 폰트, 다크�
 
 ## 환경 변수
 
-`.env.local` 참조. Supabase(URL, Anon Key, Service Key), R2(Access Key, Secret, Bucket), VAPID 키, Discord OAuth(Client ID/Secret), Cron(CRON_SECRET, CRON_USER_ID).
+`.env.local` 참조. Supabase(URL, Anon Key, Service Key), R2(Access Key, Secret, Bucket), VAPID 키, Discord OAuth(Client ID/Secret), Cron(CRON_SECRET, CRON_USER_ID), GEMINI_API_KEY, YOUTUBE_DATA_API_KEY.
 
 ## 브랜치 전략
 

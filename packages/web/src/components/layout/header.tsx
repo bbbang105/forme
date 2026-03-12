@@ -25,8 +25,9 @@ export function Header({ avatarUrl }: HeaderProps) {
       )}
     >
       <div className="flex items-center justify-between h-14 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-        <Link href="/dashboard" aria-label="홈">
-          <LogoMark size={38} />
+        <Link href="/dashboard" aria-label="대시보드로 이동" className="flex items-center gap-2">
+          <LogoMark size={28} />
+          <span className="text-base font-mono font-bold text-muted-foreground tracking-wide">forme</span>
         </Link>
         <div className="flex items-center gap-1">
           <Button

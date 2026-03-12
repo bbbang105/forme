@@ -2,7 +2,7 @@
 
 import {memo, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import Image from 'next/image';
-import {Bookmark, Check, FileText, FolderOpen, MessageSquare, Trash2} from 'lucide-react';
+import {Bookmark, BookmarkCheck, Check, FileText, FolderOpen, MessageSquare, Trash2} from 'lucide-react';
 import {cn} from '@/lib/utils';
 import {formatRelativeDate, getArticleGradient, getCategoryStyle,} from '@/lib/curation-utils';
 import {Checkbox} from '@/components/ui/checkbox';
@@ -74,7 +74,7 @@ function Thumbnail({
           className
         )}
       >
-        <FileText className="h-6 w-6 text-muted-foreground/50" />
+        <FileText className="h-6 w-6 text-muted-foreground/50" aria-hidden="true" />
       </div>
     );
   }
@@ -128,6 +128,7 @@ function InlineMemo({
   if (!editing && !initialMemo) {
     return (
       <button
+        type="button"
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -135,7 +136,7 @@ function InlineMemo({
         }}
         className="flex items-center gap-1 text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors mt-1"
       >
-        <MessageSquare className="h-3 w-3" />
+        <MessageSquare className="h-3 w-3" aria-hidden="true" />
         <span>메모 추가</span>
       </button>
     );
@@ -144,6 +145,7 @@ function InlineMemo({
   if (!editing) {
     return (
       <button
+        type="button"
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -152,7 +154,7 @@ function InlineMemo({
         className="w-full text-left mt-1.5 px-2.5 py-1.5 rounded-md bg-muted/50 border border-border/40 text-xs text-muted-foreground hover:border-border transition-colors"
       >
         <div className="flex items-start gap-1.5">
-          <MessageSquare className="h-3 w-3 mt-0.5 shrink-0 text-muted-foreground/60" />
+          <MessageSquare className="h-3 w-3 mt-0.5 shrink-0 text-muted-foreground/60" aria-hidden="true" />
           <span className="line-clamp-2 whitespace-pre-wrap">{initialMemo}</span>
         </div>
       </button>
@@ -184,13 +186,15 @@ function InlineMemo({
         }}
         maxLength={500}
         rows={2}
-        placeholder="메모를 입력하세요..."
-        className="w-full text-base sm:text-sm px-2.5 py-1.5 rounded-md bg-muted/50 border border-primary/30 text-foreground placeholder:text-muted-foreground/50 resize-none focus:outline-none focus:ring-1 focus:ring-primary/40"
+        placeholder="메모를 입력하세요…"
+        aria-label="메모 입력"
+        className="w-full text-base sm:text-sm px-2.5 py-1.5 rounded-md bg-muted/50 border border-primary/30 text-foreground placeholder:text-muted-foreground/50 resize-none focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
       />
       <div className="flex items-center justify-between mt-1">
         <span className="text-[10px] text-muted-foreground/50">{value.length}/500</span>
         <div className="flex gap-1">
           <button
+            type="button"
             onClick={() => {
               setValue(initialMemo ?? '');
               setEditing(false);
@@ -200,6 +204,7 @@ function InlineMemo({
             취소
           </button>
           <button
+            type="button"
             onClick={save}
             className="text-[10px] text-primary font-medium hover:text-primary/80 px-1.5 py-0.5 rounded"
           >
@@ -217,7 +222,7 @@ function SwipeBackground({ direction }: { direction: 'left' | 'right' }) {
     return (
       <div className="absolute inset-0 rounded-xl bg-primary/15 flex items-center pl-5 pointer-events-none">
         <div className="flex items-center gap-1.5 text-primary">
-          <Check className="h-5 w-5" />
+          <Check className="h-5 w-5" aria-hidden="true" />
           <span className="text-xs font-medium">읽음</span>
         </div>
       </div>
@@ -227,7 +232,7 @@ function SwipeBackground({ direction }: { direction: 'left' | 'right' }) {
     <div className="absolute inset-0 rounded-xl bg-destructive/15 flex items-center justify-end pr-5 pointer-events-none">
       <div className="flex items-center gap-1.5 text-destructive">
         <span className="text-xs font-medium">삭제</span>
-        <Trash2 className="h-5 w-5" />
+        <Trash2 className="h-5 w-5" aria-hidden="true" />
       </div>
     </div>
   );
@@ -340,15 +345,15 @@ export const CurationCard = memo(function CurationCard({
             </div>
             {!selectMode && (
               <div className="flex items-center gap-0.5 shrink-0">
-                <button onClick={handleDelete} className="p-1 rounded-md transition-colors text-muted-foreground/40 hover:text-destructive" aria-label="삭제">
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
                 <button
                   onClick={handleBookmark}
-                  className={cn('p-1 rounded-md transition-colors shrink-0', item.isBookmarked ? 'text-amber-500' : 'text-muted-foreground/40 hover:text-amber-500')}
+                  className={cn('p-1 rounded-md transition-colors shrink-0', item.isBookmarked ? 'text-primary' : 'text-muted-foreground/40 hover:text-primary/60')}
                   aria-label={item.isBookmarked ? '북마크 해제' : '북마크'}
                 >
-                  <Bookmark className="h-4 w-4" fill={item.isBookmarked ? 'currentColor' : 'none'} />
+                  {item.isBookmarked ? <BookmarkCheck className="h-4 w-4" aria-hidden="true" /> : <Bookmark className="h-4 w-4" aria-hidden="true" />}
+                </button>
+                <button onClick={handleDelete} className="p-1 rounded-md text-destructive/70 hover:text-destructive hover:bg-destructive/10 transition-colors" aria-label="삭제">
+                  <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                 </button>
               </div>
             )}
@@ -455,13 +460,6 @@ export const CurationCard = memo(function CurationCard({
               </div>
               {!selectMode && (
                 <div className="flex items-center gap-0.5">
-                  <button
-                    onClick={handleDelete}
-                    className="p-1.5 rounded-md transition-colors text-muted-foreground/40 hover:text-destructive"
-                    aria-label="삭제"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
                   {onCollectionPick && (
                     <button
                       onClick={handleCollectionPick}
@@ -471,7 +469,7 @@ export const CurationCard = memo(function CurationCard({
                       )}
                       aria-label="컬렉션 지정"
                     >
-                      <FolderOpen className="h-4 w-4" />
+                      <FolderOpen className="h-4 w-4" aria-hidden="true" />
                     </button>
                   )}
                   <button
@@ -479,15 +477,23 @@ export const CurationCard = memo(function CurationCard({
                     className={cn(
                       'p-1.5 rounded-md transition-colors shrink-0',
                       item.isBookmarked
-                        ? 'text-amber-500'
-                        : 'text-muted-foreground/40 hover:text-amber-500'
+                        ? 'text-primary'
+                        : 'text-muted-foreground/40 hover:text-primary/60'
                     )}
                     aria-label={item.isBookmarked ? '북마크 해제' : '북마크'}
                   >
-                    <Bookmark
-                      className="h-5 w-5"
-                      fill={item.isBookmarked ? 'currentColor' : 'none'}
-                    />
+                    {item.isBookmarked ? (
+                      <BookmarkCheck className="h-5 w-5" aria-hidden="true" />
+                    ) : (
+                      <Bookmark className="h-5 w-5" aria-hidden="true" />
+                    )}
+                  </button>
+                  <button
+                    onClick={handleDelete}
+                    className="p-1.5 rounded-md text-destructive/70 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                    aria-label="삭제"
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
                   </button>
                 </div>
               )}
@@ -661,13 +667,6 @@ export const CurationListRow = memo(function CurationListRow({
       <div className="flex items-center gap-0.5 shrink-0 pt-1">
         {!selectMode && (
           <>
-            <button
-              onClick={handleDelete}
-              className="p-1.5 rounded-md transition-colors text-muted-foreground/40 hover:text-destructive"
-              aria-label="삭제"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
             {onCollectionPick && (
               <button
                 onClick={handleCollectionPick}
@@ -677,7 +676,7 @@ export const CurationListRow = memo(function CurationListRow({
                 )}
                 aria-label="컬렉션 지정"
               >
-                <FolderOpen className="h-4 w-4" />
+                <FolderOpen className="h-4 w-4" aria-hidden="true" />
               </button>
             )}
             <button
@@ -685,15 +684,23 @@ export const CurationListRow = memo(function CurationListRow({
               className={cn(
                 'p-1.5 rounded-md transition-colors',
                 item.isBookmarked
-                  ? 'text-amber-500'
-                  : 'text-muted-foreground/40 hover:text-amber-500'
+                  ? 'text-primary'
+                  : 'text-muted-foreground/40 hover:text-primary/60'
               )}
               aria-label={item.isBookmarked ? '북마크 해제' : '북마크'}
             >
-              <Bookmark
-                className="h-5 w-5"
-                fill={item.isBookmarked ? 'currentColor' : 'none'}
-              />
+              {item.isBookmarked ? (
+                <BookmarkCheck className="h-5 w-5" aria-hidden="true" />
+              ) : (
+                <Bookmark className="h-5 w-5" aria-hidden="true" />
+              )}
+            </button>
+            <button
+              onClick={handleDelete}
+              className="p-1.5 rounded-md text-destructive/70 hover:text-destructive hover:bg-destructive/10 transition-colors"
+              aria-label="삭제"
+            >
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
             </button>
           </>
         )}

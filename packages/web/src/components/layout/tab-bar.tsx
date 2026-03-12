@@ -1,13 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { Home, Newspaper, Calendar, StickyNote, Headphones } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import {usePathname} from 'next/navigation';
+import {Calendar, Headphones, Newspaper, PlayCircle, StickyNote} from 'lucide-react';
+import {cn} from '@/lib/utils';
 
 const tabs = [
-  { href: '/dashboard', label: '홈', icon: Home },
   { href: '/curation', label: '큐레이션', icon: Newspaper },
+  { href: '/video', label: '유튜브', icon: PlayCircle },
   { href: '/calendar', label: '캘린더', icon: Calendar },
   { href: '/memo', label: '메모', icon: StickyNote },
   { href: '/podcast', label: '팟캐스트', icon: Headphones },
@@ -37,6 +37,7 @@ export function TabBar() {
                 'flex flex-col items-center justify-center gap-1 flex-1 h-full',
                 'transition-all duration-150',
                 'active:scale-[0.92] active:opacity-70',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset',
                 isActive
                   ? 'text-primary'
                   : 'text-muted-foreground hover:text-foreground'

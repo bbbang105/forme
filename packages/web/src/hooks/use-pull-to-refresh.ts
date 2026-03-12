@@ -138,6 +138,9 @@ export function usePullToRefresh(containerRef: React.RefObject<HTMLDivElement | 
         return;
       }
 
+      // 최소 10px 이상 아래로 당겨야 pull-to-refresh 시작 (미세한 터치 무시)
+      if (diff < 10 && state.current === 'idle') return;
+
       if (window.scrollY <= 0) {
         e.preventDefault();
       }
