@@ -83,8 +83,8 @@ export const GET = withTracing('GET /api/video/items', async (request: Request) 
     conditions.push(eq(videoItems.sourceId, sourceId));
   }
 
-  // Collection filter
-  if (collectionId && UUID_REGEX.test(collectionId)) {
+  // Collection filter (feed tab only — collected items don't have collectionId)
+  if (tab === 'feed' && collectionId && UUID_REGEX.test(collectionId)) {
     conditions.push(eq(videoItems.collectionId, collectionId));
   }
 

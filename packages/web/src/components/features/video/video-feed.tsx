@@ -214,7 +214,7 @@ export function VideoFeed() {
     (updates: Record<string, string | null>) => {
       const params = new URLSearchParams(searchParams.toString());
       for (const [key, value] of Object.entries(updates)) {
-        if (value) params.set(key, value);
+        if (value !== null && value !== undefined) params.set(key, value);
         else params.delete(key);
       }
       fetchedKeyRef.current = null;
@@ -239,9 +239,10 @@ export function VideoFeed() {
     updateFilter({ search: null });
   }, [updateFilter]);
 
-  // Tab switch handler — reset all sub-filters
+  // Tab switch handler — reset all sub-filters + cancel pending search debounce
   const handleTabSwitch = useCallback(
     (newTab: Tab) => {
+      clearTimeout(searchTimerRef.current);
       updateFilter({
         tab: newTab,
         status: null,
@@ -584,11 +585,12 @@ export function VideoFeed() {
             value={localSearch}
             onChange={(e) => handleSearchChange(e.target.value)}
             placeholder="제목이나 요약으로 검색..."
+            maxLength={100}
             aria-label="영상 검색"
             className={cn(
               'w-full h-10 pl-9 pr-9 rounded-lg border border-border bg-background',
               'text-base placeholder:text-muted-foreground',
-              'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1',
               'transition-colors',
             )}
           />
@@ -925,7 +927,7 @@ export function VideoFeed() {
           </p>
           <p className="text-xs">
             {isFeedTab && status === 'unread' && '생성 탭에서 영상을 수집하고 요약해보세요'}
-            {isFeedTab && status === 'read' && '피드에서 요약을 읽어보세요'}
+            {isFeedTab && status === 'read' && '안읽음 탭에서 요약을 읽으면 여기에 표시돼요'}
             {isFeedTab && status === 'bookmarked' && '마음에 드는 영상을 북마크해보세요'}
             {isCreateTab && '채널을 추가하고 영상을 수집해보세요'}
           </p>
