@@ -196,6 +196,24 @@ export function MemoToolbar({ editor }: MemoToolbarProps) {
         onChange={handleImageFileChange}
       />
 
+      {/* History */}
+      <ToolbarButton
+        onClick={() => editor.chain().focus().undo().run()}
+        disabled={!editor.can().undo()}
+        aria-label="실행 취소"
+      >
+        <Undo className="h-4 w-4" />
+      </ToolbarButton>
+      <ToolbarButton
+        onClick={() => editor.chain().focus().redo().run()}
+        disabled={!editor.can().redo()}
+        aria-label="다시 실행"
+      >
+        <Redo className="h-4 w-4" />
+      </ToolbarButton>
+
+      <ToolbarDivider />
+
       {/* Text formatting */}
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleBold().run()}
@@ -320,24 +338,6 @@ export function MemoToolbar({ editor }: MemoToolbarProps) {
         aria-label="코드 블록"
       >
         <SquareCode className="h-4 w-4" />
-      </ToolbarButton>
-
-      <ToolbarDivider />
-
-      {/* History */}
-      <ToolbarButton
-        onClick={() => editor.chain().focus().undo().run()}
-        disabled={!editor.can().undo()}
-        aria-label="실행 취소"
-      >
-        <Undo className="h-4 w-4" />
-      </ToolbarButton>
-      <ToolbarButton
-        onClick={() => editor.chain().focus().redo().run()}
-        disabled={!editor.can().redo()}
-        aria-label="다시 실행"
-      >
-        <Redo className="h-4 w-4" />
       </ToolbarButton>
     </div>
   );

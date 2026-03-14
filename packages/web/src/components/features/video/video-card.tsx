@@ -367,18 +367,18 @@ export const VideoCard = memo(function VideoCard({
       </div>
 
       {/* Right actions */}
-      <div className="flex items-center gap-0.5 shrink-0 self-start">
+      <div className="flex flex-col items-center justify-start gap-0.5 shrink-0">
         {onCollectionPick && (
           <button
             type="button"
             onClick={() => onCollectionPick(item.id)}
             className={cn(
-              'p-1.5 rounded-md transition-colors cursor-pointer',
+              'p-1.5 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-md transition-colors cursor-pointer',
               item.collectionId ? 'text-primary' : 'text-muted-foreground/40 hover:text-primary',
             )}
             aria-label="컬렉션 지정"
           >
-            <FolderOpen className="h-4 w-4" aria-hidden="true" />
+            <FolderOpen className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
         )}
         {onToggleBookmark && (
@@ -386,7 +386,7 @@ export const VideoCard = memo(function VideoCard({
             type="button"
             onClick={() => onToggleBookmark(item.id)}
             className={cn(
-              'p-1.5 rounded-md transition-colors cursor-pointer',
+              'p-1.5 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-md transition-colors cursor-pointer',
               item.isBookmarked
                 ? 'text-primary'
                 : 'text-muted-foreground/40 hover:text-primary/60',
@@ -394,9 +394,9 @@ export const VideoCard = memo(function VideoCard({
             aria-label={item.isBookmarked ? '북마크 해제' : '북마크'}
           >
             {item.isBookmarked ? (
-              <BookmarkCheck className="h-5 w-5" aria-hidden="true" />
+              <BookmarkCheck className="h-4 w-4" aria-hidden="true" />
             ) : (
-              <Bookmark className="h-5 w-5" aria-hidden="true" />
+              <Bookmark className="h-4 w-4" aria-hidden="true" />
             )}
           </button>
         )}
@@ -404,10 +404,10 @@ export const VideoCard = memo(function VideoCard({
           <button
             type="button"
             onClick={() => onDelete(item.id)}
-            className="p-1.5 rounded-md text-destructive/70 hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+            className="p-1.5 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-md text-destructive/70 hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
             aria-label={`${item.title} 삭제`}
           >
-            <Trash2 className="h-4 w-4" aria-hidden="true" />
+            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
         )}
       </div>

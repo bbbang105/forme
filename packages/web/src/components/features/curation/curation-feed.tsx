@@ -138,6 +138,7 @@ export function CurationFeed() {
       tags?: string[];
       sort?: SortMode;
       sourceId?: string;
+      collectionId?: string;
     }) => {
       const newCategory = updates.category ?? category;
       const newStatus = updates.status ?? status;
@@ -145,6 +146,7 @@ export function CurationFeed() {
       const newTags = updates.tags ?? selectedTags;
       const newSort = updates.sort ?? sort;
       const newSourceId = updates.sourceId ?? sourceId;
+      const newCollectionId = updates.collectionId ?? selectedCollectionId;
 
       const params = buildFeedParams({
         category: newCategory,
@@ -153,7 +155,7 @@ export function CurationFeed() {
         tagsParam: newTags.join(','),
         sort: newSort,
         sourceId: newSourceId,
-        collectionId: selectedCollectionId,
+        collectionId: newCollectionId,
       });
       // status 'unread' is the default, don't include in URL
       if (newStatus === 'unread') params.delete('status');
@@ -535,11 +537,7 @@ export function CurationFeed() {
   if (!loading && !hasSources) {
     return (
       <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-lg font-semibold">큐레이션</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">관심 있는 RSS 피드를 구독하고 한곳에서 읽어보세요</p>
-          </div>
+        <div className="flex items-center justify-end mb-6">
           <SourceManager onCrawlComplete={handleCrawlComplete} onFavoritesChange={handleFavoritesChange} />
         </div>
         <div className="flex flex-col items-center justify-center min-h-[40vh] text-center">
@@ -557,37 +555,6 @@ export function CurationFeed() {
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h2 className="text-lg font-semibold">큐레이션</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">관심 있는 RSS 피드를 구독하고 한곳에서 읽어보세요</p>
-        </div>
-        <div className="flex items-center gap-1.5">
-          {!selectMode ? (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setSelectMode(true)}
-              disabled={loading || items.length === 0}
-            >
-              <CheckSquare className="h-4 w-4 mr-1.5" />
-              선택
-            </Button>
-          ) : (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={exitSelectMode}
-            >
-              <X className="h-4 w-4 mr-1" />
-              취소
-            </Button>
-          )}
-          <SourceManager onCrawlComplete={handleCrawlComplete} onFavoritesChange={handleFavoritesChange} />
-        </div>
-      </div>
-
       {/* Select mode action bar */}
       {selectMode && (
         <div className="flex items-center justify-between gap-3 mb-4 px-3 py-2.5 rounded-lg bg-muted/60 border border-border/60">
@@ -622,7 +589,14 @@ export function CurationFeed() {
         selectedCategory={category}
         onCategoryChange={(c) => updateFilters({ category: c })}
         status={status}
-        onStatusChange={(s) => updateFilters({ status: s })}
+        onStatusChange={(s) => {
+          if (s !== 'bookmarked') {
+            setSelectedCollectionId('');
+            updateFilters({ status: s, collectionId: '' });
+          } else {
+            updateFilters({ status: s });
+          }
+        }}
         selectedTags={selectedTags}
         onTagsChange={(tags) => updateFilters({ tags })}
         sort={sort}
@@ -630,6 +604,31 @@ export function CurationFeed() {
         sourceId={sourceId}
         onSourceIdChange={(id) => updateFilters({ sourceId: id })}
         favoriteSources={favoriteSources}
+        statusActions={
+          <>
+            {!selectMode ? (
+              <button
+                type="button"
+                onClick={() => setSelectMode(true)}
+                disabled={loading || items.length === 0}
+                className="p-1.5 rounded-md border border-border text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors disabled:opacity-50 disabled:pointer-events-none"
+                aria-label="선택 모드"
+              >
+                <CheckSquare className="h-3.5 w-3.5" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={exitSelectMode}
+                className="p-1.5 rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+                aria-label="선택 취소"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+            <SourceManager onCrawlComplete={handleCrawlComplete} onFavoritesChange={handleFavoritesChange} />
+          </>
+        }
       />
 
       {/* Collection chips (bookmark tab only) */}

@@ -37,6 +37,8 @@ interface CurationFiltersProps {
   onStatusChange: (status: StatusFilter) => void;
   selectedTags: string[];
   onTagsChange: (tags: string[]) => void;
+  /** Extra actions to render at the end of status chips row */
+  statusActions?: React.ReactNode;
 }
 
 export function CurationFilters({
@@ -46,6 +48,7 @@ export function CurationFilters({
   onStatusChange,
   selectedTags,
   onTagsChange,
+  statusActions,
 }: CurationFiltersProps) {
   const [tagsExpanded, setTagsExpanded] = useState(false);
 
@@ -82,7 +85,7 @@ export function CurationFilters({
         })}
       </div>
 
-      {/* Status filter chips */}
+      {/* Status filter chips + actions */}
       <div className="flex items-center gap-1.5">
         <StatusChip
           active={status === 'unread'}
@@ -102,6 +105,11 @@ export function CurationFilters({
           icon={<BookmarkIcon className="h-3.5 w-3.5" />}
           label="북마크"
         />
+        {statusActions && (
+          <div className="ml-auto flex items-center gap-1">
+            {statusActions}
+          </div>
+        )}
       </div>
 
       {/* Tag filter */}

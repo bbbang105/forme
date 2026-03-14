@@ -2,18 +2,18 @@
 
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useRouter, useSearchParams} from 'next/navigation';
-import {Bookmark, Download, FileText, Loader2, Plus, Settings2, Star, Trash2} from 'lucide-react';
+import {BookmarkIcon, Download, Loader2, Mail, MailOpen, Search, Settings2, Star, Trash2, Wand2, X} from 'lucide-react';
 import {cn} from '@/lib/utils';
 import {Button} from '@/components/ui/button';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import {type VideoSource, VideoSourceBar} from './video-source-bar';
 import {CollectProgress} from './collect-progress';
@@ -21,15 +21,21 @@ import {VideoCard, type VideoItemData} from './video-card';
 import {VIDEO_SUMMARIZE_BATCH_MAX} from '@/lib/constants';
 import {getVideoCollectionsWithCount} from '@/lib/actions/video-collections';
 import {VideoCollectionPicker} from './video-collection-picker';
-import {VideoCollectionManager, type VideoCollection} from './video-collection-manager';
+import {type VideoCollection, VideoCollectionManager} from './video-collection-manager';
 
-type Tab = 'summary' | 'new' | 'bookmarked';
+type Tab = 'feed' | 'create';
+type Status = 'unread' | 'read' | 'bookmarked';
 type Period = '3d' | '7d' | '30d';
 
-const TAB_CHIPS: { value: Tab; label: string; icon: typeof FileText }[] = [
-  { value: 'summary', label: '요약', icon: FileText },
-  { value: 'new', label: '새 영상', icon: Plus },
-  { value: 'bookmarked', label: '북마크', icon: Bookmark },
+const MAIN_TABS: { value: Tab; label: string }[] = [
+  { value: 'feed', label: '피드' },
+  { value: 'create', label: '생성' },
+];
+
+const STATUS_CHIPS: { value: Status; label: string; icon: typeof Mail }[] = [
+  { value: 'unread', label: '안읽음', icon: Mail },
+  { value: 'read', label: '읽음', icon: MailOpen },
+  { value: 'bookmarked', label: '북마크', icon: BookmarkIcon },
 ];
 
 const PERIODS: { value: Period; label: string }[] = [
@@ -49,9 +55,11 @@ const TAG_OPTIONS = [
 export function VideoFeed() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const tab = (searchParams.get('tab') as Tab) || 'summary';
+  const tab = (searchParams.get('tab') as Tab) || 'feed';
+  const status = (searchParams.get('status') as Status) || 'unread';
   const activeSourceId = searchParams.get('sourceId') || '';
   const activeTag = searchParams.get('tag') || '';
+  const searchQuery = searchParams.get('search') || '';
 
   // Data state
   const [sources, setSources] = useState<VideoSource[]>([]);
@@ -67,7 +75,7 @@ export function VideoFeed() {
   const [collectPeriod, setCollectPeriod] = useState<Period>('7d');
   const [collectActive, setCollectActive] = useState(false);
 
-  // Selection mode (only for 'new' tab)
+  // Selection mode (only for 'create' tab)
   const [selectMode, setSelectMode] = useState(false);
 
   // Summarize progress
@@ -94,7 +102,9 @@ export function VideoFeed() {
   const favoriteSources = useMemo(() => sources.filter((s) => s.isFavorite), [sources]);
   const allTags = useMemo(() => [...new Set(sources.flatMap((s) => s.tags ?? []))], [sources]);
 
-  const isNewTab = tab === 'new';
+  const isCreateTab = tab === 'create';
+  const isFeedTab = tab === 'feed';
+  const isBookmarkStatus = isFeedTab && status === 'bookmarked';
 
   // Abort SSE on unmount
   useEffect(() => {
@@ -103,8 +113,20 @@ export function VideoFeed() {
     };
   }, []);
 
+  // Search local state (debounced) — handlers defined after updateFilter
+  const [localSearch, setLocalSearch] = useState(searchQuery);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  useEffect(() => {
+    setLocalSearch(searchQuery);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    return () => clearTimeout(searchTimerRef.current);
+  }, []);
+
   // Build query key for refetch tracking
-  const queryKey = `${tab}|${activeSourceId}|${activeTag}|${activeCollectionId}`;
+  const queryKey = `${tab}|${status}|${activeSourceId}|${activeTag}|${activeCollectionId}|${searchQuery}`;
 
   // Fetch sources
   const fetchSources = useCallback(async () => {
@@ -125,9 +147,11 @@ export function VideoFeed() {
 
       try {
         const params = new URLSearchParams({ tab });
+        if (isFeedTab) params.set('status', status);
         if (activeSourceId) params.set('sourceId', activeSourceId);
         if (activeTag) params.set('tag', activeTag);
         if (activeCollectionId) params.set('collectionId', activeCollectionId);
+        if (searchQuery) params.set('search', searchQuery);
         if (!reset && nextCursor) params.set('cursor', nextCursor);
 
         const res = await fetch(`/api/video/items?${params}`);
@@ -142,7 +166,7 @@ export function VideoFeed() {
         setLoadingMore(false);
       }
     },
-    [tab, activeSourceId, activeTag, activeCollectionId],
+    [tab, status, activeSourceId, activeTag, activeCollectionId, searchQuery, isFeedTab],
   );
 
   // Fetch collections
@@ -199,6 +223,49 @@ export function VideoFeed() {
     [searchParams, router],
   );
 
+  // Stable ref for updateFilter (avoid stale closure in debounce timer)
+  const updateFilterRef = useRef(updateFilter);
+  useEffect(() => { updateFilterRef.current = updateFilter; }, [updateFilter]);
+
+  // Search handlers
+  const handleSearchChange = useCallback((v: string) => {
+    setLocalSearch(v);
+    clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => updateFilterRef.current({ search: v || null }), 300);
+  }, []);
+
+  const handleSearchClear = useCallback(() => {
+    setLocalSearch('');
+    updateFilter({ search: null });
+  }, [updateFilter]);
+
+  // Tab switch handler — reset all sub-filters
+  const handleTabSwitch = useCallback(
+    (newTab: Tab) => {
+      updateFilter({
+        tab: newTab,
+        status: null,
+        sourceId: null,
+        tag: null,
+        collectionId: null,
+        search: null,
+      });
+    },
+    [updateFilter],
+  );
+
+  // Status switch handler — reset collection when leaving bookmark
+  const handleStatusSwitch = useCallback(
+    (newStatus: Status) => {
+      if (newStatus !== 'bookmarked') {
+        updateFilter({ status: newStatus, collectionId: null });
+      } else {
+        updateFilter({ status: newStatus });
+      }
+    },
+    [updateFilter],
+  );
+
   // Handlers
   const handleAddSource = async (channelUrl: string) => {
     const res = await fetch('/api/video/sources', {
@@ -232,30 +299,32 @@ export function VideoFeed() {
   const handleCollectComplete = () => {
     setCollectActive(false);
     fetchedKeyRef.current = null;
-    // Stay on 'new' tab and refetch
-    if (tab === 'new') {
+    if (isCreateTab) {
       fetchItems({ reset: true });
     } else {
-      updateFilter({ tab: 'new' });
+      handleTabSwitch('create');
     }
   };
 
-  const handleSelect = (id: string) => {
+  // Stable ref for items (avoid stale closure in handlers passed to memo'd cards)
+  const itemsRef = useRef(items);
+  useEffect(() => { itemsRef.current = items; }, [items]);
+
+  const handleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
-  };
+  }, []);
 
   // Click: summarized → detail page + mark read, others → YouTube + mark read
   const handleCardClick = useCallback(
     async (id: string) => {
-      const item = items.find((i) => i.id === id);
+      const item = itemsRef.current.find((i) => i.id === id);
       if (!item) return;
 
-      // Mark as read (optimistic + server)
       if (!item.isRead) {
         setItems((prev) =>
           prev.map((i) => (i.id === id ? { ...i, isRead: true } : i)),
@@ -277,11 +346,11 @@ export function VideoFeed() {
         window.open(`https://www.youtube.com/watch?v=${item.videoId}`, '_blank', 'noopener');
       }
     },
-    [items, router],
+    [router],
   );
 
-  const handleToggleBookmark = async (id: string) => {
-    const item = items.find((i) => i.id === id);
+  const handleToggleBookmark = useCallback(async (id: string) => {
+    const item = itemsRef.current.find((i) => i.id === id);
     if (!item) return;
 
     if (!item.isBookmarked) {
@@ -320,10 +389,10 @@ export function VideoFeed() {
         prev.map((i) => (i.id === id ? {...i, isBookmarked: true, collectionId: prevCollectionId} : i)),
       );
     }
-  };
+  }, []);
 
-  const handleMemoChange = async (id: string, memo: string | null) => {
-    const item = items.find((i) => i.id === id);
+  const handleMemoChange = useCallback(async (id: string, memo: string | null) => {
+    const item = itemsRef.current.find((i) => i.id === id);
     const wasBookmarked = item?.isBookmarked ?? false;
 
     setItems((prev) =>
@@ -338,11 +407,10 @@ export function VideoFeed() {
       body: JSON.stringify({memo}),
     });
 
-    // 메모 작성으로 처음 북마크됨 → 컬렉션 피커
     if (memo && !wasBookmarked) {
       setPickerItemId(id);
     }
-  };
+  }, []);
 
   const handleSummarize = async () => {
     if (selectedIds.size === 0) return;
@@ -422,7 +490,7 @@ export function VideoFeed() {
     }
   };
 
-  const handleDeleteItem = async (id: string) => {
+  const handleDeleteItem = useCallback(async (id: string) => {
     const res = await fetch(`/api/video/${id}`, { method: 'DELETE' });
     if (res.ok || res.status === 204) {
       setItems((prev) => prev.filter((i) => i.id !== id));
@@ -432,7 +500,7 @@ export function VideoFeed() {
         return next;
       });
     }
-  };
+  }, []);
 
   const handleBulkDelete = async () => {
     if (selectedIds.size === 0) return;
@@ -451,9 +519,12 @@ export function VideoFeed() {
     }
   };
 
-  const handleCollectionSelect = async (collectionId: string | null) => {
-    if (!pickerItemId) return;
-    const id = pickerItemId;
+  const pickerItemIdRef = useRef(pickerItemId);
+  useEffect(() => { pickerItemIdRef.current = pickerItemId; }, [pickerItemId]);
+
+  const handleCollectionSelect = useCallback(async (collectionId: string | null) => {
+    if (!pickerItemIdRef.current) return;
+    const id = pickerItemIdRef.current;
     setPickerItemId(null);
 
     setItems((prev) =>
@@ -468,11 +539,11 @@ export function VideoFeed() {
       body: JSON.stringify({collectionId}),
     });
     fetchCollections();
-  };
+  }, [fetchCollections]);
 
-  const handleCollectionPick = (id: string) => {
+  const handleCollectionPick = useCallback((id: string) => {
     setPickerItemId(id);
-  };
+  }, []);
 
   const collectionMap = useMemo(() => new Map(collections.map((c) => [c.id, {id: c.id, name: c.name, color: c.color}])), [collections]);
 
@@ -481,34 +552,88 @@ export function VideoFeed() {
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-4 max-w-7xl mx-auto space-y-4 pb-24">
-      {/* Tab chips */}
-      <div className="flex items-center gap-2">
-        {TAB_CHIPS.map((chip) => {
-          const Icon = chip.icon;
-          return (
-            <button
-              key={chip.value}
-              type="button"
-              onClick={() => updateFilter({ tab: chip.value, sourceId: null, tag: null })}
-              className={cn(
-                'inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium',
-                'transition-colors cursor-pointer',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
-                tab === chip.value
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-muted-foreground hover:text-foreground',
-              )}
-            >
-              <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-              {chip.label}
-            </button>
-          );
-        })}
-
+      {/* ── 1단: 메인 탭 (세그먼트 컨트롤) ── */}
+      <div className="flex rounded-xl bg-muted/50 p-1 gap-0.5">
+        {MAIN_TABS.map(({ value, label }) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => handleTabSwitch(value)}
+            className={cn(
+              'flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2.5 text-sm font-semibold',
+              'transition-all cursor-pointer',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
+              tab === value
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            {value === 'feed' && <Mail className="h-4 w-4" aria-hidden="true" />}
+            {value === 'create' && <Wand2 className="h-4 w-4" aria-hidden="true" />}
+            {label}
+          </button>
+        ))}
       </div>
 
-      {/* ── 새 영상 탭: 소스 관리 + 수집 ── */}
-      {isNewTab && (
+      {/* ── 피드 탭: 검색 ── */}
+      {isFeedTab && (
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+          <input
+            type="text"
+            value={localSearch}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            placeholder="제목이나 요약으로 검색..."
+            aria-label="영상 검색"
+            className={cn(
+              'w-full h-10 pl-9 pr-9 rounded-lg border border-border bg-background',
+              'text-base placeholder:text-muted-foreground',
+              'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1',
+              'transition-colors',
+            )}
+          />
+          {localSearch && (
+            <button
+              type="button"
+              onClick={handleSearchClear}
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-muted transition-colors"
+              aria-label="검색어 지우기"
+            >
+              <X className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* ── 2단: 피드 탭 — 상태 필터 칩 ── */}
+      {isFeedTab && (
+        <div className="flex items-center gap-1.5">
+          {STATUS_CHIPS.map((chip) => {
+            const Icon = chip.icon;
+            return (
+              <button
+                key={chip.value}
+                type="button"
+                onClick={() => handleStatusSwitch(chip.value)}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium',
+                  'transition-colors cursor-pointer',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
+                  status === chip.value
+                    ? 'bg-primary text-primary-foreground'
+                    : 'border border-border text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                )}
+              >
+                <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+                {chip.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ── 생성 탭: 소스 관리 + 수집 ── */}
+      {isCreateTab && (
         <>
           <VideoSourceBar
             sources={sources}
@@ -586,7 +711,7 @@ export function VideoFeed() {
         </div>
       )}
 
-      {(allTags.length > 0 || (isNewTab && !loading && items.length > 0)) && (
+      {(allTags.length > 0 || (isCreateTab && !loading && items.length > 0)) && (
         <div className="flex items-center gap-1.5 overflow-x-auto overflow-y-visible scrollbar-none">
           {TAG_OPTIONS.filter((t) => allTags.includes(t.value)).map((tagOpt) => (
             <button
@@ -606,7 +731,7 @@ export function VideoFeed() {
               {tagOpt.label}
             </button>
           ))}
-          {isNewTab && !loading && items.length > 0 && (
+          {isCreateTab && !loading && items.length > 0 && (
             <button
               type="button"
               onClick={() => {
@@ -629,8 +754,8 @@ export function VideoFeed() {
         </div>
       )}
 
-      {/* ── 새 영상 탭: 선택 모드 바 ── */}
-      {isNewTab && selectMode && (
+      {/* ── 생성 탭: 선택 모드 바 ── */}
+      {isCreateTab && selectMode && (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <p className="text-xs text-muted-foreground">
@@ -740,8 +865,8 @@ export function VideoFeed() {
         </div>
       )}
 
-      {/* ── 북마크 탭: 컬렉션 칩 필터 ── */}
-      {tab === 'bookmarked' && (
+      {/* ── 북마크 상태: 컬렉션 칩 필터 ── */}
+      {isBookmarkStatus && (
         <div className="flex items-center gap-2 overflow-x-auto scrollbar-none pb-0.5">
           <button
             type="button"
@@ -793,16 +918,16 @@ export function VideoFeed() {
       ) : items.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-16 text-muted-foreground">
           <p className="text-sm">
-            {tab === 'summary' && '요약된 영상이 없어요'}
-            {tab === 'new' && '새 영상이 없어요'}
-            {tab === 'bookmarked' && '북마크한 영상이 없어요'}
+            {isFeedTab && status === 'unread' && '안읽은 요약이 없어요'}
+            {isFeedTab && status === 'read' && '읽은 요약이 없어요'}
+            {isFeedTab && status === 'bookmarked' && '북마크한 영상이 없어요'}
+            {isCreateTab && '수집된 영상이 없어요'}
           </p>
           <p className="text-xs">
-            {tab === 'summary'
-              ? '새 영상 탭에서 영상을 선택해 요약해보세요'
-              : tab === 'new'
-                ? '채널을 추가하고 영상을 수집해보세요'
-                : '마음에 드는 영상을 북마크해보세요'}
+            {isFeedTab && status === 'unread' && '생성 탭에서 영상을 수집하고 요약해보세요'}
+            {isFeedTab && status === 'read' && '피드에서 요약을 읽어보세요'}
+            {isFeedTab && status === 'bookmarked' && '마음에 드는 영상을 북마크해보세요'}
+            {isCreateTab && '채널을 추가하고 영상을 수집해보세요'}
           </p>
         </div>
       ) : (
@@ -812,14 +937,14 @@ export function VideoFeed() {
               key={item.id}
               item={item}
               selected={selectedIds.has(item.id)}
-              onSelect={isNewTab && selectMode ? handleSelect : undefined}
+              onSelect={isCreateTab && selectMode ? handleSelect : undefined}
               onClick={selectMode ? undefined : handleCardClick}
               onDelete={(id) => setDeleteTarget(items.find((i) => i.id === id) ?? null)}
-              onToggleBookmark={item.status === 'summarized' ? handleToggleBookmark : undefined}
-              onMemoChange={tab !== 'new' ? handleMemoChange : undefined}
-              onCollectionPick={tab === 'bookmarked' ? handleCollectionPick : undefined}
-              collectionMap={tab === 'bookmarked' ? collectionMap : undefined}
-              showMemo={tab !== 'new'}
+              onToggleBookmark={isFeedTab ? handleToggleBookmark : undefined}
+              onMemoChange={isFeedTab ? handleMemoChange : undefined}
+              onCollectionPick={isBookmarkStatus ? handleCollectionPick : undefined}
+              collectionMap={isBookmarkStatus ? collectionMap : undefined}
+              showMemo={isFeedTab}
               sourceTags={sourceTagMap.get(item.sourceId) ?? []}
             />
           ))}

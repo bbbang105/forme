@@ -22,6 +22,7 @@ export interface FeedFilterBarProps {
   sourceId: string;
   onSourceIdChange: (sourceId: string) => void;
   favoriteSources: { id: string; name: string }[];
+  statusActions?: React.ReactNode;
 }
 
 export function FeedFilterBar({
@@ -39,11 +40,26 @@ export function FeedFilterBar({
   sourceId,
   onSourceIdChange,
   favoriteSources,
+  statusActions,
 }: FeedFilterBarProps) {
   return (
     <>
+      {/* Category segment tabs (맨 위) */}
+      <div className="mb-3">
+        <CurationFilters
+          categories={categories}
+          selectedCategory={selectedCategory}
+          onCategoryChange={onCategoryChange}
+          status={status}
+          onStatusChange={onStatusChange}
+          selectedTags={selectedTags}
+          onTagsChange={onTagsChange}
+          statusActions={statusActions}
+        />
+      </div>
+
       {/* Search */}
-      <div className="mb-4">
+      <div className="mb-3">
         <CurationSearch
           value={search}
           onChange={onSearchChange}
@@ -73,21 +89,8 @@ export function FeedFilterBar({
         </div>
       )}
 
-      {/* Filters */}
-      <div className="mb-4">
-        <CurationFilters
-          categories={categories}
-          selectedCategory={selectedCategory}
-          onCategoryChange={onCategoryChange}
-          status={status}
-          onStatusChange={onStatusChange}
-          selectedTags={selectedTags}
-          onTagsChange={onTagsChange}
-        />
-      </div>
-
       {/* Sort toggle */}
-      <div className="flex items-center gap-1.5 mb-6">
+      <div className="flex items-center gap-1.5 mb-4">
         <SortButton
           active={sort === 'latest'}
           onClick={() => onSortChange('latest')}

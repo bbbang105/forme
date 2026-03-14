@@ -1,13 +1,16 @@
 import {NextResponse} from 'next/server';
-import {and, desc, eq, inArray, lt, or} from 'drizzle-orm';
+import {and, desc, eq, inArray, lt, or, sql} from 'drizzle-orm';
 import {db, videoItems, videoSources} from '@forme/shared';
 import {createClient} from '@/lib/supabase/server';
 import {withTracing} from '@/lib/logger';
 import {UUID_REGEX} from '@/lib/validators';
 import {VIDEO_FEED_PAGE_SIZE, VIDEO_SUMMARIZING_TIMEOUT_MS} from '@/lib/constants';
+import {escapeIlike} from '@/lib/curation-utils';
 
-type Tab = 'summary' | 'new' | 'bookmarked';
-const VALID_TABS: Tab[] = ['summary', 'new', 'bookmarked'];
+type Tab = 'feed' | 'create';
+type Status = 'unread' | 'read' | 'bookmarked';
+const VALID_TABS: Tab[] = ['feed', 'create'];
+const VALID_STATUSES: Status[] = ['unread', 'read', 'bookmarked'];
 
 export const GET = withTracing('GET /api/video/items', async (request: Request) => {
   const supabase = await createClient();
@@ -15,9 +18,14 @@ export const GET = withTracing('GET /api/video/items', async (request: Request) 
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const url = new URL(request.url);
-  const tab = (url.searchParams.get('tab') || 'summary') as Tab;
+  const tab = (url.searchParams.get('tab') || 'feed') as Tab;
   if (!VALID_TABS.includes(tab)) {
     return NextResponse.json({ error: 'Invalid tab' }, { status: 400 });
+  }
+
+  const status = (url.searchParams.get('status') || 'unread') as Status;
+  if (tab === 'feed' && !VALID_STATUSES.includes(status)) {
+    return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
   }
 
   const sourceId = url.searchParams.get('sourceId');
@@ -26,8 +34,8 @@ export const GET = withTracing('GET /api/video/items', async (request: Request) 
   const cursor = url.searchParams.get('cursor');
   const limit = VIDEO_FEED_PAGE_SIZE;
 
-  // summarizing 타임아웃 리커버리 (new 탭에서만 실행 — summarizing 아이템이 보이는 탭)
-  if (tab === 'new') {
+  // summarizing 타임아웃 리커버리 (create 탭에서만 실행)
+  if (tab === 'create') {
     await db.update(videoItems)
       .set({ status: 'collected' })
       .where(and(
@@ -40,18 +48,34 @@ export const GET = withTracing('GET /api/video/items', async (request: Request) 
   // Build conditions
   const conditions = [eq(videoItems.userId, user.id)];
 
-  // Tab filter
-  if (tab === 'summary') {
+  // Tab + status filter
+  if (tab === 'feed') {
+    // 피드 탭: 요약 완료된 영상만
     conditions.push(eq(videoItems.status, 'summarized'));
-  } else if (tab === 'new') {
+
+    if (status === 'unread') {
+      conditions.push(eq(videoItems.isRead, false));
+    } else if (status === 'read') {
+      conditions.push(eq(videoItems.isRead, true));
+    } else if (status === 'bookmarked') {
+      conditions.push(eq(videoItems.isBookmarked, true));
+    }
+  } else if (tab === 'create') {
     conditions.push(
       or(
         eq(videoItems.status, 'collected'),
         eq(videoItems.status, 'summarizing'),
       )!,
     );
-  } else if (tab === 'bookmarked') {
-    conditions.push(eq(videoItems.isBookmarked, true));
+  }
+
+  // Search filter (escapeIlike + raw SQL ESCAPE for wildcard safety)
+  const search = url.searchParams.get('search')?.trim();
+  if (search && search.length >= 2 && search.length <= 100) {
+    const pattern = `%${escapeIlike(search)}%`;
+    conditions.push(
+      sql`(${videoItems.title} ILIKE ${pattern} ESCAPE '\\' OR COALESCE(${videoItems.oneLiner}, '') ILIKE ${pattern} ESCAPE '\\')`,
+    );
   }
 
   // Source filter

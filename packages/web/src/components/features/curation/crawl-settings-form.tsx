@@ -48,9 +48,9 @@ export function CrawlSettingsForm({
         </label>
         <div className="flex gap-2">
           {([
-            { value: '3d', label: '최근 3일' },
-            { value: '7d', label: '최근 7일' },
-            { value: '30d', label: '최근 30일' },
+            { value: '3d', label: '3일' },
+            { value: '7d', label: '7일' },
+            { value: '30d', label: '30일' },
             { value: 'custom', label: '직접 선택' },
           ] as const).map((opt) => (
             <button
