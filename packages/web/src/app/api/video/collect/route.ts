@@ -89,7 +89,7 @@ export const POST = withTracing('POST /api/video/collect', async (request: Reque
         if (!isSafeUrl(rssUrl)) {
           failCount++;
           write('progress', {
-            result: { sourceId: source.id, sourceName: source.channelName, success: false, newItemsAdded: 0, error: 'Unsafe URL' },
+            result: { sourceId: source.id, sourceName: source.channelName, success: false, newItemsAdded: 0, error: `'${source.channelName}' RSS URL이 유효하지 않습니다` },
           });
           continue;
         }
@@ -101,8 +101,11 @@ export const POST = withTracing('POST /api/video/collect', async (request: Reque
           });
           if (!res.ok) {
             failCount++;
+            const errorMsg = res.status === 404
+              ? `'${source.channelName}' 채널의 RSS 피드를 찾을 수 없습니다`
+              : `'${source.channelName}' 수집 중 오류가 발생했습니다 (${res.status})`;
             write('progress', {
-              result: { sourceId: source.id, sourceName: source.channelName, success: false, newItemsAdded: 0, error: `HTTP ${res.status}` },
+              result: { sourceId: source.id, sourceName: source.channelName, success: false, newItemsAdded: 0, error: errorMsg },
             });
             continue;
           }
@@ -175,7 +178,7 @@ export const POST = withTracing('POST /api/video/collect', async (request: Reque
         } catch {
           failCount++;
           write('progress', {
-            result: { sourceId: source.id, sourceName: source.channelName, success: false, newItemsAdded: 0, error: '수집 실패' },
+            result: { sourceId: source.id, sourceName: source.channelName, success: false, newItemsAdded: 0, error: `'${source.channelName}' 수집에 실패했습니다` },
           });
         }
       }

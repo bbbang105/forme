@@ -256,9 +256,9 @@ export function SourceManager({ onCrawlComplete, onFavoritesChange }: SourceMana
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-1.5">
-          <Settings2 className="h-4 w-4" />
-          <span className="hidden sm:inline">소스 관리</span>
+        <Button variant="outline" size="icon" className="h-8 w-8">
+          <Settings2 className="h-3.5 w-3.5" />
+          <span className="sr-only">소스 관리</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md max-h-[85vh] flex flex-col overflow-hidden">

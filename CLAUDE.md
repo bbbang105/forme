@@ -92,6 +92,8 @@ pnpm db:push          # 스키마 직접 push (dev용)
 - SW 등록: 지수 백오프 재시도 (최대 3회, constants.ts 참조), 푸시 구독 자동 동기화 (syncPushSubscription, sessionStorage 중복 방지)
 - RSS 크롤 중복 방지: 크로스소스 제목 dedup (동일 제목 → DB 미저장, curationSources join으로 유저별 기존 제목 조회)
 - 유튜브 요약: video_sources (채널 소스) + video_items (수집/요약 영상) + video_bookmark_collections (컬렉션) 테이블, 수집과 요약 분리 (수집: RSS 무료, 요약: Gemini API), @handle URL → 페이지 파싱으로 channelId 추출, youtube.com/channel/ URL도 지원, SSE 스트리밍 요약 (api/curation/crawl 패턴), 자막 추출 실패 시 description 폴백 (summarySource 플래그), 마크다운 렌더러 next/dynamic 지연 로딩, 최대 3개 배치 요약 (VIDEO_SUMMARIZE_BATCH_MAX), YouTube Data API v3로 duration 조회 → Shorts/2분 미만 필터, Gemini 싱글톤 패턴, 자막 URL SSRF 방어 (isSafeUrl), videoId 정규식 검증, 북마크 컬렉션 (DnD 순서변경 + 피커 바텀시트 + 피드 칩 필터), optimistic updates + 에러 롤백
+- 유튜브 피드 2탭 구조: "피드" (세그먼트 탭, 요약 완료 영상) + "생성" (수집/요약 실행), 피드 탭 내 상태 칩 (안읽음/읽음/북마크 — 큐레이션 동일 패턴), 피드 탭 검색 (escapeIlike + raw SQL ESCAPE), 탭 전환 시 하위 필터 전체 초기화, itemsRef 패턴 (useCallback + ref로 stale closure 방지)
+- 큐레이션 필터 순서: 카테고리 세그먼트 → 상태 칩 (+ statusActions 슬롯) → 검색 → 즐겨찾기 소스 → 정렬, 헤더 제거 (선택/소스관리 버튼을 상태 칩 우측에 배치)
 - 테스트: Vitest + `vi.hoisted()` Proxy 기반 DB 목 패턴 (`packages/web/src/__tests__/`)
 
 ## 핵심 파일
@@ -181,7 +183,7 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/components/features/dashboard/attendance-recorder.tsx` | 출석 기록 (클라이언트, 방문 시 자동 호출) |
 | `packages/web/src/components/features/curation/source-card.tsx` | 소스 카드 (DnD, 즐겨찾기, 활성/비활성 토글) |
 | `packages/web/src/components/features/curation/crawl-settings-form.tsx` | 크롤 설정 폼 (기간 선택, 수집 시작) |
-| `packages/web/src/components/features/curation/feed-filter-bar.tsx` | 피드 필터 바 (검색, 즐겨찾기 소스, 카테고리/상태 필터, 정렬) |
+| `packages/web/src/components/features/curation/feed-filter-bar.tsx` | 피드 필터 바 (카테고리 → 상태칩+statusActions → 검색 → 즐겨찾기 → 정렬 순서) |
 | `packages/web/src/components/features/curation/mini-card-link.tsx` | 대시보드 큐레이션 클릭 시 읽음 처리 래퍼 |
 | `packages/web/src/app/api/curation/[id]/route.ts` | 큐레이션 아이템 PATCH (읽음/북마크/메모/컬렉션) + DELETE (단건 삭제, ownership join 검증) |
 | `packages/web/src/app/api/curation/bulk-delete/route.ts` | 큐레이션 일괄 삭제 (POST, max 100개, UUID 전수 검증) |
@@ -203,9 +205,9 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/app/api/video/collect/route.ts` | RSS 영상 수집 SSE (기간 필터, videoId 중복 스킵, Shorts 2분 미만 필터, max 50 소스) |
 | `packages/web/src/app/api/video/[id]/route.ts` | 영상 아이템 PATCH (읽음/북마크/메모/컬렉션) + DELETE (userId 검증) |
 | `packages/web/src/app/api/video/summarize/route.ts` | 영상 요약 SSE API (자막 추출 → Gemini → DB) |
-| `packages/web/src/app/api/video/items/route.ts` | 영상 피드 목록 (status 필터, 커서 페이지네이션) |
-| `packages/web/src/components/features/video/video-feed.tsx` | 유튜브 피드 메인 (소스관리 + 수집 + 요약 + 무한스크롤, useMemo 최적화, optimistic rollback) |
-| `packages/web/src/components/features/video/video-card.tsx` | 영상 카드 (React.memo, 체크박스/요약 미리보기/인라인 메모) |
+| `packages/web/src/app/api/video/items/route.ts` | 영상 피드 목록 (tab=feed/create, status=unread/read/bookmarked, 검색 escapeIlike, 커서 페이지네이션) |
+| `packages/web/src/components/features/video/video-feed.tsx` | 유튜브 피드 메인 (2탭 세그먼트 + 상태 칩 + 검색 + 무한스크롤, itemsRef/updateFilterRef 패턴, useCallback 최적화) |
+| `packages/web/src/components/features/video/video-card.tsx` | 영상 카드 (React.memo, flex-col 액션 버튼, 인라인 메모, 터치 타겟 36px) |
 | `packages/web/src/components/features/video/video-source-bar.tsx` | 채널 소스 관리 다이얼로그 (추가/삭제/즐겨찾기/태그) |
 | `packages/web/src/components/features/video/video-collection-manager.tsx` | 비디오 컬렉션 관리 다이얼로그 (DnD sortable 순서변경, 색상/이름 편집, 삭제) |
 | `packages/web/src/components/features/video/video-collection-picker.tsx` | 비디오 컬렉션 선택 바텀시트 (ARIA listbox, 키보드 접근성, 새 컬렉션 인라인 생성) |
