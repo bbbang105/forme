@@ -37,17 +37,21 @@ const INNERTUBE_API_KEY = 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8';
 async function fetchCaptionText(videoId: string): Promise<string> {
   if (!YOUTUBE_VIDEO_ID_REGEX.test(videoId)) throw new Error('Invalid video ID');
 
-  // innertube player API 직접 호출 (ANDROID client — 페이지 파싱 불필요, Vercel 서버리스 호환)
+  // innertube player API 직접 호출 (WEB client + 브라우저 헤더 — 클라우드 IP 차단 우회)
   const playerRes = await fetch(
     `https://www.youtube.com/youtubei/v1/player?key=${INNERTUBE_API_KEY}`,
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
       body: JSON.stringify({
         context: {
           client: {
-            clientName: 'ANDROID',
-            clientVersion: '20.10.38',
+            clientName: 'WEB',
+            clientVersion: '2.20240101.00.00',
           },
         },
         videoId,
