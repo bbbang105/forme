@@ -1,7 +1,7 @@
 'use client';
 
 import {useCallback, useEffect, useState} from 'react';
-import {ArrowLeft, Check, Loader2, User} from 'lucide-react';
+import {ArrowLeft, Check, Loader2, LogOut, User} from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import {INTEREST_OPTIONS} from '@forme/shared/config';
@@ -243,8 +243,21 @@ export default function ProfilePage() {
         <p className="text-sm text-destructive text-center">{error}</p>
       )}
 
-      {/* Save */}
-      <div className="flex justify-end">
+      {/* Save + Logout */}
+      <div className="flex items-center justify-between">
+        <button
+          type="button"
+          onClick={async () => {
+            const {createClient} = await import('@/lib/supabase/client');
+            const supabase = createClient();
+            await supabase.auth.signOut();
+            window.location.href = '/login';
+          }}
+          className="ml-1 inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+        >
+          <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
+          로그아웃
+        </button>
         <Button
           onClick={handleSave}
           disabled={saving || selectedInterests.length < MIN_INTERESTS}

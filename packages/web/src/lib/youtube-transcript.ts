@@ -31,25 +31,15 @@ export async function fetchTranscript(
   }
 }
 
+// 공개 innertube API key (WEB client) — 페이지 파싱 불필요
+const INNERTUBE_API_KEY = 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8';
+
 async function fetchCaptionText(videoId: string): Promise<string> {
   if (!YOUTUBE_VIDEO_ID_REGEX.test(videoId)) throw new Error('Invalid video ID');
 
-  // Step 1: YouTube 페이지에서 innertube API key 추출
-  const pageRes = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    },
-    signal: AbortSignal.timeout(10_000),
-  });
-  if (!pageRes.ok) throw new Error(`YouTube page fetch failed: ${pageRes.status}`);
-  const html = await pageRes.text();
-
-  const apiKeyMatch = html.match(/"INNERTUBE_API_KEY":\s*"([a-zA-Z0-9_-]+)"/);
-  if (!apiKeyMatch) throw new Error('No innertube API key found');
-
-  // Step 2: innertube player API (ANDROID client)
+  // innertube player API 직접 호출 (ANDROID client — 페이지 파싱 불필요, Vercel 서버리스 호환)
   const playerRes = await fetch(
-    `https://www.youtube.com/youtubei/v1/player?key=${apiKeyMatch[1]}`,
+    `https://www.youtube.com/youtubei/v1/player?key=${INNERTUBE_API_KEY}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
