@@ -91,13 +91,13 @@ export function CurationFilters({
           active={status === 'unread'}
           onClick={() => onStatusChange('unread')}
           icon={<Mail className="h-3.5 w-3.5" />}
-          label="안읽은 글"
+          label="안읽음"
         />
         <StatusChip
           active={status === 'read'}
           onClick={() => onStatusChange('read')}
           icon={<MailOpen className="h-3.5 w-3.5" />}
-          label="읽은 글"
+          label="읽음"
         />
         <StatusChip
           active={status === 'bookmarked'}

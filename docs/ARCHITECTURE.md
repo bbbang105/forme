@@ -1,6 +1,6 @@
 # forme - 아키텍처 & 기술 선정 이유
 
-> 최종 업데이트: 2026-03-13 (유튜브 북마크 컬렉션, Shorts 필터, SSRF/videoId 검증 강화, 접근성 aria-hidden)
+> 최종 업데이트: 2026-03-16 (YouTube URL 직접 추가, 일괄 액션, 읽음 정렬, 즐겨찾기 DnD, Gemini 모델 업그레이드)
 
 개인 올인원 PWA. 큐레이션(RSS), 캘린더, 메모(리치 에디터), 팟캐스트, 유튜브 요약을 하나의 앱에 통합.
 모바일 퍼스트, 오프라인 지원, 푸시 알림까지 네이티브 앱 수준의 경험을 웹으로 제공.
@@ -39,7 +39,7 @@ graph TB
     RSS[RSS Feeds<br/>큐레이션 소스]
     DC[Discord OAuth]
     DW[Discord Webhook<br/>팟캐스트 알림]
-    GM[Gemini 2.5 Flash-Lite<br/>영상 요약 AI]
+    GM[Gemini 2.5 Flash<br/>영상 요약 AI<br/>GEMINI_MODEL 환경변수]
     YT[YouTube<br/>RSS + 자막 + Data API v3]
   end
 
@@ -190,7 +190,7 @@ flowchart LR
 - **인증**: `React.cache` 기반 `getAuthUser()` — 동일 요청 내 중복 인증 제거
 - **캘린더**: Optimistic updates — 로컬 상태 즉시 반영, 서버 백그라운드 동기화. 데스크톱 2컬럼 (`lg:flex-row` 캘린더 | 상세), 모바일 단일 컬럼. 이벤트 카테고리(아이콘+색상) 지원
 - **큐레이션 UX**: 스와이프 액션 (`useSwipeAction` 훅, axis-lock + 타이머 정리), 키보드 네비 (j/k/o/b, DOM 직접 포커스링), 일괄 삭제 (100개 청크, 다이얼로그 스피너), 인라인 메모 (북마크 탭, key prop 동기화), 북마크 컬렉션 (DnD 정렬, 색상 태그, 컬렉션별 필터)
-- **유튜브 요약**: 수집과 요약 분리 — RSS로 무료 수집 (videoId 중복 스킵, YouTube Data API v3로 duration 조회 → Shorts/2분 미만 필터) → 선택적 Gemini 요약 (싱글톤 패턴, 자막 추출 → description 폴백, summarySource 플래그). SSE 스트리밍 요약 (api/curation/crawl 패턴), 마크다운 렌더러 `next/dynamic` 지연 로딩, 북마크 컬렉션 (DnD 순서변경 + 피커 바텀시트 + 피드 칩 필터), optimistic updates + 에러 롤백, 자막 URL SSRF 방어
+- **유튜브 요약**: 수집과 요약 분리 — RSS로 무료 수집 (videoId 중복 스킵, YouTube Data API v3로 duration 조회 → Shorts/2분 미만 필터) → 선택적 Gemini 요약 (GEMINI_MODEL 환경변수, 영상 길이별 동적 프롬프트, 자막 최대 80K자, 자막 추출 → description 폴백, summarySource 플래그). URL 직접 추가 (AddUrlDialog → SSE 원스텝 요약, 트랜잭션 delete+insert, cancel 시 orphan 정리). SSE 스트리밍 요약 (api/curation/crawl 패턴), 마크다운 렌더러 `next/dynamic` 지연 로딩, 북마크 컬렉션 (DnD 순서변경 + 피커 바텀시트 + 피드 칩 필터), optimistic updates + 에러 롤백, 자막 URL SSRF 방어, 읽음 탭 readAt DESC 정렬, 피드 선택 모드 (일괄 삭제/안읽음 되돌리기), 즐겨찾기 소스 DnD 순서변경
 - **크롤링 중복 방지**: 크로스소스 제목 dedup — 동일 유저의 기존 아이템 제목과 비교 후 중복 스킵 (curationSources join, 100개 청크 조회)
 - **에러 처리**: 모든 (main) 페이지 error.tsx (calendar, curation, memo, podcast, video) — `error` prop 로깅, 사용자에게 제네릭 메시지만 표출
 - **접근성**: 탭바 `aria-current="page"`, 검색 `aria-label`, 이벤트 폼 색상 `focus-visible:ring-2` + `aria-label`, 폼 라벨 `htmlFor`/`id` 연결, 에러 메시지 `role="alert" aria-live="polite"`, 터치 타겟 최소 44x44px, `@utility focus-ring` CSS 유틸리티, `prefers-reduced-motion` 미디어 쿼리, progressbar ARIA 속성, 장식 아이콘 `aria-hidden="true"` (라벨 있는 버튼 내부 lucide 아이콘)
@@ -310,7 +310,7 @@ erDiagram
 
   video_items {
     uuid id PK
-    uuid sourceId FK
+    uuid sourceId FK "nullable — 수동 URL 추가"
     uuid collectionId FK
     uuid userId
     text videoId UK
@@ -323,6 +323,7 @@ erDiagram
     text memo
     integer duration
     timestamp publishedAt
+    timestamp readAt "읽음 시점"
   }
 
   video_bookmark_collections {
@@ -363,9 +364,12 @@ erDiagram
 | GET/POST/DELETE | `/api/push/subscribe` | 푸시 구독 관리 |
 | GET/POST/DELETE | `/api/video/sources` | 유튜브 채널 소스 CRUD (@handle + /channel/ URL 지원) |
 | POST | `/api/video/collect` | RSS 영상 수집 SSE (기간 필터, videoId 중복 스킵, Shorts 2분 미만 필터, max 50 소스) |
-| POST | `/api/video/summarize` | 영상 요약 SSE (자막 추출 → Gemini → DB, 최대 3개 배치) |
-| GET | `/api/video/items` | 영상 피드 목록 (status/tag/collection 필터, 커서 페이지네이션, summarizing 타임아웃 리커버리) |
-| PATCH/DELETE | `/api/video/[id]` | 영상 아이템 읽음/북마크/메모/컬렉션 업데이트 + 삭제 (userId 검증) |
+| POST | `/api/video/summarize` | 영상 요약 SSE (자막 추출 → Gemini → DB, 최대 5개 배치, duration 기반 프롬프트) |
+| POST | `/api/video/add-url` | URL 직접 추가 SSE (메타 → 자막 → 요약 원스텝, 트랜잭션, cancel 정리) |
+| POST | `/api/video/bulk-action` | 일괄 액션 (mark_unread/delete, max 100개) |
+| PUT | `/api/video/sources/reorder` | 즐겨찾기 소스 순서 배치 업데이트 |
+| GET | `/api/video/items` | 영상 피드 목록 (status/tag/collection 필터, 읽음 탭 readAt DESC, 커서 페이지네이션, summarizing 타임아웃 리커버리) |
+| PATCH/DELETE | `/api/video/[id]` | 영상 아이템 읽음/북마크/메모/컬렉션 업데이트 + 삭제 (readAt 자동 설정, userId 검증) |
 
 ---
 

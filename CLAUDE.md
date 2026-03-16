@@ -23,7 +23,7 @@ pnpm 모노레포: `packages/web` (Next.js 16 PWA) + `packages/shared` (DB 스�
 | 번들 분석 | @next/bundle-analyzer (`ANALYZE=true pnpm build`) |
 | 배포 | Vercel (리전: `icn1` 서울, Hobby 플랜) |
 | 스케줄링 | Vercel Cron (일 1회) + Supabase pg_cron + pg_net (고빈도) |
-| AI 요약 | @google/generative-ai (Gemini 2.5 Flash-Lite, JSON 모드) |
+| AI 요약 | @google/generative-ai (GEMINI_MODEL 환경변수, 기본 gemini-2.5-flash, JSON 모드, 영상 길이별 동적 프롬프트) |
 | 자막 추출 | Innertube API (커스텀 구현) |
 | 영상 메타 | YouTube Data API v3 (duration, Shorts 필터) |
 | 마크다운 렌더링 | react-markdown + remark-gfm + rehype-highlight |
@@ -91,8 +91,11 @@ pnpm db:push          # 스키마 직접 push (dev용)
 - header 아바타: 서버사이드 fetch (layout.tsx async → avatarUrl prop), 클라이언트 워터폴 제거
 - SW 등록: 지수 백오프 재시도 (최대 3회, constants.ts 참조), 푸시 구독 자동 동기화 (syncPushSubscription, sessionStorage 중복 방지)
 - RSS 크롤 중복 방지: 크로스소스 제목 dedup (동일 제목 → DB 미저장, curationSources join으로 유저별 기존 제목 조회)
-- 유튜브 요약: video_sources (채널 소스) + video_items (수집/요약 영상) + video_bookmark_collections (컬렉션) 테이블, 수집과 요약 분리 (수집: RSS 무료, 요약: Gemini API), @handle URL → 페이지 파싱으로 channelId 추출, youtube.com/channel/ URL도 지원, SSE 스트리밍 요약 (api/curation/crawl 패턴), 자막 추출 실패 시 description 폴백 (summarySource 플래그), 마크다운 렌더러 next/dynamic 지연 로딩, 최대 3개 배치 요약 (VIDEO_SUMMARIZE_BATCH_MAX), YouTube Data API v3로 duration 조회 → Shorts/2분 미만 필터, Gemini 싱글톤 패턴, 자막 URL SSRF 방어 (isSafeUrl), videoId 정규식 검증, 북마크 컬렉션 (DnD 순서변경 + 피커 바텀시트 + 피드 칩 필터), optimistic updates + 에러 롤백
-- 유튜브 피드 2탭 구조: "피드" (세그먼트 탭, 요약 완료 영상) + "생성" (수집/요약 실행), 피드 탭 내 상태 칩 (안읽음/읽음/북마크 — 큐레이션 동일 패턴), 피드 탭 검색 (escapeIlike + raw SQL ESCAPE), 탭 전환 시 하위 필터 전체 초기화, itemsRef 패턴 (useCallback + ref로 stale closure 방지)
+- 유튜브 요약: video_sources (채널 소스) + video_items (수집/요약 영상, sourceId nullable — 수동 URL 추가 지원) + video_bookmark_collections (컬렉션) 테이블, 수집과 요약 분리 (수집: RSS 무료, 요약: Gemini API), @handle URL → 페이지 파싱으로 channelId 추출 (한글 핸들 decodeURIComponent 대응, 100자 제한), youtube.com/channel/ URL도 지원, SSE 스트리밍 요약 (api/curation/crawl 패턴), 자막 추출 실패 시 description 폴백 (summarySource 플래그), 자막 최대 80,000자, 마크다운 렌더러 next/dynamic 지연 로딩, 최대 5개 배치 요약 (VIDEO_SUMMARIZE_BATCH_MAX), YouTube Data API v3로 duration 조회 → Shorts/2분 미만 필터, GEMINI_MODEL 환경변수 (기본 gemini-2.5-flash), 영상 길이별 동적 프롬프트 (10분 미만/10~30분/30~60분/60분+ 분량 가이드), 자막 URL SSRF 방어 (isSafeUrl), videoId 정규식 검증, 북마크 컬렉션 (DnD 순서변경 + 피커 바텀시트 + 피드 칩 필터), optimistic updates + 에러 롤백
+- 유튜브 URL 직접 추가: 피드 탭 태그 칩 우측 + 버튼 → AddUrlDialog (SSE 원스텝: 메타 → 자막 → 요약 → DB), 기존 영상 있으면 트랜잭션으로 삭제 후 재등록, cancel 시 orphan DB 정리
+- 유튜브 피드 2탭 구조: "피드" (세그먼트 탭, 요약 완료 영상) + "생성" (수집/요약 실행), 피드 탭 내 상태 칩 (안읽음/읽음/북마크 — 큐레이션 동일 패턴), 피드 탭 검색 (escapeIlike + raw SQL ESCAPE), 탭 전환 시 하위 필터 전체 초기화, itemsRef 패턴 (useCallback + ref로 stale closure 방지), 읽음 탭 readAt DESC 정렬 (최근 읽은 순)
+- 유튜브 선택 모드: 피드 탭 상태 칩 우측 "선택" 버튼, 생성 탭 수집 라인 우측 "선택" 버튼, 일괄 삭제 (bulk-action API), 읽음 탭에서 일괄 안읽음 되돌리기 (mark_unread)
+- 유튜브 즐겨찾기 소스: DnD 순서변경 (@dnd-kit/sortable, GripVertical 핸들, /api/video/sources/reorder 배치 업데이트)
 - 큐레이션 필터 순서: 카테고리 세그먼트 → 상태 칩 (+ statusActions 슬롯) → 검색 → 즐겨찾기 소스 → 정렬, 헤더 제거 (선택/소스관리 버튼을 상태 칩 우측에 배치)
 - 테스트: Vitest + `vi.hoisted()` Proxy 기반 DB 목 패턴 (`packages/web/src/__tests__/`)
 
@@ -204,11 +207,15 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/app/api/video/sources/route.ts` | 유튜브 채널 소스 CRUD (@handle + /channel/ URL 지원) |
 | `packages/web/src/app/api/video/collect/route.ts` | RSS 영상 수집 SSE (기간 필터, videoId 중복 스킵, Shorts 2분 미만 필터, max 50 소스) |
 | `packages/web/src/app/api/video/[id]/route.ts` | 영상 아이템 PATCH (읽음/북마크/메모/컬렉션) + DELETE (userId 검증) |
-| `packages/web/src/app/api/video/summarize/route.ts` | 영상 요약 SSE API (자막 추출 → Gemini → DB) |
-| `packages/web/src/app/api/video/items/route.ts` | 영상 피드 목록 (tab=feed/create, status=unread/read/bookmarked, 검색 escapeIlike, 커서 페이지네이션) |
-| `packages/web/src/components/features/video/video-feed.tsx` | 유튜브 피드 메인 (2탭 세그먼트 + 상태 칩 + 검색 + 무한스크롤, itemsRef/updateFilterRef 패턴, useCallback 최적화) |
-| `packages/web/src/components/features/video/video-card.tsx` | 영상 카드 (React.memo, flex-col 액션 버튼, 인라인 메모, 터치 타겟 36px) |
-| `packages/web/src/components/features/video/video-source-bar.tsx` | 채널 소스 관리 다이얼로그 (추가/삭제/즐겨찾기/태그) |
+| `packages/web/src/app/api/video/summarize/route.ts` | 영상 요약 SSE API (자막 추출 → Gemini → DB, duration 기반 프롬프트) |
+| `packages/web/src/app/api/video/add-url/route.ts` | URL 직접 추가 SSE API (메타 → 자막 → 요약 원스텝, 트랜잭션 delete+insert, cancel 정리) |
+| `packages/web/src/app/api/video/bulk-action/route.ts` | 영상 일괄 액션 (mark_unread/delete, max 100개, userId 스코핑) |
+| `packages/web/src/app/api/video/sources/reorder/route.ts` | 즐겨찾기 소스 순서 배치 업데이트 (favoriteOrder) |
+| `packages/web/src/app/api/video/items/route.ts` | 영상 피드 목록 (tab=feed/create, status=unread/read/bookmarked, 읽음 탭 readAt DESC 정렬, 검색 escapeIlike, 커서 페이지네이션) |
+| `packages/web/src/components/features/video/video-feed.tsx` | 유튜브 피드 메인 (2탭 세그먼트 + 상태 칩 + 검색 + 무한스크롤 + 선택 모드 + URL 추가, itemsRef/updateFilterRef 패턴, useCallback 최적화) |
+| `packages/web/src/components/features/video/video-card.tsx` | 영상 카드 (React.memo, flex-col 액션 버튼, 인라인 메모, 선택 모드 시 액션 숨김) |
+| `packages/web/src/components/features/video/video-source-bar.tsx` | 채널 소스 관리 다이얼로그 (추가/삭제/즐겨찾기/태그, 즐겨찾기 DnD 순서변경) |
+| `packages/web/src/components/features/video/add-url-dialog.tsx` | URL 직접 추가 다이얼로그 (SSE 진행 표시, aria-live, role="progressbar") |
 | `packages/web/src/components/features/video/video-collection-manager.tsx` | 비디오 컬렉션 관리 다이얼로그 (DnD sortable 순서변경, 색상/이름 편집, 삭제) |
 | `packages/web/src/components/features/video/video-collection-picker.tsx` | 비디오 컬렉션 선택 바텀시트 (ARIA listbox, 키보드 접근성, 새 컬렉션 인라인 생성) |
 | `packages/web/src/components/features/video/collect-progress.tsx` | 수집 진행 SSE 표시 (role="status" aria-live="polite") |
@@ -230,7 +237,7 @@ study-admin 스타일: Sky Blue `#0ea5e9` 포인트, Pretendard 폰트, 다크�
 
 ## 환경 변수
 
-`.env.local` 참조. Supabase(URL, Anon Key, Service Key), R2(Access Key, Secret, Bucket), VAPID 키, Discord OAuth(Client ID/Secret), Cron(CRON_SECRET, CRON_USER_ID), GEMINI_API_KEY, YOUTUBE_DATA_API_KEY.
+`.env.local` 참조. Supabase(URL, Anon Key, Service Key), R2(Access Key, Secret, Bucket), VAPID 키, Discord OAuth(Client ID/Secret), Cron(CRON_SECRET, CRON_USER_ID), GEMINI_API_KEY, GEMINI_MODEL(기본 gemini-2.5-flash), YOUTUBE_API_KEY.
 
 ## 브랜치 전략
 

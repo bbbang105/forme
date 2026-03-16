@@ -47,10 +47,10 @@ export const POST = withTracing('POST /api/video/sources', async (request: Reque
 
   // 2) youtube.com/@handle 형식 — 페이지에서 channelId 추출
   if (!channelId) {
-    const handleMatch = channelUrl.match(/youtube\.com\/@([\w.-]+)/);
-    if (handleMatch) {
+    const handleMatch = decodeURIComponent(channelUrl).match(/youtube\.com\/@([^\/\s?#]+)/);
+    if (handleMatch && handleMatch[1]!.length <= 100) {
       try {
-        const pageUrl = `https://www.youtube.com/@${handleMatch[1]}`;
+        const pageUrl = `https://www.youtube.com/@${encodeURIComponent(handleMatch[1]!)}`;
         if (!isSafeUrl(pageUrl)) {
           return NextResponse.json({ error: 'Unsafe URL' }, { status: 400 });
         }

@@ -107,15 +107,19 @@ export const GET = withTracing('GET /api/video/items', async (request: Request) 
     }
   }
 
+  // 읽음 탭: readAt 기준, 그 외: publishedAt 기준
+  const isReadTab = tab === 'feed' && status === 'read';
+  const cursorColumn = isReadTab ? videoItems.readAt : videoItems.publishedAt;
+
   // Cursor pagination
   if (cursor) {
     const [cursorDate, cursorId] = cursor.split('|');
     if (cursorDate && cursorId && !isNaN(Date.parse(cursorDate)) && UUID_REGEX.test(cursorId)) {
       conditions.push(
         or(
-          lt(videoItems.publishedAt, new Date(cursorDate)),
+          lt(cursorColumn, new Date(cursorDate)),
           and(
-            eq(videoItems.publishedAt, new Date(cursorDate)),
+            eq(cursorColumn, new Date(cursorDate)),
             lt(videoItems.id, cursorId),
           ),
         )!,
@@ -123,15 +127,19 @@ export const GET = withTracing('GET /api/video/items', async (request: Request) 
     }
   }
 
+  const sortColumn = isReadTab ? videoItems.readAt : videoItems.publishedAt;
+
   const rows = await db.select().from(videoItems)
     .where(and(...conditions))
-    .orderBy(desc(videoItems.publishedAt), desc(videoItems.id))
+    .orderBy(desc(sortColumn), desc(videoItems.id))
     .limit(limit + 1);
 
   const hasMore = rows.length > limit;
   const items = hasMore ? rows.slice(0, limit) : rows;
-  const nextCursor = hasMore && items.length > 0
-    ? `${items[items.length - 1]!.publishedAt?.toISOString()}|${items[items.length - 1]!.id}`
+  const lastItem = items[items.length - 1];
+  const cursorDate = isReadTab ? lastItem?.readAt : lastItem?.publishedAt;
+  const nextCursor = hasMore && lastItem && cursorDate
+    ? `${cursorDate.toISOString()}|${lastItem.id}`
     : null;
 
   return NextResponse.json({ items, nextCursor, hasMore }, {

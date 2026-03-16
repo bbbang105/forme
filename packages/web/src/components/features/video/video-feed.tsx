@@ -2,7 +2,7 @@
 
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useRouter, useSearchParams} from 'next/navigation';
-import {BookmarkIcon, Download, Loader2, Mail, MailOpen, Search, Settings2, Star, Trash2, Wand2, X} from 'lucide-react';
+import {BookmarkIcon, Download, Loader2, Mail, MailOpen, MailX, Plus, Search, Settings2, Star, Trash2, Wand2, X} from 'lucide-react';
 import {cn} from '@/lib/utils';
 import {Button} from '@/components/ui/button';
 import {
@@ -22,6 +22,9 @@ import {VIDEO_SUMMARIZE_BATCH_MAX} from '@/lib/constants';
 import {getVideoCollectionsWithCount} from '@/lib/actions/video-collections';
 import {VideoCollectionPicker} from './video-collection-picker';
 import {type VideoCollection, VideoCollectionManager} from './video-collection-manager';
+import {AddUrlDialog} from './add-url-dialog';
+
+const EMPTY_TAGS: string[] = [];
 
 type Tab = 'feed' | 'create';
 type Status = 'unread' | 'read' | 'bookmarked';
@@ -75,7 +78,7 @@ export function VideoFeed() {
   const [collectPeriod, setCollectPeriod] = useState<Period>('7d');
   const [collectActive, setCollectActive] = useState(false);
 
-  // Selection mode (only for 'create' tab)
+  // Selection mode (create tab + feed tab)
   const [selectMode, setSelectMode] = useState(false);
 
   // Summarize progress
@@ -94,6 +97,7 @@ export function VideoFeed() {
   const [pickerItemId, setPickerItemId] = useState<string | null>(null);
   const [showCollectionManager, setShowCollectionManager] = useState(false);
   const activeCollectionId = searchParams.get('collectionId') || '';
+  const [showAddUrl, setShowAddUrl] = useState(false);
 
   const sentinelRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -394,6 +398,7 @@ export function VideoFeed() {
 
   const handleMemoChange = useCallback(async (id: string, memo: string | null) => {
     const item = itemsRef.current.find((i) => i.id === id);
+    const prevMemo = item?.memo ?? null;
     const wasBookmarked = item?.isBookmarked ?? false;
 
     setItems((prev) =>
@@ -402,11 +407,21 @@ export function VideoFeed() {
       ),
     );
 
-    await fetch(`/api/video/${id}`, {
-      method: 'PATCH',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({memo}),
-    });
+    try {
+      const res = await fetch(`/api/video/${id}`, {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({memo}),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      setItems((prev) =>
+        prev.map((i) =>
+          i.id === id ? {...i, memo: prevMemo, isBookmarked: wasBookmarked} : i,
+        ),
+      );
+      return;
+    }
 
     if (memo && !wasBookmarked) {
       setPickerItemId(id);
@@ -507,16 +522,42 @@ export function VideoFeed() {
     if (selectedIds.size === 0) return;
     setBulkDeleting(true);
     try {
-      await Promise.all(
-        Array.from(selectedIds).map((id) =>
-          fetch(`/api/video/${id}`, { method: 'DELETE' }),
-        ),
-      );
-      setItems((prev) => prev.filter((i) => !selectedIds.has(i.id)));
-      setSelectedIds(new Set());
+      const res = await fetch('/api/video/bulk-action', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({itemIds: Array.from(selectedIds), action: 'delete'}),
+      });
+      if (res.ok) {
+        setItems((prev) => prev.filter((i) => !selectedIds.has(i.id)));
+        setSelectedIds(new Set());
+        setSelectMode(false);
+      }
     } finally {
       setBulkDeleting(false);
       setShowBulkDelete(false);
+    }
+  };
+
+  const [bulkUnreading, setBulkUnreading] = useState(false);
+  const [showBulkUnread, setShowBulkUnread] = useState(false);
+
+  const handleBulkMarkUnread = async () => {
+    if (selectedIds.size === 0) return;
+    setBulkUnreading(true);
+    try {
+      const res = await fetch('/api/video/bulk-action', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({itemIds: Array.from(selectedIds), action: 'mark_unread'}),
+      });
+      if (res.ok) {
+        setItems((prev) => prev.filter((i) => !selectedIds.has(i.id)));
+        setSelectedIds(new Set());
+        setSelectMode(false);
+      }
+    } finally {
+      setBulkUnreading(false);
+      setShowBulkUnread(false);
     }
   };
 
@@ -544,6 +585,10 @@ export function VideoFeed() {
 
   const handleCollectionPick = useCallback((id: string) => {
     setPickerItemId(id);
+  }, []);
+
+  const handleDeleteRequest = useCallback((id: string) => {
+    setDeleteTarget(itemsRef.current.find((i) => i.id === id) ?? null);
   }, []);
 
   const collectionMap = useMemo(() => new Map(collections.map((c) => [c.id, {id: c.id, name: c.name, color: c.color}])), [collections]);
@@ -607,30 +652,101 @@ export function VideoFeed() {
         </div>
       )}
 
-      {/* ── 2단: 피드 탭 — 상태 필터 칩 ── */}
+      {/* ── 2단: 피드 탭 — 상태 필터 칩 + 선택 버튼 ── */}
       {isFeedTab && (
-        <div className="flex items-center gap-1.5">
-          {STATUS_CHIPS.map((chip) => {
-            const Icon = chip.icon;
-            return (
-              <button
-                key={chip.value}
-                type="button"
-                onClick={() => handleStatusSwitch(chip.value)}
-                className={cn(
-                  'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium',
-                  'transition-colors cursor-pointer',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
-                  status === chip.value
-                    ? 'bg-primary text-primary-foreground'
-                    : 'border border-border text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-                )}
+        <div className="relative flex items-center">
+          <div className="flex items-center gap-1.5 pr-12">
+            {STATUS_CHIPS.map((chip) => {
+              const Icon = chip.icon;
+              return (
+                <button
+                  key={chip.value}
+                  type="button"
+                  onClick={() => handleStatusSwitch(chip.value)}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium',
+                    'transition-colors cursor-pointer',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
+                    status === chip.value
+                      ? 'bg-primary text-primary-foreground'
+                      : 'border border-border text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                  )}
+                >
+                  <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+                  {chip.label}
+                </button>
+              );
+            })}
+          </div>
+          {!loading && items.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                setSelectMode((prev) => {
+                  if (prev) setSelectedIds(new Set());
+                  return !prev;
+                });
+              }}
+              className={cn(
+                'absolute right-0 inline-flex shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium',
+                'transition-colors cursor-pointer',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
+                selectMode
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {selectMode ? '취소' : '선택'}
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* ── 피드 탭: 선택 모드 바 ── */}
+      {isFeedTab && selectMode && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">
+              {selectedIds.size > 0 ? `${selectedIds.size}개 선택됨` : '영상을 선택하세요'}
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                if (selectedIds.size === items.length) setSelectedIds(new Set());
+                else setSelectedIds(new Set(items.map((i) => i.id)));
+              }}
+              className="text-xs text-primary hover:underline cursor-pointer"
+            >
+              {selectedIds.size === items.length ? '선택 해제' : '전체 선택'}
+            </button>
+          </div>
+
+          {selectedIds.size > 0 && (
+            <div className="flex gap-2">
+              {status === 'read' && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowBulkUnread(true)}
+                  disabled={bulkUnreading}
+                  className="flex-1 gap-1.5 h-auto py-2.5"
+                >
+                  <MailX className="h-3.5 w-3.5" aria-hidden="true" />
+                  안읽음으로
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowBulkDelete(true)}
+                disabled={bulkDeleting}
+                className="flex-1 gap-1.5 h-auto py-2.5 text-destructive hover:text-destructive"
               >
-                <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-                {chip.label}
-              </button>
-            );
-          })}
+                <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                삭제
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
@@ -674,6 +790,27 @@ export function VideoFeed() {
                 <Download className="h-3.5 w-3.5" aria-hidden="true" />
                 수집
               </Button>
+              {!loading && items.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectMode((prev) => {
+                      if (prev) setSelectedIds(new Set());
+                      return !prev;
+                    });
+                  }}
+                  className={cn(
+                    'ml-auto inline-flex shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium',
+                    'transition-colors cursor-pointer',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
+                    selectMode
+                      ? 'bg-primary/10 text-primary'
+                      : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  {selectMode ? '취소' : '선택'}
+                </button>
+              )}
             </div>
           )}
 
@@ -701,6 +838,7 @@ export function VideoFeed() {
               className={cn(
                 'inline-flex items-center gap-1 shrink-0 rounded-full px-3 py-1.5 text-xs font-medium',
                 'transition-colors cursor-pointer border',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
                 activeSourceId === source.id
                   ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30'
                   : 'bg-background text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground',
@@ -713,44 +851,44 @@ export function VideoFeed() {
         </div>
       )}
 
-      {(allTags.length > 0 || (isCreateTab && !loading && items.length > 0)) && (
-        <div className="flex items-center gap-1.5 overflow-x-auto overflow-y-visible scrollbar-none">
-          {TAG_OPTIONS.filter((t) => allTags.includes(t.value)).map((tagOpt) => (
+      {(allTags.length > 0 || isFeedTab || (isCreateTab && !loading && items.length > 0)) && (
+        <div className="relative flex items-center">
+          <div className="flex items-center gap-1.5 overflow-x-auto overflow-y-visible scrollbar-none pr-10">
+            {TAG_OPTIONS.filter((t) => allTags.includes(t.value)).map((tagOpt) => (
+              <button
+                key={tagOpt.value}
+                type="button"
+                onClick={() =>
+                  updateFilter({ tag: activeTag === tagOpt.value ? null : tagOpt.value })
+                }
+                className={cn(
+                  'inline-flex shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium',
+                  'transition-colors cursor-pointer',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
+                  activeTag === tagOpt.value
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted/60 text-muted-foreground hover:text-foreground ring-1 ring-border/50',
+                )}
+              >
+                {tagOpt.label}
+              </button>
+            ))}
+          </div>
+
+          {/* URL 직접 추가 버튼 — 항상 우측 고정 */}
+          {isFeedTab && (
             <button
-              key={tagOpt.value}
               type="button"
-              onClick={() =>
-                updateFilter({ tag: activeTag === tagOpt.value ? null : tagOpt.value })
-              }
+              onClick={() => setShowAddUrl(true)}
               className={cn(
-                'inline-flex shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium',
-                'transition-colors cursor-pointer',
-                activeTag === tagOpt.value
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted/60 text-muted-foreground hover:text-foreground ring-1 ring-border/50',
+                'absolute right-0 inline-flex items-center justify-center',
+                'h-7 w-7 rounded-full bg-primary text-primary-foreground',
+                'shadow-sm hover:bg-primary/90 transition-colors cursor-pointer',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
               )}
+              aria-label="YouTube URL 직접 추가"
             >
-              {tagOpt.label}
-            </button>
-          ))}
-          {isCreateTab && !loading && items.length > 0 && (
-            <button
-              type="button"
-              onClick={() => {
-                setSelectMode((prev) => {
-                  if (prev) setSelectedIds(new Set());
-                  return !prev;
-                });
-              }}
-              className={cn(
-                'ml-auto inline-flex shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium',
-                'transition-colors cursor-pointer',
-                selectMode
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
-              {selectMode ? '취소' : '선택'}
+              <Plus className="h-3.5 w-3.5" aria-hidden="true" />
             </button>
           )}
         </div>
@@ -816,7 +954,7 @@ export function VideoFeed() {
 
       {/* ── 요약 진행 상황 ── */}
       {summarizeProgress && (
-        <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+        <div className="rounded-lg border border-border bg-card p-4 space-y-3" role="status" aria-live="polite">
           <div className="flex items-center justify-between">
             <p className="text-sm font-medium">
               {summarizing
@@ -875,6 +1013,7 @@ export function VideoFeed() {
             onClick={() => updateFilter({collectionId: null})}
             className={cn(
               'shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
               !activeCollectionId
                 ? 'bg-primary text-primary-foreground'
                 : 'bg-muted text-muted-foreground hover:text-foreground',
@@ -889,6 +1028,7 @@ export function VideoFeed() {
               onClick={() => updateFilter({collectionId: activeCollectionId === col.id ? null : col.id})}
               className={cn(
                 'shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
                 activeCollectionId === col.id
                   ? 'bg-primary text-primary-foreground'
                   : 'bg-muted/60 text-muted-foreground hover:bg-muted',
@@ -939,15 +1079,15 @@ export function VideoFeed() {
               key={item.id}
               item={item}
               selected={selectedIds.has(item.id)}
-              onSelect={isCreateTab && selectMode ? handleSelect : undefined}
+              onSelect={selectMode ? handleSelect : undefined}
               onClick={selectMode ? undefined : handleCardClick}
-              onDelete={(id) => setDeleteTarget(items.find((i) => i.id === id) ?? null)}
+              onDelete={handleDeleteRequest}
               onToggleBookmark={isFeedTab ? handleToggleBookmark : undefined}
               onMemoChange={isFeedTab ? handleMemoChange : undefined}
               onCollectionPick={isBookmarkStatus ? handleCollectionPick : undefined}
               collectionMap={isBookmarkStatus ? collectionMap : undefined}
               showMemo={isFeedTab}
-              sourceTags={sourceTagMap.get(item.sourceId) ?? []}
+              sourceTags={item.sourceId ? sourceTagMap.get(item.sourceId) ?? EMPTY_TAGS : EMPTY_TAGS}
             />
           ))}
         </div>
@@ -1009,6 +1149,24 @@ export function VideoFeed() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Bulk mark unread confirmation */}
+      <AlertDialog open={showBulkUnread} onOpenChange={setShowBulkUnread}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>안읽음으로 되돌리시겠습니까?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {selectedIds.size}개 영상이 안읽음 상태로 변경됩니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBulkMarkUnread}>
+              {bulkUnreading ? '처리 중...' : '안읽음으로'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Collection picker */}
       <VideoCollectionPicker
         open={!!pickerItemId}
@@ -1016,6 +1174,16 @@ export function VideoFeed() {
         collections={collections}
         currentCollectionId={pickerItemId ? (items.find((i) => i.id === pickerItemId)?.collectionId ?? null) : null}
         onSelect={handleCollectionSelect}
+      />
+
+      {/* Add URL dialog */}
+      <AddUrlDialog
+        open={showAddUrl}
+        onOpenChange={setShowAddUrl}
+        onComplete={() => {
+          fetchedKeyRef.current = null;
+          fetchItems({reset: true});
+        }}
       />
 
       {/* Collection manager */}

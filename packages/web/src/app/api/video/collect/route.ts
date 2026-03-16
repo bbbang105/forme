@@ -62,10 +62,7 @@ export const POST = withTracing('POST /api/video/collect', async (request: Reque
 
   const existingItems = await db.select({ videoId: videoItems.videoId })
     .from(videoItems)
-    .where(and(
-      eq(videoItems.userId, user.id),
-      inArray(videoItems.sourceId, sourceIds),
-    ));
+    .where(eq(videoItems.userId, user.id));
   const existingVideoIds = new Set(existingItems.map((i) => i.videoId));
 
   const stream = new ReadableStream({
