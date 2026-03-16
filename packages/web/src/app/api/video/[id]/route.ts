@@ -58,9 +58,12 @@ export const PATCH = withTracing('PATCH /api/video/[id]', async (request, ctx) =
       return NextResponse.json({error: 'Item not found'}, {status: 404});
     }
 
-    const updateValues: Partial<{isRead: boolean; isBookmarked: boolean; memo: string | null; collectionId: string | null}> = {};
+    const updateValues: Partial<{isRead: boolean; isBookmarked: boolean; memo: string | null; collectionId: string | null; readAt: Date | null}> = {};
 
-    if (isRead !== undefined) updateValues.isRead = isRead;
+    if (isRead !== undefined) {
+      updateValues.isRead = isRead;
+      updateValues.readAt = isRead ? new Date() : null;
+    }
     if (isBookmarked !== undefined) updateValues.isBookmarked = isBookmarked;
     if (memo !== undefined) {
       updateValues.memo = memo ? memo.slice(0, 500) : null;

@@ -4,7 +4,7 @@ import {videoSources} from './video-sources';
 export const videoItems = pgTable('video_items', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').notNull(),
-  sourceId: uuid('source_id').notNull().references(() => videoSources.id, { onDelete: 'cascade' }),
+  sourceId: uuid('source_id').references(() => videoSources.id, { onDelete: 'cascade' }),
   videoId: text('video_id').notNull(),
   title: text('title').notNull(),
   description: text('description'),
@@ -22,6 +22,7 @@ export const videoItems = pgTable('video_items', {
   memo: text('memo'),
   collectionId: uuid('collection_id'),
   duration: integer('duration'),
+  readAt: timestamp('read_at', { withTimezone: true }),
   summarizedAt: timestamp('summarized_at', { withTimezone: true }),
 }, (table) => ({
   userVideoIdx: uniqueIndex('idx_video_items_user_video').on(table.userId, table.videoId),

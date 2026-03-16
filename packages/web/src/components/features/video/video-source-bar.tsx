@@ -1,7 +1,25 @@
 'use client';
 
-import {useState} from 'react';
-import {Loader2, Pause, Play, Plus, Settings2, Star, Trash2, Youtube} from 'lucide-react';
+import {useCallback, useState} from 'react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import {restrictToVerticalAxis} from '@dnd-kit/modifiers';
+import {CSS} from '@dnd-kit/utilities';
+import {GripVertical, Loader2, Pause, Play, Plus, Settings2, Star, Trash2, Youtube} from 'lucide-react';
 import {cn} from '@/lib/utils';
 import {Button} from '@/components/ui/button';
 import {
@@ -58,6 +76,29 @@ interface VideoSourceBarProps {
   onUpdate: () => void;
 }
 
+function SortableChannelCard(props: {
+  source: VideoSource;
+  deleting: string | null;
+  onToggleFavorite: (source: VideoSource) => void;
+  onToggleActive: (source: VideoSource) => void;
+  onToggleTag: (source: VideoSource, tag: string) => void;
+  onDelete: (source: VideoSource) => void;
+}) {
+  const {attributes, listeners, setNodeRef, transform, transition, isDragging} = useSortable({id: props.source.id});
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : undefined,
+    zIndex: isDragging ? 10 : undefined,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <ChannelCard {...props} dragHandleProps={{...attributes, ...listeners}} />
+    </div>
+  );
+}
+
 function ChannelCard({
   source,
   deleting,
@@ -65,6 +106,7 @@ function ChannelCard({
   onToggleActive,
   onToggleTag,
   onDelete,
+  dragHandleProps,
 }: {
   source: VideoSource;
   deleting: string | null;
@@ -72,6 +114,7 @@ function ChannelCard({
   onToggleActive: (source: VideoSource) => void;
   onToggleTag: (source: VideoSource, tag: string) => void;
   onDelete: (source: VideoSource) => void;
+  dragHandleProps?: Record<string, unknown>;
 }) {
   const [tagOpen, setTagOpen] = useState(false);
   const sourceTags = source.tags ?? [];
@@ -80,6 +123,16 @@ function ChannelCard({
     <div className={cn('p-3 rounded-lg border border-border/60 space-y-2', !source.isActive && 'opacity-50')}>
       {/* Top row: icon + name + actions */}
       <div className="flex items-center gap-3">
+        {dragHandleProps && (
+          <button
+            type="button"
+            className="touch-none p-0.5 text-muted-foreground/40 hover:text-muted-foreground cursor-grab active:cursor-grabbing shrink-0"
+            aria-label="드래그하여 순서 변경"
+            {...dragHandleProps}
+          >
+            <GripVertical className="h-4 w-4" aria-hidden="true" />
+          </button>
+        )}
         <div className={cn('flex items-center justify-center h-9 w-9 rounded-full shrink-0', source.isActive ? 'bg-red-500/10' : 'bg-muted')}>
           <Youtube className={cn('h-4 w-4', source.isActive ? 'text-red-500' : 'text-muted-foreground')} aria-hidden="true" />
         </div>
@@ -94,6 +147,7 @@ function ChannelCard({
         </div>
         <div className="flex items-center gap-0.5 shrink-0">
           <button
+            type="button"
             onClick={() => onToggleActive(source)}
             className={cn(
               'p-1.5 rounded-md transition-colors cursor-pointer',
@@ -106,6 +160,7 @@ function ChannelCard({
             {source.isActive ? <Play className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true" /> : <Pause className="h-3.5 w-3.5" aria-hidden="true" />}
           </button>
           <button
+            type="button"
             onClick={() => onToggleFavorite(source)}
             className={cn(
               'p-1.5 rounded-md transition-colors cursor-pointer',
@@ -118,6 +173,7 @@ function ChannelCard({
             <Star className="h-3.5 w-3.5" fill={source.isFavorite ? 'currentColor' : 'none'} aria-hidden="true" />
           </button>
           <button
+            type="button"
             onClick={() => onDelete(source)}
             disabled={deleting === source.id}
             className="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
@@ -191,6 +247,32 @@ export function VideoSourceBar({ sources, onAdd, onDelete, onUpdate }: VideoSour
   const [deleting, setDeleting] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<VideoSource | null>(null);
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, {activationConstraint: {distance: 5}}),
+    useSensor(KeyboardSensor, {coordinateGetter: sortableKeyboardCoordinates}),
+  );
+
+  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
+    const {active, over} = event;
+    if (!over || active.id === over.id) return;
+
+    const favs = sources.filter((s) => s.isFavorite);
+    const oldIndex = favs.findIndex((s) => s.id === active.id);
+    const newIndex = favs.findIndex((s) => s.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const reordered = arrayMove(favs, oldIndex, newIndex);
+    const items = reordered.map((s, i) => ({id: s.id, favoriteOrder: i}));
+
+    // Optimistic: trigger refetch after API
+    const res = await fetch('/api/video/sources/reorder', {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({items}),
+    });
+    if (res.ok) onUpdate();
+  }, [sources, onUpdate]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -214,25 +296,25 @@ export function VideoSourceBar({ sources, onAdd, onDelete, onUpdate }: VideoSour
     }
   };
 
-  const handleToggleFavorite = async (source: VideoSource) => {
+  const handleToggleFavorite = useCallback(async (source: VideoSource) => {
     await fetch(`/api/video/sources/${source.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ isFavorite: !source.isFavorite }),
     });
     onUpdate();
-  };
+  }, [onUpdate]);
 
-  const handleToggleActive = async (source: VideoSource) => {
+  const handleToggleActive = useCallback(async (source: VideoSource) => {
     await fetch(`/api/video/sources/${source.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ isActive: !source.isActive }),
     });
     onUpdate();
-  };
+  }, [onUpdate]);
 
-  const handleToggleTag = async (source: VideoSource, tag: string) => {
+  const handleToggleTag = useCallback(async (source: VideoSource, tag: string) => {
     const current = source.tags ?? [];
     const next = current.includes(tag)
       ? current.filter((t) => t !== tag)
@@ -243,7 +325,7 @@ export function VideoSourceBar({ sources, onAdd, onDelete, onUpdate }: VideoSour
       body: JSON.stringify({ tags: next }),
     });
     onUpdate();
-  };
+  }, [onUpdate]);
 
   const favoriteSources = sources.filter((s) => s.isFavorite);
   const normalSources = sources.filter((s) => !s.isFavorite);
@@ -311,24 +393,33 @@ export function VideoSourceBar({ sources, onAdd, onDelete, onUpdate }: VideoSour
             </div>
           ) : (
             <div className="space-y-4">
-              {/* Favorite channels */}
+              {/* Favorite channels (DnD sortable) */}
               {favoriteSources.length > 0 && (
                 <div className="space-y-2">
                   <p className="text-xs font-medium text-amber-600 dark:text-amber-400 flex items-center gap-1">
                     <Star className="h-3 w-3" fill="currentColor" aria-hidden="true" />
                     즐겨찾기 ({favoriteSources.length})
                   </p>
-                  {favoriteSources.map((source) => (
-                    <ChannelCard
-                      key={source.id}
-                      source={source}
-                      deleting={deleting}
-                      onToggleFavorite={handleToggleFavorite}
-                      onToggleActive={handleToggleActive}
-                      onToggleTag={handleToggleTag}
-                      onDelete={(s) => setDeleteTarget(s)}
-                    />
-                  ))}
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    modifiers={[restrictToVerticalAxis]}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <SortableContext items={favoriteSources.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+                      {favoriteSources.map((source) => (
+                        <SortableChannelCard
+                          key={source.id}
+                          source={source}
+                          deleting={deleting}
+                          onToggleFavorite={handleToggleFavorite}
+                          onToggleActive={handleToggleActive}
+                          onToggleTag={handleToggleTag}
+                          onDelete={(s) => setDeleteTarget(s)}
+                        />
+                      ))}
+                    </SortableContext>
+                  </DndContext>
                 </div>
               )}
 

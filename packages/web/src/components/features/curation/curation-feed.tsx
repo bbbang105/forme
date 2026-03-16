@@ -695,9 +695,9 @@ export function CurationFeed() {
               : selectedTags.length > 0
                 ? '선택한 태그에 맞는 글이 없습니다.'
                 : status === 'unread'
-                  ? '안읽은 글이 없습니다. 모두 읽었어요!'
+                  ? '안읽은 글이 없어요. 모두 읽었어요!'
                   : status === 'read'
-                    ? '읽은 글이 없습니다.'
+                    ? '읽은 글이 없어요.'
                     : status === 'bookmarked'
                       ? '북마크한 글이 없습니다.'
                       : '수집된 글이 없습니다. 소스를 추가하고 수집해보세요.'}

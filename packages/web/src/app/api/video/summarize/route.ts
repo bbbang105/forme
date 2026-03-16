@@ -76,7 +76,7 @@ export const POST = withTracing('POST /api/video/summarize', async (request: Req
 
         try {
           const transcript = await fetchTranscript(item.videoId, item.description);
-          const result = await summarizeVideo(transcript.content, transcript.source);
+          const result = await summarizeVideo(transcript.content, transcript.source, item.duration);
 
           await db.update(videoItems)
             .set({

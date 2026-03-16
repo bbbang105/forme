@@ -9,7 +9,7 @@ import {formatRelativeDate, getArticleGradient} from '@/lib/curation-utils';
 export interface VideoItemData {
   id: string;
   videoId: string;
-  sourceId: string;
+  sourceId: string | null;
   title: string;
   description: string | null;
   thumbnailUrl: string | null;
@@ -258,17 +258,15 @@ export const VideoCard = memo(function VideoCard({
     <>
       {/* Checkbox (select mode) */}
       {onSelect && (
-        <div className="flex items-start pt-0.5 shrink-0">
-          <div className="flex items-center justify-center min-h-[44px] min-w-[44px]">
-            <input
-              type="checkbox"
-              checked={selected ?? false}
-              onChange={() => onSelect(item.id)}
-              onClick={(e) => e.stopPropagation()}
-              className="h-4 w-4 rounded border-muted-foreground accent-primary cursor-pointer"
-              aria-label={`${item.title} 선택`}
-            />
-          </div>
+        <div className="flex items-center shrink-0 pr-1">
+          <input
+            type="checkbox"
+            checked={selected ?? false}
+            onChange={() => onSelect(item.id)}
+            onClick={(e) => e.stopPropagation()}
+            className="h-4 w-4 rounded border-muted-foreground accent-primary cursor-pointer"
+            aria-label={`${item.title} 선택`}
+          />
         </div>
       )}
 
@@ -366,14 +364,14 @@ export const VideoCard = memo(function VideoCard({
         )}
       </div>
 
-      {/* Right actions */}
-      <div className="flex flex-col items-center justify-start gap-0.5 shrink-0">
+      {/* Right actions — 선택 모드에서는 숨김 */}
+      {!onSelect && <div className="flex flex-col items-center justify-start shrink-0">
         {onCollectionPick && (
           <button
             type="button"
             onClick={() => onCollectionPick(item.id)}
             className={cn(
-              'p-1.5 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-md transition-colors cursor-pointer',
+              'p-1 min-w-[28px] min-h-[28px] flex items-center justify-center rounded-md transition-colors cursor-pointer',
               item.collectionId ? 'text-primary' : 'text-muted-foreground/40 hover:text-primary',
             )}
             aria-label="컬렉션 지정"
@@ -386,7 +384,7 @@ export const VideoCard = memo(function VideoCard({
             type="button"
             onClick={() => onToggleBookmark(item.id)}
             className={cn(
-              'p-1.5 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-md transition-colors cursor-pointer',
+              'p-1 min-w-[28px] min-h-[28px] flex items-center justify-center rounded-md transition-colors cursor-pointer',
               item.isBookmarked
                 ? 'text-primary'
                 : 'text-muted-foreground/40 hover:text-primary/60',
@@ -404,13 +402,13 @@ export const VideoCard = memo(function VideoCard({
           <button
             type="button"
             onClick={() => onDelete(item.id)}
-            className="p-1.5 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-md text-destructive/70 hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+            className="p-1 min-w-[28px] min-h-[28px] flex items-center justify-center rounded-md text-destructive/70 hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
             aria-label={`${item.title} 삭제`}
           >
             <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
         )}
-      </div>
+      </div>}
     </div>
   );
 });

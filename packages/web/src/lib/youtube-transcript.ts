@@ -1,7 +1,7 @@
 import {isSafeUrl} from '@/lib/url-safety';
 import {YOUTUBE_VIDEO_ID_REGEX} from '@/lib/validators';
 
-const MAX_TRANSCRIPT_CHARS = 40_000;
+const MAX_TRANSCRIPT_CHARS = 80_000;
 
 export interface TranscriptResult {
   content: string;
