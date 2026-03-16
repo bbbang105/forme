@@ -3,14 +3,20 @@ import {YOUTUBE_VIDEO_ID_REGEX} from '@/lib/validators';
 
 const MAX_TRANSCRIPT_CHARS = 80_000;
 
+const BROWSER_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+  'Accept-Language': 'en-US,en;q=0.9',
+  'Cookie': 'CONSENT=YES+1',
+};
+
 export interface TranscriptResult {
   content: string;
   source: 'transcript' | 'description';
 }
 
 /**
- * YouTube 자막 추출 (innertube ANDROID client → timedtext XML 파싱)
- * Python youtube-transcript-api와 동일한 방식
+ * YouTube 자막 추출 (페이지 스크레이핑 → timedtext XML 파싱)
+ * CONSENT 쿠키로 consent 페이지 우회, Vercel 서버리스 호환
  */
 export async function fetchTranscript(
   videoId: string,
@@ -31,52 +37,48 @@ export async function fetchTranscript(
   }
 }
 
-// 공개 innertube API key (WEB client) — 페이지 파싱 불필요
-const INNERTUBE_API_KEY = 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8';
-
 async function fetchCaptionText(videoId: string): Promise<string> {
   if (!YOUTUBE_VIDEO_ID_REGEX.test(videoId)) throw new Error('Invalid video ID');
 
-  // innertube player API 직접 호출 (WEB client + 브라우저 헤더 — 클라우드 IP 차단 우회)
-  const playerRes = await fetch(
-    `https://www.youtube.com/youtubei/v1/player?key=${INNERTUBE_API_KEY}`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-        'Accept-Language': 'en-US,en;q=0.9',
-      },
-      body: JSON.stringify({
-        context: {
-          client: {
-            clientName: 'WEB',
-            clientVersion: '2.20240101.00.00',
-          },
-        },
-        videoId,
-      }),
-      signal: AbortSignal.timeout(10_000),
-    },
-  );
+  // YouTube 페이지에서 ytInitialPlayerResponse 추출 (CONSENT 쿠키로 consent 페이지 우회)
+  const pageRes = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+    headers: BROWSER_HEADERS,
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!pageRes.ok) throw new Error(`YouTube page fetch failed: ${pageRes.status}`);
+  const html = await pageRes.text();
 
-  if (!playerRes.ok) throw new Error(`Innertube player failed: ${playerRes.status}`);
-  const playerData = await playerRes.json();
+  // ytInitialPlayerResponse JSON에서 captionTracks 추출
+  const playerMatch = html.match(/ytInitialPlayerResponse\s*=\s*(\{.+?\});/);
+  if (!playerMatch) throw new Error('No ytInitialPlayerResponse found');
 
-  const tracks = playerData?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+  let playerData: Record<string, unknown>;
+  try {
+    playerData = JSON.parse(playerMatch[1]!);
+  } catch {
+    throw new Error('Failed to parse ytInitialPlayerResponse');
+  }
+
+  const captions = playerData?.captions as Record<string, unknown> | undefined;
+  const renderer = captions?.playerCaptionsTracklistRenderer as Record<string, unknown> | undefined;
+  const tracks = renderer?.captionTracks as Array<{ languageCode: string; baseUrl: string }> | undefined;
+
   if (!tracks || tracks.length === 0) throw new Error('No caption tracks');
 
   // 한국어 > 영어 > 첫 번째
   const track =
-    tracks.find((t: { languageCode: string }) => t.languageCode === 'ko') ??
-    tracks.find((t: { languageCode: string }) => t.languageCode === 'en') ??
+    tracks.find((t) => t.languageCode === 'ko') ??
+    tracks.find((t) => t.languageCode === 'en') ??
     tracks[0];
 
   if (!track?.baseUrl) throw new Error('No valid caption URL');
   if (!isSafeUrl(track.baseUrl)) throw new Error('Unsafe caption URL');
 
-  // Step 3: 자막 XML fetch + 파싱
-  const captionRes = await fetch(track.baseUrl, { signal: AbortSignal.timeout(10_000) });
+  // 자막 XML fetch + 파싱
+  const captionRes = await fetch(track.baseUrl, {
+    headers: BROWSER_HEADERS,
+    signal: AbortSignal.timeout(10_000),
+  });
   if (!captionRes.ok) throw new Error(`Caption fetch failed: ${captionRes.status}`);
   const xml = await captionRes.text();
 
