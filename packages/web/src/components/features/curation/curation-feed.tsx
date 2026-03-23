@@ -2,7 +2,7 @@
 
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useRouter, useSearchParams} from 'next/navigation';
-import {CheckSquare, Loader2, Newspaper, Settings2, Trash2, X} from 'lucide-react';
+import {CheckSquare, Loader2, MailX, Newspaper, Settings2, Trash2, X} from 'lucide-react';
 import {cn} from '@/lib/utils';
 import {Skeleton} from '@/components/ui/skeleton';
 import {Button} from '@/components/ui/button';
@@ -107,7 +107,9 @@ export function CurationFeed() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkUnreadOpen, setBulkUnreadOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [bulkUnreading, setBulkUnreading] = useState(false);
 
   // Refs for infinite scroll
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -419,6 +421,33 @@ export function CurationFeed() {
     setDeleting(false);
   }, [selectedIds, fetchItems]);
 
+  const handleBulkMarkUnread = useCallback(async () => {
+    if (selectedIds.size === 0) return;
+    setBulkUnreading(true);
+
+    const ids = [...selectedIds];
+    setItems((prev) => prev.filter((item) => !selectedIds.has(item.id)));
+
+    let failed = false;
+    for (let i = 0; i < ids.length; i += 100) {
+      const chunk = ids.slice(i, i + 100);
+      const res = await fetch('/api/curation/bulk-action', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ids: chunk, action: 'mark_unread'}),
+      });
+      if (!res.ok) failed = true;
+    }
+
+    if (failed) {
+      fetchItems(null, false);
+    }
+    setSelectedIds(new Set());
+    setSelectMode(false);
+    setBulkUnreadOpen(false);
+    setBulkUnreading(false);
+  }, [selectedIds, fetchItems]);
+
   // ── Selection helpers ──
 
   const toggleSelect = useCallback((id: string) => {
@@ -431,12 +460,12 @@ export function CurationFeed() {
   }, []);
 
   const toggleSelectAll = useCallback(() => {
-    if (selectedIds.size === items.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(items.map((i) => i.id)));
-    }
-  }, [items, selectedIds.size]);
+    setSelectedIds((prev) => {
+      const all = itemsRef.current;
+      if (prev.size === all.length) return new Set();
+      return new Set(all.map((i) => i.id));
+    });
+  }, []);
 
   const exitSelectMode = useCallback(() => {
     setSelectMode(false);
@@ -565,19 +594,32 @@ export function CurationFeed() {
             >
               {selectedIds.size === items.length ? '전체 해제' : '전체 선택'}
             </button>
-            <span className="text-sm text-muted-foreground">
+            <span className="text-sm text-muted-foreground" aria-live="polite" aria-atomic="true">
               {selectedIds.size}개 선택됨
             </span>
           </div>
-          <Button
-            variant="destructive"
-            size="sm"
-            disabled={selectedIds.size === 0 || deleting}
-            onClick={() => setBulkDeleteOpen(true)}
-          >
-            {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Trash2 className="h-4 w-4 mr-1.5" />}
-            {deleting ? '삭제 중...' : '삭제'}
-          </Button>
+          <div className="flex items-center gap-2">
+            {status === 'read' && (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={selectedIds.size === 0 || bulkUnreading}
+                onClick={() => setBulkUnreadOpen(true)}
+              >
+                {bulkUnreading ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" aria-hidden="true" /> : <MailX className="h-4 w-4 mr-1.5" aria-hidden="true" />}
+                {bulkUnreading ? '이동 중...' : '안읽음으로'}
+              </Button>
+            )}
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={selectedIds.size === 0 || deleting}
+              onClick={() => setBulkDeleteOpen(true)}
+            >
+              {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" aria-hidden="true" /> : <Trash2 className="h-4 w-4 mr-1.5" aria-hidden="true" />}
+              {deleting ? '삭제 중...' : '삭제'}
+            </Button>
+          </div>
         </div>
       )}
 
@@ -807,7 +849,28 @@ export function CurationFeed() {
               disabled={deleting}
               onClick={handleBulkDeleteConfirm}
             >
-              {deleting ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" />삭제 중...</> : `${selectedIds.size}개 삭제`}
+              {deleting ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" aria-hidden="true" />삭제 중...</> : `${selectedIds.size}개 삭제`}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk mark unread confirm */}
+      <AlertDialog open={bulkUnreadOpen} onOpenChange={(open) => !open && setBulkUnreadOpen(false)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>안읽음으로 되돌리기</AlertDialogTitle>
+            <AlertDialogDescription>
+              선택한 {selectedIds.size}개의 글을 안읽음 상태로 이동합니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkUnreading}>취소</AlertDialogCancel>
+            <Button
+              disabled={bulkUnreading}
+              onClick={handleBulkMarkUnread}
+            >
+              {bulkUnreading ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" aria-hidden="true" />이동 중...</> : '안읽음으로'}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

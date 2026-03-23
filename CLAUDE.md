@@ -24,7 +24,7 @@ pnpm 모노레포: `packages/web` (Next.js 16 PWA) + `packages/shared` (DB 스�
 | 배포 | Vercel (리전: `icn1` 서울, Hobby 플랜) |
 | 스케줄링 | Vercel Cron (일 1회) + Supabase pg_cron + pg_net (고빈도) |
 | AI 요약 | @google/generative-ai (GEMINI_MODEL 환경변수, 기본 gemini-2.5-flash, JSON 모드, 영상 길이별 동적 프롬프트) |
-| 자막 추출 | Innertube API (커스텀 구현) |
+| 자막 추출 | Innertube ANDROID client API (POT 불필요, 커스텀 구현) |
 | 영상 메타 | YouTube Data API v3 (duration, Shorts 필터) |
 | 마크다운 렌더링 | react-markdown + remark-gfm + rehype-highlight |
 
@@ -65,6 +65,7 @@ pnpm db:push          # 스키마 직접 push (dev용)
 - Safari PWA 대응: Dialog `flex flex-col` + `inset-y-0 my-auto` 센터링 (grid+translate 금지), `body[data-scroll-locked]`에서 `overscroll-behavior-y: auto` 해제, pull-to-refresh에서 다이얼로그 열림 감지 스킵
 - 큐레이션 정렬: status=read 탭에서 readAt DESC 정렬 (최근 읽은 순)
 - 큐레이션 삭제: 단건 삭제 (AlertDialog 확인) + 일괄 삭제 (체크박스 선택, 100개 청크), ownership은 curationSources join으로 검증
+- 큐레이션 선택 모드: 읽음 탭에서 일괄 안읽음 되돌리기 (bulk-action API, mark_unread) + 일괄 삭제, aria-live 선택 카운트, itemsRef 패턴
 - 큐레이션 북마크 메모: InlineMemo 컴포넌트 (북마크 탭 전용, 500자, key prop으로 외부 상태 동기화)
 - 큐레이션 북마크 컬렉션: bookmark_collections 테이블 (RLS), 컬렉션 CRUD + DnD 순서변경 (@dnd-kit/sortable, GripVertical), 피커 바텀시트, 피드 컬렉션 칩 필터 (북마크 탭 전용), IDOR 방어 (소유권 검증)
 - 큐레이션 UX: 스와이프 액션 (우→읽음, 좌→삭제), 키보드 네비 (j/k/o/b, ref 기반 리스너 — 아이템 변경 시 재등록 불필요)
@@ -91,7 +92,7 @@ pnpm db:push          # 스키마 직접 push (dev용)
 - header 아바타: 서버사이드 fetch (layout.tsx async → avatarUrl prop), 클라이언트 워터폴 제거
 - SW 등록: 지수 백오프 재시도 (최대 3회, constants.ts 참조), 푸시 구독 자동 동기화 (syncPushSubscription, sessionStorage 중복 방지)
 - RSS 크롤 중복 방지: 크로스소스 제목 dedup (동일 제목 → DB 미저장, curationSources join으로 유저별 기존 제목 조회)
-- 유튜브 요약: video_sources (채널 소스) + video_items (수집/요약 영상, sourceId nullable — 수동 URL 추가 지원) + video_bookmark_collections (컬렉션) 테이블, 수집과 요약 분리 (수집: RSS 무료, 요약: Gemini API), @handle URL → 페이지 파싱으로 channelId 추출 (한글 핸들 decodeURIComponent 대응, 100자 제한), youtube.com/channel/ URL도 지원, SSE 스트리밍 요약 (api/curation/crawl 패턴), 자막 추출 실패 시 description 폴백 (summarySource 플래그), 자막 최대 80,000자, 마크다운 렌더러 next/dynamic 지연 로딩, 최대 5개 배치 요약 (VIDEO_SUMMARIZE_BATCH_MAX), YouTube Data API v3로 duration 조회 → Shorts/2분 미만 필터, GEMINI_MODEL 환경변수 (기본 gemini-2.5-flash), 영상 길이별 동적 프롬프트 (10분 미만/10~30분/30~60분/60분+ 분량 가이드), 자막 URL SSRF 방어 (isSafeUrl), videoId 정규식 검증, 북마크 컬렉션 (DnD 순서변경 + 피커 바텀시트 + 피드 칩 필터), optimistic updates + 에러 롤백
+- 유튜브 요약: video_sources (채널 소스) + video_items (수집/요약 영상, sourceId nullable — 수동 URL 추가 지원) + video_bookmark_collections (컬렉션) 테이블, 수집과 요약 분리 (수집: RSS 무료, 요약: Gemini API), @handle URL → 페이지 파싱으로 channelId 추출 (한글 핸들 decodeURIComponent 대응, 100자 제한), youtube.com/channel/ URL도 지원, SSE 스트리밍 요약 (api/curation/crawl 패턴), 자막 추출: Innertube ANDROID client (POT 불필요, WEB client는 빈 응답), 실패 시 description 폴백 (summarySource 플래그), 자막 최대 80,000자, 마크다운 렌더러 next/dynamic 지연 로딩, 최대 5개 배치 요약 (VIDEO_SUMMARIZE_BATCH_MAX), YouTube Data API v3로 duration 조회 → Shorts/2분 미만 필터, GEMINI_MODEL 환경변수 (기본 gemini-2.5-flash), 영상 길이별 동적 프롬프트 (10분 미만/10~30분/30~60분/60분+ 분량 가이드), 자막 URL SSRF 방어 (isSafeUrl), videoId 정규식 검증, 북마크 컬렉션 (DnD 순서변경 + 피커 바텀시트 + 피드 칩 필터), optimistic updates + 에러 롤백
 - 유튜브 URL 직접 추가: 피드 탭 태그 칩 우측 + 버튼 → AddUrlDialog (SSE 원스텝: 메타 → 자막 → 요약 → DB), 기존 영상 있으면 트랜잭션으로 삭제 후 재등록, cancel 시 orphan DB 정리
 - 유튜브 피드 2탭 구조: "피드" (세그먼트 탭, 요약 완료 영상) + "생성" (수집/요약 실행), 피드 탭 내 상태 칩 (안읽음/읽음/북마크 — 큐레이션 동일 패턴), 피드 탭 검색 (escapeIlike + raw SQL ESCAPE), 탭 전환 시 하위 필터 전체 초기화, itemsRef 패턴 (useCallback + ref로 stale closure 방지), 읽음 탭 readAt DESC 정렬 (최근 읽은 순)
 - 유튜브 선택 모드: 피드 탭 상태 칩 우측 "선택" 버튼, 생성 탭 수집 라인 우측 "선택" 버튼, 일괄 삭제 (bulk-action API), 읽음 탭에서 일괄 안읽음 되돌리기 (mark_unread)
@@ -190,6 +191,7 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/components/features/curation/mini-card-link.tsx` | 대시보드 큐레이션 클릭 시 읽음 처리 래퍼 |
 | `packages/web/src/app/api/curation/[id]/route.ts` | 큐레이션 아이템 PATCH (읽음/북마크/메모/컬렉션) + DELETE (단건 삭제, ownership join 검증) |
 | `packages/web/src/app/api/curation/bulk-delete/route.ts` | 큐레이션 일괄 삭제 (POST, max 100개, UUID 전수 검증) |
+| `packages/web/src/app/api/curation/bulk-action/route.ts` | 큐레이션 일괄 액션 (mark_unread/delete, max 100개, ownership join 검증) |
 | `packages/web/src/hooks/use-swipe-action.ts` | 터치 스와이프 제스처 훅 (axis-lock, damped swipe, ref 기반 콜백, 타이머 cleanup) |
 | `packages/web/src/lib/format-time.ts` | 공유 시간 포맷 유틸 (formatTime, formatDuration) |
 | `packages/web/src/lib/constants.ts` | 앱 전역 상수 (페이지네이션, 제한값, SW 재시도 설정) |
@@ -202,7 +204,7 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/shared/src/schema/video-sources.ts` | 유튜브 채널 소스 스키마 |
 | `packages/shared/src/schema/video-items.ts` | 유튜브 영상 수집/요약 스키마 (status: collected/summarizing/summarized/failed) |
 | `packages/web/src/lib/gemini.ts` | Gemini AI 요약 유틸 (싱글톤 패턴, JSON 스키마 모드, transcript/description 프롬프트) |
-| `packages/web/src/lib/youtube-transcript.ts` | YouTube 자막 추출 (Innertube API, 언어 폴백 + description 폴백, SSRF 방어, 10초 타임아웃) |
+| `packages/web/src/lib/youtube-transcript.ts` | YouTube 자막 추출 (Innertube ANDROID client, POT 불필요, 언어 폴백 ko>en>first + description 폴백, SSRF 방어, 10초 타임아웃) |
 | `packages/web/src/lib/youtube-api.ts` | YouTube Data API v3 유틸 (fetchVideoDurations, videoId 검증, ISO 8601 duration 파싱) |
 | `packages/web/src/app/api/video/sources/route.ts` | 유튜브 채널 소스 CRUD (@handle + /channel/ URL 지원) |
 | `packages/web/src/app/api/video/collect/route.ts` | RSS 영상 수집 SSE (기간 필터, videoId 중복 스킵, Shorts 2분 미만 필터, max 50 소스) |
