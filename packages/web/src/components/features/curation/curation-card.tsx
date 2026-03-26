@@ -155,7 +155,7 @@ function InlineMemo({
       >
         <div className="flex items-start gap-1.5">
           <MessageSquare className="h-3 w-3 mt-0.5 shrink-0 text-muted-foreground/60" aria-hidden="true" />
-          <span className="line-clamp-2 whitespace-pre-wrap">{initialMemo}</span>
+          <span className="whitespace-pre-wrap">{initialMemo}</span>
         </div>
       </button>
     );
@@ -427,7 +427,7 @@ export const CurationCard = memo(function CurationCard({
                   {collection.name}
                 </span>
               )}
-              {item.tags?.slice(0, 3).map((tag) => (
+              {item.tags?.map((tag) => (
                 <span
                   key={tag}
                   className="inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-medium text-primary bg-primary/10 ring-1 ring-inset ring-primary/20"
@@ -632,7 +632,7 @@ export const CurationListRow = memo(function CurationListRow({
               {collection.name}
             </span>
           )}
-          {item.tags?.slice(0, 3).map((tag) => (
+          {item.tags?.map((tag) => (
             <span
               key={tag}
               className="inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-medium text-primary bg-primary/10 ring-1 ring-inset ring-primary/20"
