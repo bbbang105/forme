@@ -2,7 +2,7 @@
 
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useRouter, useSearchParams} from 'next/navigation';
-import {CheckSquare, Loader2, MailX, Newspaper, Settings2, Trash2, X} from 'lucide-react';
+import {CheckSquare, Loader2, MailX, Newspaper, Plus, Settings2, Trash2, X} from 'lucide-react';
 import {cn} from '@/lib/utils';
 import {Skeleton} from '@/components/ui/skeleton';
 import {Button} from '@/components/ui/button';
@@ -34,6 +34,11 @@ const SourceManager = dynamic(
 
 const CollectionManager = dynamic(
   () => import('./collection-manager').then((m) => m.CollectionManager),
+  { ssr: false }
+);
+
+const AddUrlDialog = dynamic(
+  () => import('./add-url-dialog').then((m) => m.AddUrlDialog),
   { ssr: false }
 );
 
@@ -87,12 +92,14 @@ export function CurationFeed() {
   const [categories, setCategories] = useState<string[]>([]);
   const [hasSources, setHasSources] = useState(true);
   const [favoriteSources, setFavoriteSources] = useState<{ id: string; name: string }[]>([]);
+  const [manualSourceId, setManualSourceId] = useState<string | null>(null);
 
   // Collection state
   const [collections, setCollections] = useState<BookmarkCollection[]>([]);
   const [selectedCollectionId, setSelectedCollectionId] = useState<string>('');
   const [collectionPickerTarget, setCollectionPickerTarget] = useState<string | null>(null);
   const [collectionManagerOpen, setCollectionManagerOpen] = useState(false);
+  const [addUrlOpen, setAddUrlOpen] = useState(false);
 
   const collectionMap = useMemo(() => {
     const map = new Map<string, CollectionInfo>();
@@ -200,13 +207,15 @@ export function CurationFeed() {
   const fetchCategories = useCallback(async () => {
     const res = await fetch('/api/curation/sources');
     if (!res.ok) return;
-    const sources: { id: string; name: string; category: string; isFavorite: boolean }[] = await res.json();
+    const sources: { id: string; name: string; url: string; category: string; isFavorite: boolean }[] = await res.json();
     setHasSources(sources.length > 0);
     const cats = [...new Set(sources.map((s) => s.category))] as string[];
     setCategories(cats);
     setFavoriteSources(
       sources.filter((s) => s.isFavorite).map((s) => ({ id: s.id, name: s.name }))
     );
+    const manual = sources.find((s) => s.url === 'manual://');
+    setManualSourceId(manual?.id ?? null);
   }, []);
 
   // Fetch collections
@@ -309,30 +318,39 @@ export function CurationFeed() {
   // ── Memo handler ──
 
   const handleMemoChange = useCallback(async (id: string, memo: string | null) => {
-    const shouldBookmark = memo !== null;
+    const item = itemsRef.current.find((i) => i.id === id);
+    const prevMemo = item?.memo ?? null;
+    const wasBookmarked = item?.isBookmarked ?? false;
+
     setItems((prev) =>
-      prev.map((item) =>
-        item.id === id
-          ? { ...item, memo, ...(shouldBookmark && !item.isBookmarked ? { isBookmarked: true } : {}) }
-          : item
+      prev.map((i) =>
+        i.id === id
+          ? { ...i, memo, isBookmarked: memo ? true : i.isBookmarked }
+          : i
       )
     );
 
-    const body: Record<string, unknown> = { memo };
-    if (shouldBookmark) {
-      body.isBookmarked = true;
+    try {
+      const res = await fetch(`/api/curation/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ memo }),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      setItems((prev) =>
+        prev.map((i) =>
+          i.id === id ? { ...i, memo: prevMemo, isBookmarked: wasBookmarked } : i
+        )
+      );
+      return;
     }
 
-    const res = await fetch(`/api/curation/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-
-    if (!res.ok) {
-      fetchItems(null, false);
+    // 메모 추가 + 기존에 북마크 아니었으면 → 컬렉션 피커 자동 오픈
+    if (memo && !wasBookmarked) {
+      setCollectionPickerTarget(id);
     }
-  }, [fetchItems]);
+  }, []);
 
   const isBookmarkTab = status === 'bookmarked';
   const showMemo = status === 'bookmarked' || status === 'read';
@@ -646,6 +664,7 @@ export function CurationFeed() {
         sourceId={sourceId}
         onSourceIdChange={(id) => updateFilters({ sourceId: id })}
         favoriteSources={favoriteSources}
+        manualSourceId={manualSourceId}
         statusActions={
           <>
             {!selectMode ? (
@@ -668,6 +687,14 @@ export function CurationFeed() {
                 <X className="h-3.5 w-3.5" />
               </button>
             )}
+            <button
+              type="button"
+              onClick={() => setAddUrlOpen(true)}
+              className="p-1.5 rounded-md border border-border text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+              aria-label="URL 직접 추가"
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </button>
             <SourceManager onCrawlComplete={handleCrawlComplete} onFavoritesChange={handleFavoritesChange} />
           </>
         }
@@ -761,8 +788,8 @@ export function CurationFeed() {
                   onMarkRead={handleMarkRead}
                   onDelete={handleDeleteRequest}
                   onMemoChange={handleMemoChange}
-                  onCollectionPick={isBookmarkTab ? handleCollectionPick : undefined}
-                  collectionMap={isBookmarkTab ? collectionMap : undefined}
+                  onCollectionPick={(isBookmarkTab || status === 'read') ? handleCollectionPick : undefined}
+                  collectionMap={(isBookmarkTab || status === 'read') ? collectionMap : undefined}
                   showMemo={showMemo}
                   selectMode={selectMode}
                   selected={selectedIds.has(item.id)}
@@ -787,8 +814,8 @@ export function CurationFeed() {
                   onMarkRead={handleMarkRead}
                   onDelete={handleDeleteRequest}
                   onMemoChange={handleMemoChange}
-                  onCollectionPick={isBookmarkTab ? handleCollectionPick : undefined}
-                  collectionMap={isBookmarkTab ? collectionMap : undefined}
+                  onCollectionPick={(isBookmarkTab || status === 'read') ? handleCollectionPick : undefined}
+                  collectionMap={(isBookmarkTab || status === 'read') ? collectionMap : undefined}
                   showMemo={showMemo}
                   selectMode={selectMode}
                   selected={selectedIds.has(item.id)}
@@ -887,6 +914,13 @@ export function CurationFeed() {
             : null
         }
         onSelect={handleCollectionSelect}
+      />
+
+      {/* Add URL dialog */}
+      <AddUrlDialog
+        open={addUrlOpen}
+        onOpenChange={setAddUrlOpen}
+        onComplete={() => { fetchItems(null, false); fetchCategories(); }}
       />
 
       {/* Collection manager dialog */}

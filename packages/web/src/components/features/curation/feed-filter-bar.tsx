@@ -1,6 +1,6 @@
 'use client';
 
-import {Clock, Sparkles, Star} from 'lucide-react';
+import {Clock, Link2, Sparkles, Star} from 'lucide-react';
 import {cn} from '@/lib/utils';
 import {CurationFilters, type StatusFilter} from './curation-filters';
 import {CurationSearch} from './curation-search';
@@ -22,6 +22,7 @@ export interface FeedFilterBarProps {
   sourceId: string;
   onSourceIdChange: (sourceId: string) => void;
   favoriteSources: { id: string; name: string }[];
+  manualSourceId?: string | null;
   statusActions?: React.ReactNode;
 }
 
@@ -40,6 +41,7 @@ export function FeedFilterBar({
   sourceId,
   onSourceIdChange,
   favoriteSources,
+  manualSourceId,
   statusActions,
 }: FeedFilterBarProps) {
   return (
@@ -67,8 +69,24 @@ export function FeedFilterBar({
       </div>
 
       {/* Favorite sources bar */}
-      {favoriteSources.length > 0 && (
+      {(manualSourceId || favoriteSources.length > 0) && (
         <div className="mb-3 flex gap-2 overflow-x-auto scrollbar-hide">
+          {manualSourceId && (
+            <button
+              onClick={() =>
+                onSourceIdChange(sourceId === manualSourceId ? '' : manualSourceId)
+              }
+              className={cn(
+                'inline-flex items-center gap-1 shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer border',
+                sourceId === manualSourceId
+                  ? 'bg-primary/15 text-primary border-primary/30'
+                  : 'bg-background text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground'
+              )}
+            >
+              <Link2 className="h-3 w-3" />
+              직접 추가
+            </button>
+          )}
           {favoriteSources.map((src) => (
             <button
               key={src.id}

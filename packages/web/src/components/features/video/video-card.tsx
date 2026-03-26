@@ -175,7 +175,7 @@ function InlineMemo({
       >
         <div className="flex items-start gap-1.5">
           <MessageSquare className="h-3 w-3 mt-0.5 shrink-0 text-muted-foreground/60" aria-hidden="true" />
-          <span className="line-clamp-2 whitespace-pre-wrap">{initialMemo}</span>
+          <span className="whitespace-pre-wrap">{initialMemo}</span>
         </div>
       </button>
     );

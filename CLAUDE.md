@@ -66,7 +66,8 @@ pnpm db:push          # 스키마 직접 push (dev용)
 - 큐레이션 정렬: status=read 탭에서 readAt DESC 정렬 (최근 읽은 순)
 - 큐레이션 삭제: 단건 삭제 (AlertDialog 확인) + 일괄 삭제 (체크박스 선택, 100개 청크), ownership은 curationSources join으로 검증
 - 큐레이션 선택 모드: 읽음 탭에서 일괄 안읽음 되돌리기 (bulk-action API, mark_unread) + 일괄 삭제, aria-live 선택 카운트, itemsRef 패턴
-- 큐레이션 북마크 메모: InlineMemo 컴포넌트 (북마크 탭 전용, 500자, key prop으로 외부 상태 동기화)
+- 큐레이션 URL 수동 등록: POST /api/curation/add-url (preview 모드 + 저장 모드), "직접 추가" 시스템 소스 자동 생성 (manual://), OG 메타 파싱 (50KB streaming), AddUrlDialog 2단계 플로우 (가져오기→미리보기 편집→등록), INTEREST_OPTIONS 태그 클릭 토글 (최대 5개), 카테고리 선택 (AI/DEV/UXUI/ECONOMY), 즐겨찾기 바에 "직접 추가" 필터 칩
+- 큐레이션 북마크 메모: InlineMemo 컴포넌트 (읽음+북마크 탭, 500자, key prop으로 외부 상태 동기화), 읽음 탭 메모 저장 시 자동 북마크 + 컬렉션 피커 자동 오픈 (비디오 패턴 동일), PATCH API 서버측 메모→자동 북마크 (명시적 isBookmarked 지정 시 덮어쓰지 않음)
 - 큐레이션 북마크 컬렉션: bookmark_collections 테이블 (RLS), 컬렉션 CRUD + DnD 순서변경 (@dnd-kit/sortable, GripVertical), 피커 바텀시트, 피드 컬렉션 칩 필터 (북마크 탭 전용), IDOR 방어 (소유권 검증)
 - 큐레이션 UX: 스와이프 액션 (우→읽음, 좌→삭제), 키보드 네비 (j/k/o/b, ref 기반 리스너 — 아이템 변경 시 재등록 불필요)
 - 메모 캐싱: 에디터 뒤로가기 시 `router.refresh()` + MemoList initialMemos props 동기화
@@ -84,6 +85,7 @@ pnpm db:push          # 스키마 직접 push (dev용)
 - 컴포넌트 분리: 대형 컴포넌트 → 하위 컴포넌트/훅 추출 (source-card, crawl-settings-form, calendar-header, recurrence-form, feed-filter-bar, tag-input, day-cell, lane-utils, use-calendar-state, use-editor-config, useImageUpload, LinkInput)
 - 자동저장 훅: `hooks/use-auto-save.ts` — saveFnRef 패턴, Promise 기반 동시 저장 방어, detach() API, IME 컴포지션 중 저장 스킵
 - 공유 유틸: `lib/format-time.ts` (formatTime, formatDuration), `lib/constants.ts` (앱 전역 상수 — 페이지네이션, 제한값, SW 재시도 설정, VIDEO_FEED_PAGE_SIZE, VIDEO_SUMMARIZE_BATCH_MAX, VIDEO_SUMMARIZING_TIMEOUT_MS)
+- 공유 상수: `packages/shared/src/config/interest-options.ts` (INTEREST_OPTIONS 30개 관심 태그, 큐레이션 소스 + URL 등록에서 공통 사용, `@forme/shared/config`로 import — 클라이언트 번들 안전)
 - 공유 UI: `components/ui/list-skeleton.tsx` (피드/메모 목록 스켈레톤, role="status" aria-busy)
 - 캘린더 상태 훅: `use-calendar-state.ts` — 14개 상태 + 핸들러 추출, async/await 데이터 페칭
 - 에디터 설정 훅: `use-editor-config.ts` — TipTap 확장 배열 useMemo로 안정적 참조
@@ -128,6 +130,8 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/hooks/use-pull-to-refresh.ts` | Pull-to-Refresh 훅 (DOM 직접 조작, 스크롤 컨테이너 감지, window.location.reload, 다이얼로그 열림 감지 스킵) |
 | `packages/web/src/lib/push.ts` | 푸시 알림 발송 (sendPushToUser) |
 | `packages/web/src/lib/greetings.ts` | 대시보드 인사 문구 (100개 랜덤) |
+| `packages/web/src/app/api/curation/add-url/route.ts` | 큐레이션 URL 수동 등록 API (preview/save 2모드, OG 메타 파싱, "직접 추가" 시스템 소스) |
+| `packages/web/src/components/features/curation/add-url-dialog.tsx` | URL 직접 추가 다이얼로그 (2단계 미리보기 폼, INTEREST_OPTIONS 태그 토글, 카테고리 선택) |
 | `packages/web/src/app/api/curation/crawl/route.ts` | SSE 수동 크롤 API |
 | `packages/web/src/app/api/curation/sources/reorder/route.ts` | 즐겨찾기 소스 순서 배치 업데이트 |
 | `packages/web/src/lib/cron-auth.ts` | Cron 인증 유틸 (verifyCronSecret + getAllUserIds 멀티유저, constant-time safeCompare, 5분 TTL 캐시, 레거시 verifyCronAuth 호환) |
@@ -268,6 +272,7 @@ study-admin 스타일: Sky Blue `#0ea5e9` 포인트, Pretendard 폰트, 다크�
 | `docs/26-03-08-safari-dialog-scroll-fix.md` | Safari 다이얼로그 스크롤 수정 (Chrome vs Safari 차이, 해결책) |
 | `docs/plans/26-03-08-calendar-push-ux-design.md` | 캘린더 푸시알림 + UX 개선 설계 (데일리 요약, 리마인더, 밀린 투두, 애니메이션) |
 | `docs/plans/26-03-12-bookmark-collections.md` | 북마크 컬렉션 기능 설계 (스키마, CRUD, DnD, 피드 필터) |
+| `docs/plans/26-03-26-curation-url-add-memo-flow.md` | 큐레이션 URL 수동 등록 + 메모→북마크 플로우 설계 |
 
 ## docs 파일명 컨벤션
 
