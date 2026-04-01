@@ -211,35 +211,57 @@ export const POST = withTracing('POST /api/curation/add-url', async (request) =>
 
     const sourceId = manualSource.id;
 
-    // 2. 중복 URL 체크
+    // 2. 중복 URL 체크 (삭제된 아이템은 재등록 허용)
     const [existing] = await db
-      .select({id: curationItems.id})
+      .select({id: curationItems.id, deletedAt: curationItems.deletedAt})
       .from(curationItems)
       .where(and(eq(curationItems.sourceId, sourceId), eq(curationItems.url, url)))
       .limit(1);
 
-    if (existing) {
+    if (existing && !existing.deletedAt) {
       return NextResponse.json({error: '이미 등록된 URL입니다'}, {status: 409});
     }
 
     // 3. 썸네일 URL 검증
     const thumbnailUrl = typeof body.thumbnailUrl === 'string' && isSafeUrl(body.thumbnailUrl) ? body.thumbnailUrl : null;
 
-    // 4. curationItems 삽입
-    const [inserted] = await db
-      .insert(curationItems)
-      .values({
-        sourceId,
-        title,
-        url,
-        description,
-        thumbnailUrl,
-        category,
-        tags,
-        isRead: false,
-        isBookmarked: false,
-      })
-      .returning();
+    // 4. curationItems 삽입 (삭제된 아이템이면 복원)
+    let inserted;
+    if (existing?.deletedAt) {
+      [inserted] = await db
+        .update(curationItems)
+        .set({
+          title,
+          description,
+          thumbnailUrl,
+          category,
+          tags,
+          isRead: false,
+          isBookmarked: false,
+          readAt: null,
+          memo: null,
+          collectionId: null,
+          collectedAt: new Date(),
+          deletedAt: null,
+        })
+        .where(eq(curationItems.id, existing.id))
+        .returning();
+    } else {
+      [inserted] = await db
+        .insert(curationItems)
+        .values({
+          sourceId,
+          title,
+          url,
+          description,
+          thumbnailUrl,
+          category,
+          tags,
+          isRead: false,
+          isBookmarked: false,
+        })
+        .returning();
+    }
 
     return NextResponse.json(
       {

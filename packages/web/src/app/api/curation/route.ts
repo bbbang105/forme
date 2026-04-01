@@ -2,7 +2,7 @@ import {NextResponse} from 'next/server';
 import {createClient} from '@/lib/supabase/server';
 import {UUID_REGEX} from '@/lib/validators';
 import {curationItems, curationSources, db, profiles} from '@forme/shared';
-import {and, desc, eq, inArray, sql, type SQL} from 'drizzle-orm';
+import {and, desc, eq, inArray, isNull, sql, type SQL} from 'drizzle-orm';
 import {escapeIlike} from '@/lib/curation-utils';
 import {withTracing} from '@/lib/logger';
 
@@ -144,7 +144,7 @@ export const GET = withTracing('GET /api/curation', async (request) => {
     : [];
 
   // ── Build filter conditions ──
-  const filterConditions = [eq(curationSources.userId, user.id)];
+  const filterConditions = [eq(curationSources.userId, user.id), isNull(curationItems.deletedAt)];
 
   if (category && category !== 'all') {
     // 'dev' includes legacy categories that map to dev
@@ -211,7 +211,7 @@ export const GET = withTracing('GET /api/curation', async (request) => {
         SELECT unnest(ri.tags) AS tag, COUNT(*)::int AS freq
         FROM curation_items ri
         JOIN curation_sources rs ON ri.source_id = rs.id
-        WHERE rs.user_id = ${user.id} AND ri.is_read = true
+        WHERE rs.user_id = ${user.id} AND ri.is_read = true AND ri.deleted_at IS NULL
         GROUP BY 1
       ) rtf
       WHERE rtf.tag = ANY(${curationItems.tags})
@@ -223,7 +223,7 @@ export const GET = withTracing('GET /api/curation', async (request) => {
         SELECT ri.category, COUNT(*)::int AS freq
         FROM curation_items ri
         JOIN curation_sources rs ON ri.source_id = rs.id
-        WHERE rs.user_id = ${user.id} AND ri.is_read = true
+        WHERE rs.user_id = ${user.id} AND ri.is_read = true AND ri.deleted_at IS NULL
         GROUP BY 1
       ) rcf
       WHERE rcf.category = ${curationItems.category}

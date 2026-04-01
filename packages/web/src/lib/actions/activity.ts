@@ -3,7 +3,7 @@
 import {getAuthUser} from '@/lib/auth';
 import {traceAction, traceQuery} from '@/lib/logger';
 import {curationItems, curationSources, db, todos, userDailyActivity} from '@forme/shared';
-import {and, count, desc, eq, sql} from 'drizzle-orm';
+import {and, count, desc, eq, isNull, sql} from 'drizzle-orm';
 
 function getKstToday(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date());
@@ -89,6 +89,7 @@ export async function getDailyMissionStats() {
             and(
               eq(curationSources.userId, user.id),
               eq(curationItems.isRead, true),
+              isNull(curationItems.deletedAt),
               sql`DATE(${curationItems.readAt} AT TIME ZONE 'Asia/Seoul') = ${today}`,
             )
           )
@@ -106,6 +107,7 @@ export async function getDailyMissionStats() {
             and(
               eq(curationSources.userId, user.id),
               eq(curationItems.isRead, true),
+              isNull(curationItems.deletedAt),
               sql`${curationItems.readAt} IS NOT NULL`,
             )
           )
