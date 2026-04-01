@@ -1,7 +1,7 @@
 import {NextResponse} from 'next/server';
 import {createClient} from '@/lib/supabase/server';
 import {bookmarkCollections, curationItems, curationSources, db} from '@forme/shared';
-import {and, eq} from 'drizzle-orm';
+import {and, eq, isNull} from 'drizzle-orm';
 import {withTracing} from '@/lib/logger';
 import {UUID_REGEX} from '@/lib/validators';
 
@@ -51,7 +51,8 @@ export const DELETE = withTracing('DELETE /api/curation/[id]', async (_request, 
       .where(
         and(
           eq(curationItems.id, id),
-          eq(curationSources.userId, user.id)
+          eq(curationSources.userId, user.id),
+          isNull(curationItems.deletedAt)
         )
       )
       .limit(1);
@@ -60,7 +61,7 @@ export const DELETE = withTracing('DELETE /api/curation/[id]', async (_request, 
       return NextResponse.json({ error: 'Item not found' }, { status: 404 });
     }
 
-    await db.delete(curationItems).where(eq(curationItems.id, id));
+    await db.update(curationItems).set({ deletedAt: new Date() }).where(eq(curationItems.id, id));
 
     return new NextResponse(null, { status: 204 });
   } catch (err) {
@@ -166,7 +167,8 @@ export const PATCH = withTracing('PATCH /api/curation/[id]', async (request, ctx
       .where(
         and(
           eq(curationItems.id, id),
-          eq(curationSources.userId, user.id)
+          eq(curationSources.userId, user.id),
+          isNull(curationItems.deletedAt)
         )
       )
       .limit(1);

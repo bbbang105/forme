@@ -1,7 +1,7 @@
 import {NextResponse} from 'next/server';
 import {createClient} from '@/lib/supabase/server';
 import {curationItems, curationSources, db} from '@forme/shared';
-import {and, eq, inArray} from 'drizzle-orm';
+import {and, eq, inArray, isNull} from 'drizzle-orm';
 import {withTracing} from '@/lib/logger';
 import {UUID_REGEX} from '@/lib/validators';
 
@@ -65,7 +65,8 @@ export const POST = withTracing('POST /api/curation/bulk-delete', async (request
       .where(
         and(
           inArray(curationItems.id, ids),
-          eq(curationSources.userId, user.id)
+          eq(curationSources.userId, user.id),
+          isNull(curationItems.deletedAt)
         )
       );
 
@@ -75,7 +76,9 @@ export const POST = withTracing('POST /api/curation/bulk-delete', async (request
       return NextResponse.json({ error: 'No items found' }, { status: 404 });
     }
 
-    await db.delete(curationItems).where(inArray(curationItems.id, ownedIds));
+    await db.update(curationItems)
+      .set({ deletedAt: new Date() })
+      .where(inArray(curationItems.id, ownedIds));
 
     return NextResponse.json({ deleted: ownedIds.length });
   } catch (err) {

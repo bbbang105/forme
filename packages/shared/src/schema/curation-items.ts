@@ -18,6 +18,7 @@ export const curationItems = pgTable('curation_items', {
   readAt: timestamp('read_at', { withTimezone: true }),
   memo: text('memo'),
   collectionId: uuid('collection_id').references(() => bookmarkCollections.id, { onDelete: 'set null' }),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
 }, (table) => ({
   sourceUrlIdx: uniqueIndex('idx_items_source_url').on(table.sourceId, table.url),
   publishedIdx: index('idx_items_published').on(table.publishedAt),
@@ -26,4 +27,5 @@ export const curationItems = pgTable('curation_items', {
   readAtIdx: index('idx_items_read_at').on(table.readAt),
   filtersIdx: index('idx_items_filters').on(table.sourceId, table.isRead, table.isBookmarked, table.category),
   collectionIdx: index('idx_items_collection').on(table.collectionId),
+  deletedAtIdx: index('idx_items_deleted_at').on(table.deletedAt),
 }));

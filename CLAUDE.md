@@ -63,6 +63,7 @@ pnpm db:push          # 스키마 직접 push (dev용)
 - 푸시 알림 Cron: 데일리 요약 (08:00 KST, 일정+투두 카운트), 일정 리마인더 (5분 간격, 현재~1시간 이내 윈도우, 자정 경계 대응, biweekly 격주 검증, reminderSent 즉시 업데이트, 유저별 병렬 처리)
 - 모바일 PWA: viewport `maximumScale: 1, userScalable: false`, 모든 input/textarea/select `text-base`(16px) 이상 (iOS 자동 줌 방지), 크롬 스타일 pull-to-refresh (`overscroll-behavior-y: contain` + DOM 직접 조작 + 컨텐츠 translateY + 인라인 SVG 인디케이터 + `window.location.reload()`)
 - Safari PWA 대응: Dialog `flex flex-col` + `inset-y-0 my-auto` 센터링 (grid+translate 금지), `body[data-scroll-locked]`에서 `overscroll-behavior-y: auto` 해제, pull-to-refresh에서 다이얼로그 열림 감지 스킵
+- 큐레이션 Soft Delete: `deletedAt` 타임스탬프 기반 (NULL = 활성), 모든 SELECT에 `isNull(curationItems.deletedAt)` 필터 필수, 삭제 아이템은 DB에 유지되어 크롤 시 재수집 방지 (title dedup + unique constraint), `add-url`에서 삭제된 URL 재등록 시 UPDATE로 복원
 - 큐레이션 정렬: status=read 탭에서 readAt DESC 정렬 (최근 읽은 순)
 - 큐레이션 삭제: 단건 삭제 (AlertDialog 확인) + 일괄 삭제 (체크박스 선택, 100개 청크), ownership은 curationSources join으로 검증
 - 큐레이션 선택 모드: 읽음 탭에서 일괄 안읽음 되돌리기 (bulk-action API, mark_unread) + 일괄 삭제, aria-live 선택 카운트, itemsRef 패턴

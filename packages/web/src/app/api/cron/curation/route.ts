@@ -5,7 +5,7 @@ import {sendDiscordEmbed} from '@/lib/discord';
 import {withTracing} from '@/lib/logger';
 import {getAllUserIds, verifyCronSecret} from '@/lib/cron-auth';
 import {curationItems, curationSources, db} from '@forme/shared';
-import {and, desc, eq, gte} from 'drizzle-orm';
+import {and, desc, eq, gte, isNull} from 'drizzle-orm';
 
 export const maxDuration = 300;
 
@@ -95,6 +95,7 @@ export const GET = withTracing('GET /api/cron/curation', async (request) => {
             and(
               eq(curationSources.userId, userId),
               gte(curationItems.collectedAt, since),
+              isNull(curationItems.deletedAt),
             ),
           )
           .orderBy(desc(curationItems.collectedAt))

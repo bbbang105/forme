@@ -4,7 +4,7 @@ import {getAuthUser} from '@/lib/auth';
 import {traceAction, traceQuery} from '@/lib/logger';
 import {HEX_COLOR_REGEX, UUID_REGEX} from '@/lib/validators';
 import {bookmarkCollections, curationItems, curationSources, db} from '@forme/shared';
-import {and, asc, eq, sql} from 'drizzle-orm';
+import {and, asc, eq, isNull, sql} from 'drizzle-orm';
 import {revalidatePath} from 'next/cache';
 
 export async function getCollections() {
@@ -36,7 +36,8 @@ export async function getCollectionsWithCount() {
         .innerJoin(curationSources, eq(curationItems.sourceId, curationSources.id))
         .where(and(
           sql`${curationItems.collectionId} IS NOT NULL`,
-          eq(curationSources.userId, user.id)
+          eq(curationSources.userId, user.id),
+          isNull(curationItems.deletedAt)
         ))
         .groupBy(curationItems.collectionId)
     );
@@ -170,7 +171,7 @@ export async function assignCollection(itemId: string, collectionId: string | nu
       db.select({ id: curationItems.id })
         .from(curationItems)
         .innerJoin(curationSources, eq(curationItems.sourceId, curationSources.id))
-        .where(and(eq(curationItems.id, itemId), eq(curationSources.userId, user.id)))
+        .where(and(eq(curationItems.id, itemId), eq(curationSources.userId, user.id), isNull(curationItems.deletedAt)))
         .limit(1)
     );
 

@@ -4,7 +4,7 @@ import {cn} from '@/lib/utils';
 import {formatRelativeDate, getArticleGradient, getCategoryStyle,} from '@/lib/curation-utils';
 import {getAuthUser} from '@/lib/auth';
 import {curationItems, curationSources, db} from '@forme/shared';
-import {and, desc, eq, sql} from 'drizzle-orm';
+import {and, desc, eq, isNull, sql} from 'drizzle-orm';
 import {MiniCardLink} from './mini-card-link';
 import {MiniCardThumbnail} from './mini-card-thumbnail';
 
@@ -59,6 +59,7 @@ export async function DashboardCuration() {
       and(
         eq(curationSources.userId, user.id),
         eq(curationItems.isRead, false),
+        isNull(curationItems.deletedAt),
       )
     )
     .orderBy(sql`${sortDateExpr} DESC`, desc(curationItems.id))

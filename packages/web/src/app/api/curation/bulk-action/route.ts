@@ -1,5 +1,5 @@
 import {NextResponse} from 'next/server';
-import {and, eq, inArray} from 'drizzle-orm';
+import {and, eq, inArray, isNull} from 'drizzle-orm';
 import {curationItems, curationSources, db} from '@forme/shared';
 import {createClient} from '@/lib/supabase/server';
 import {withTracing} from '@/lib/logger';
@@ -42,7 +42,7 @@ export const POST = withTracing('POST /api/curation/bulk-action', async (request
       .select({id: curationItems.id})
       .from(curationItems)
       .innerJoin(curationSources, eq(curationItems.sourceId, curationSources.id))
-      .where(and(inArray(curationItems.id, ids), eq(curationSources.userId, user.id)));
+      .where(and(inArray(curationItems.id, ids), eq(curationSources.userId, user.id), isNull(curationItems.deletedAt)));
 
     const ownedIds = ownedItems.map((item) => item.id);
     if (ownedIds.length === 0) {
@@ -54,7 +54,9 @@ export const POST = withTracing('POST /api/curation/bulk-action', async (request
     if (action === 'mark_unread') {
       await db.update(curationItems).set({isRead: false, readAt: null}).where(condition);
     } else if (action === 'delete') {
-      await db.delete(curationItems).where(condition);
+      await db.update(curationItems)
+        .set({ deletedAt: new Date() })
+        .where(condition);
     }
 
     return NextResponse.json({ok: true, affected: ownedIds.length});
