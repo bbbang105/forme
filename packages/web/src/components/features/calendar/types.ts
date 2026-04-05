@@ -14,6 +14,7 @@ export interface CalendarEvent {
   recurrenceDays: number[] | null;
   recurrenceEndDate: string | null;
   excludedDates: string[] | null;
+  completedDates: string[] | null;
   // 가상 인스턴스용 (UI에서만 사용)
   _originalId?: string;
   _instanceDate?: string;

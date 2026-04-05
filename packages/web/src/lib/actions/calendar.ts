@@ -33,6 +33,7 @@ function expandRecurringEvents(
     }
 
     const excluded = new Set(event.excludedDates ?? []);
+    const completed = new Set(event.completedDates ?? []);
     const days = event.recurrenceDays ?? [];
     if (days.length === 0) {
       result.push(event);
@@ -80,6 +81,7 @@ function expandRecurringEvents(
           id: `${event.id}_${dateStr}`,
           startDate: dateStr,
           endDate: dateStr,
+          isCompleted: completed.has(dateStr),
           _originalId: event.id,
           _instanceDate: dateStr,
         });
@@ -332,6 +334,33 @@ export async function toggleCalendarEvent(id: string) {
     revalidatePath('/calendar');
     return toggled;
   });
+}
+
+export async function toggleRecurringInstance(eventId: string, dateStr: string) {
+  return traceAction('toggleRecurringInstance', async () => {
+    if (!UUID_REGEX.test(eventId)) throw new Error('잘못된 ID입니다');
+    if (!DATE_REGEX.test(dateStr)) throw new Error('날짜 형식이 올바르지 않습니다');
+    const user = await getAuthUser();
+
+    const [event] = await db.select().from(calendarEvents)
+      .where(and(eq(calendarEvents.id, eventId), eq(calendarEvents.userId, user.id)));
+    if (!event) throw new Error('일정을 찾을 수 없습니다');
+
+    const existing = event.completedDates ?? [];
+    const idx = existing.indexOf(dateStr);
+    const completed = idx >= 0
+      ? existing.filter((_, i) => i !== idx)
+      : [...existing, dateStr];
+
+    await traceQuery('calendar.events.toggleInstance', () =>
+      db.update(calendarEvents)
+        .set({ completedDates: completed, updatedAt: new Date() })
+        .where(and(eq(calendarEvents.id, eventId), eq(calendarEvents.userId, user.id)))
+    );
+
+    revalidatePath('/calendar');
+    revalidatePath('/dashboard');
+  }, { eventId, dateStr });
 }
 
 export async function excludeRecurringDate(eventId: string, dateStr: string) {

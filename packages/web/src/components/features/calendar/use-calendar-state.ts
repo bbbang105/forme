@@ -4,10 +4,11 @@ import {useCallback, useEffect, useRef, useState} from 'react';
 import {addMonths, endOfMonth, format, startOfMonth, subMonths} from 'date-fns';
 import {
     deleteCalendarEvent,
-    excludeRecurringDate,
     deleteRecurringAfter as _deleteRecurringAfter,
+    excludeRecurringDate,
     getCalendarEvents,
     toggleCalendarEvent,
+    toggleRecurringInstance,
 } from '@/lib/actions/calendar';
 import {getCategories} from '@/lib/actions/categories';
 import {getTodosByDateRange, toggleTodo, updateTodo} from '@/lib/actions/todos';
@@ -55,7 +56,7 @@ export interface CalendarState {
   handleEventUpdate: (updated: CalendarEvent) => void;
   handleEventDelete: (eventId: string) => void;
   handleEventDeleteDirect: (eventId: string) => void;
-  handleEventToggle: (eventId: string, isCompleted: boolean) => void;
+  handleEventToggle: (eventId: string, isCompleted: boolean, instanceDate?: string) => void;
   handleExcludeDate: (eventId: string, dateStr: string) => Promise<void>;
   handleDeleteAfter: (eventId: string, dateStr: string) => Promise<void>;
 }
@@ -229,16 +230,28 @@ export function useCalendarState(): CalendarState {
     });
   }, [fetchData]);
 
-  const handleEventToggle = useCallback((eventId: string, isCompleted: boolean) => {
-    const match = (e: CalendarEvent) => e.id === eventId || e._originalId === eventId;
-    setEvents((prev) =>
-      prev.map((e) => (match(e) ? { ...e, isCompleted } : e))
-    );
-    toggleCalendarEvent(eventId).catch(() => {
+  const handleEventToggle = useCallback((eventId: string, isCompleted: boolean, instanceDate?: string) => {
+    if (instanceDate) {
+      // 반복 인스턴스 개별 토글
       setEvents((prev) =>
-        prev.map((e) => (match(e) ? { ...e, isCompleted: !isCompleted } : e))
+        prev.map((e) => (e._originalId === eventId && e._instanceDate === instanceDate ? { ...e, isCompleted } : e))
       );
-    });
+      toggleRecurringInstance(eventId, instanceDate).catch(() => {
+        setEvents((prev) =>
+          prev.map((e) => (e._originalId === eventId && e._instanceDate === instanceDate ? { ...e, isCompleted: !isCompleted } : e))
+        );
+      });
+    } else {
+      // 일반 이벤트 토글
+      setEvents((prev) =>
+        prev.map((e) => (e.id === eventId ? { ...e, isCompleted } : e))
+      );
+      toggleCalendarEvent(eventId).catch(() => {
+        setEvents((prev) =>
+          prev.map((e) => (e.id === eventId ? { ...e, isCompleted: !isCompleted } : e))
+        );
+      });
+    }
   }, []);
 
   const handleExcludeDate = useCallback(async (eventId: string, dateStr: string) => {

@@ -18,6 +18,7 @@ export const calendarEvents = pgTable('calendar_events', {
   recurrenceDays: integer('recurrence_days').array(),
   recurrenceEndDate: date('recurrence_end_date'),
   excludedDates: date('excluded_dates').array(),
+  completedDates: date('completed_dates').array(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
