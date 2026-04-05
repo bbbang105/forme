@@ -162,6 +162,7 @@ export const DayCell = React.memo(function DayCell({
                   className={cn(
                     'text-[9px] sm:text-[11px] leading-tight px-1 py-px font-medium truncate -mx-px',
                     isStart && 'overflow-visible whitespace-nowrap relative z-10',
+                    event.isCompleted && 'line-through opacity-50',
                   )}
                   style={{
                     backgroundColor: `${event.color}20`,
@@ -195,7 +196,10 @@ export const DayCell = React.memo(function DayCell({
               return (
                 <div
                   key={event.id}
-                  className="text-[9px] sm:text-[11px] leading-tight px-1 py-px font-medium truncate rounded-sm"
+                  className={cn(
+                    'text-[9px] sm:text-[11px] leading-tight px-1 py-px font-medium truncate rounded-sm',
+                    event.isCompleted && 'line-through opacity-50',
+                  )}
                   style={{
                     backgroundColor: `${event.color}20`,
                     color: event.color,
@@ -212,7 +216,10 @@ export const DayCell = React.memo(function DayCell({
             return (
               <div
                 key={event.id}
-                className="flex items-center gap-px text-[9px] sm:text-[11px] leading-tight py-px px-0.5 truncate"
+                className={cn(
+                  'flex items-center gap-px text-[9px] sm:text-[11px] leading-tight py-px px-0.5 truncate',
+                  event.isCompleted && 'line-through opacity-50',
+                )}
                 title={`${event.startTime} ${event.title}`}
               >
                 <span
