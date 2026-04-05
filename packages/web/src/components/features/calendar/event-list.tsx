@@ -22,7 +22,7 @@ interface EventListProps {
   categories: EventCategory[];
   onEdit: (event: CalendarEvent) => void;
   onDelete: (eventId: string) => void;
-  onToggle: (eventId: string, isCompleted: boolean) => void;
+  onToggle: (eventId: string, isCompleted: boolean, instanceDate?: string) => void;
   onExcludeDate?: (eventId: string, dateStr: string) => void;
   onDeleteAfter?: (eventId: string, dateStr: string) => void;
 }
@@ -75,7 +75,7 @@ export function EventList({ events, selectedDate, categories, onEdit, onDelete, 
           >
             {/* 완료 체크 */}
             <button
-              onClick={() => onToggle(event._originalId ?? event.id, !event.isCompleted)}
+              onClick={() => onToggle(event._originalId ?? event.id, !event.isCompleted, event._instanceDate)}
               className="mt-0.5 shrink-0 transition-transform active:scale-95"
             >
               {event.isCompleted
