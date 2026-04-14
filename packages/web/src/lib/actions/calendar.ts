@@ -389,6 +389,94 @@ export async function excludeRecurringDate(eventId: string, dateStr: string) {
   }, { eventId, dateStr });
 }
 
+/**
+ * 반복 일정의 개별 인스턴스만 수정 (Google Calendar "이 일정만 수정" 패턴)
+ * 1) 부모 이벤트의 excludedDates에 해당 날짜 추가 (+ completedDates에서 제거)
+ * 2) 수정된 내용으로 새로운 단독 이벤트 생성
+ * 두 작업을 트랜잭션으로 묶어 원자성 보장
+ */
+export async function updateRecurringInstance(
+  parentId: string,
+  instanceDate: string,
+  data: {
+    title: string;
+    startDate: string;
+    endDate: string;
+    startTime?: string | null;
+    endTime?: string | null;
+    color?: string;
+    description?: string | null;
+    location?: string | null;
+    categoryId?: string | null;
+  }
+) {
+  return traceAction('updateRecurringInstance', async () => {
+    if (!UUID_REGEX.test(parentId)) throw new Error('잘못된 ID입니다');
+    if (!DATE_REGEX.test(instanceDate)) throw new Error('날짜 형식이 올바르지 않습니다');
+    const user = await getAuthUser();
+
+    // 입력 검증 (DB 변경 전에 수행)
+    if (!data.title.trim()) throw new Error('제목을 입력해주세요');
+    if (data.title.trim().length > 200) throw new Error('제목은 200자 이내여야 합니다');
+    if (!DATE_REGEX.test(data.startDate) || !DATE_REGEX.test(data.endDate)) throw new Error('날짜 형식이 올바르지 않습니다');
+    if (data.startDate > data.endDate) throw new Error('종료일은 시작일 이후여야 합니다');
+    if (data.color && !HEX_COLOR_REGEX.test(data.color)) throw new Error('올바른 색상을 선택해주세요');
+    if (data.description && data.description.length > 2000) throw new Error('설명은 2000자 이내여야 합니다');
+    if (data.startTime != null && !TIME_REGEX.test(data.startTime)) throw new Error('시작 시간 형식이 올바르지 않습니다.');
+    if (data.endTime != null && !TIME_REGEX.test(data.endTime)) throw new Error('종료 시간 형식이 올바르지 않습니다.');
+    if (data.location && data.location.length > 200) throw new Error('장소는 200자 이하로 입력해주세요.');
+    if (data.startTime && data.endTime && data.startDate === data.endDate && data.endTime < data.startTime) throw new Error('종료 시간은 시작 시간 이후여야 합니다.');
+    if (data.categoryId && !UUID_REGEX.test(data.categoryId)) throw new Error('잘못된 카테고리 ID입니다');
+
+    const created = await db.transaction(async (tx) => {
+      // 부모 이벤트 조회
+      const [parent] = await tx.select().from(calendarEvents)
+        .where(and(eq(calendarEvents.id, parentId), eq(calendarEvents.userId, user.id)));
+      if (!parent) throw new Error('일정을 찾을 수 없습니다');
+
+      // excludedDates에 인스턴스 날짜 추가 (spread로 불변 복사)
+      const excluded = [...(parent.excludedDates ?? [])];
+      if (!excluded.includes(instanceDate)) {
+        excluded.push(instanceDate);
+      }
+
+      // completedDates에서 해당 날짜 제거
+      const completed = (parent.completedDates ?? []).filter(d => d !== instanceDate);
+
+      await tx.update(calendarEvents)
+        .set({ excludedDates: excluded, completedDates: completed, updatedAt: new Date() })
+        .where(and(eq(calendarEvents.id, parentId), eq(calendarEvents.userId, user.id)));
+
+      // 수정된 내용으로 새 단독 이벤트 생성
+      const [row] = await tx.insert(calendarEvents)
+        .values({
+          userId: user.id,
+          title: data.title.trim(),
+          startDate: data.startDate,
+          endDate: data.endDate,
+          startTime: data.startTime || null,
+          endTime: data.endTime || null,
+          color: data.color || parent.color,
+          description: data.description?.trim() || null,
+          location: data.location?.trim() || null,
+          categoryId: data.categoryId || null,
+          isCompleted: false,
+          recurrenceType: null,
+          recurrenceDays: null,
+          recurrenceEndDate: null,
+          excludedDates: null,
+        })
+        .returning();
+
+      return row;
+    });
+
+    revalidatePath('/calendar');
+    revalidatePath('/dashboard');
+    return created;
+  }, { parentId, instanceDate });
+}
+
 export async function deleteRecurringAfter(eventId: string, dateStr: string) {
   return traceAction('deleteRecurringAfter', async () => {
     if (!UUID_REGEX.test(eventId)) throw new Error('잘못된 ID입니다');

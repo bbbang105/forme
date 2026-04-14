@@ -24,7 +24,12 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import {createCalendarEvent, deleteCalendarEvent, updateCalendarEvent} from '@/lib/actions/calendar';
+import {
+    createCalendarEvent,
+    deleteCalendarEvent,
+    updateCalendarEvent,
+    updateRecurringInstance
+} from '@/lib/actions/calendar';
 import {Loader2, MapPin, Trash2} from 'lucide-react';
 import {cn} from '@/lib/utils';
 import type {CalendarEvent, EventCategory} from './types';
@@ -67,6 +72,7 @@ interface EventFormProps {
   onManageCategories?: () => void;
   onExcludeDate?: (eventId: string, dateStr: string) => void;
   onDeleteAfter?: (eventId: string, dateStr: string) => void;
+  onInstanceUpdate?: (parentId: string, instanceDate: string, created: CalendarEvent) => void;
 }
 
 export function EventForm({
@@ -81,6 +87,7 @@ export function EventForm({
   onManageCategories,
   onExcludeDate,
   onDeleteAfter,
+  onInstanceUpdate,
 }: EventFormProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -96,6 +103,7 @@ export function EventForm({
           onManageCategories={onManageCategories}
           onExcludeDate={onExcludeDate}
           onDeleteAfter={onDeleteAfter}
+          onInstanceUpdate={onInstanceUpdate}
         />
       )}
     </Dialog>
@@ -113,6 +121,7 @@ function EventFormContent({
   onManageCategories,
   onExcludeDate,
   onDeleteAfter,
+  onInstanceUpdate,
 }: {
   event?: CalendarEvent | null;
   defaultDate?: string;
@@ -124,6 +133,7 @@ function EventFormContent({
   onManageCategories?: () => void;
   onExcludeDate?: (eventId: string, dateStr: string) => void;
   onDeleteAfter?: (eventId: string, dateStr: string) => void;
+  onInstanceUpdate?: (parentId: string, instanceDate: string, created: CalendarEvent) => void;
 }) {
   const isEditing = !!event;
   const [title, setTitle] = useState(event?.title ?? '');
@@ -148,6 +158,13 @@ function EventFormContent({
   const [recurrenceEndDate, setRecurrenceEndDate] = useState(event?.recurrenceEndDate ?? '');
   const [error, setError] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showEditScopeDialog, setShowEditScopeDialog] = useState(false);
+  const [pendingEventData, setPendingEventData] = useState<{
+    title: string; startDate: string; endDate: string;
+    startTime: string | null; endTime: string | null; color: string;
+    description: string | null; location: string | null; categoryId: string | null;
+    recurrenceType: string | null; recurrenceDays: number[] | null; recurrenceEndDate: string | null;
+  } | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const handleCategorySelect = (cat: EventCategory) => {
@@ -162,27 +179,36 @@ function EventFormContent({
   };
 
 
+  const buildEventData = () => ({
+    title,
+    startDate,
+    endDate: isRecurring ? startDate : endDate,
+    startTime: isAllDay ? null : startTime,
+    endTime: isAllDay ? null : endTime,
+    color,
+    description: description || null,
+    location: location || null,
+    categoryId,
+    recurrenceType: isRecurring ? recurrenceType : null,
+    recurrenceDays: isRecurring ? recurrenceDays : null,
+    recurrenceEndDate: isRecurring && recurrenceEndDate ? recurrenceEndDate : null,
+  });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    const eventData = buildEventData();
+
+    // 반복 인스턴스 수정 시 범위 선택 다이얼로그 표시
+    if (isEditing && event?._originalId && event?._instanceDate) {
+      setPendingEventData(eventData);
+      setShowEditScopeDialog(true);
+      return;
+    }
+
     startTransition(async () => {
       try {
-        const eventData = {
-          title,
-          startDate,
-          endDate: isRecurring ? startDate : endDate,
-          startTime: isAllDay ? null : startTime,
-          endTime: isAllDay ? null : endTime,
-          color,
-          description: description || null,
-          location: location || null,
-          categoryId,
-          recurrenceType: isRecurring ? recurrenceType : null,
-          recurrenceDays: isRecurring ? recurrenceDays : null,
-          recurrenceEndDate: isRecurring && recurrenceEndDate ? recurrenceEndDate : null,
-        };
-
-        // When editing a recurring instance, use the original event id for the update
         const editId = event?._originalId ?? event?.id;
 
         if (isEditing && event && editId) {
@@ -195,6 +221,45 @@ function EventFormContent({
           if (created) {
             onEventCreate(created as CalendarEvent);
           }
+        }
+        onOpenChange(false);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : '저장에 실패했습니다');
+      }
+    });
+  };
+
+  /** 모든 반복 일정 수정 */
+  const handleEditAll = () => {
+    if (!pendingEventData || !event) return;
+    setShowEditScopeDialog(false);
+    startTransition(async () => {
+      try {
+        const editId = event._originalId ?? event.id;
+        const updated = await updateCalendarEvent(editId, pendingEventData);
+        if (updated) {
+          onEventUpdate(updated as CalendarEvent);
+        }
+        onOpenChange(false);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : '저장에 실패했습니다');
+      }
+    });
+  };
+
+  /** 이 일정만 수정 (개별 인스턴스 분리) */
+  const handleEditThisOnly = () => {
+    if (!pendingEventData || !event?._originalId || !event?._instanceDate) return;
+    setShowEditScopeDialog(false);
+    startTransition(async () => {
+      try {
+        const created = await updateRecurringInstance(
+          event._originalId!,
+          event._instanceDate!,
+          pendingEventData,
+        );
+        if (created) {
+          onInstanceUpdate?.(event._originalId!, event._instanceDate!, created as CalendarEvent);
         }
         onOpenChange(false);
       } catch (err) {
@@ -234,7 +299,7 @@ function EventFormContent({
     onOpenChange(false);
   };
 
-  const isRecurringInstance = !!event?.recurrenceType;
+  const isRecurringInstance = !!event?._originalId && !!event?._instanceDate;
 
   return (
       <DialogContent className="sm:max-w-md flex flex-col p-0 gap-0" onInteractOutside={(e) => e.preventDefault()} onPointerDownOutside={(e) => e.preventDefault()}>
@@ -552,6 +617,37 @@ function EventFormContent({
                 </AlertDialogAction>
               </AlertDialogFooter>
             )}
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* 반복 일정 수정 범위 선택 다이얼로그 */}
+        <AlertDialog open={showEditScopeDialog} onOpenChange={setShowEditScopeDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>반복 일정 수정</AlertDialogTitle>
+              <AlertDialogDescription>
+                {`"${event?.title}" 반복 일정을 어떻게 수정하시겠습니까?`}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="flex flex-col gap-2 py-2">
+              <AlertDialogAction
+                onClick={handleEditThisOnly}
+                disabled={isPending}
+                className="min-h-11 bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                이 일정만 수정
+              </AlertDialogAction>
+              <AlertDialogAction
+                onClick={handleEditAll}
+                disabled={isPending}
+                className="min-h-11 bg-background text-foreground border border-input hover:bg-accent hover:text-accent-foreground"
+              >
+                모든 반복 일정 수정
+              </AlertDialogAction>
+            </div>
+            <div className="flex justify-end">
+              <AlertDialogCancel>취소</AlertDialogCancel>
+            </div>
           </AlertDialogContent>
         </AlertDialog>
       </DialogContent>

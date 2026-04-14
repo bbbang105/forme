@@ -59,6 +59,7 @@ export interface CalendarState {
   handleEventToggle: (eventId: string, isCompleted: boolean, instanceDate?: string) => void;
   handleExcludeDate: (eventId: string, dateStr: string) => Promise<void>;
   handleDeleteAfter: (eventId: string, dateStr: string) => Promise<void>;
+  handleInstanceUpdate: (parentId: string, instanceDate: string, created: CalendarEvent) => void;
 }
 
 export function useCalendarState(): CalendarState {
@@ -214,10 +215,15 @@ export function useCalendarState(): CalendarState {
   }, []);
 
   const handleEventUpdate = useCallback((updated: CalendarEvent) => {
-    setEvents((prev) =>
-      prev.map((e) => (e.id === updated.id ? updated : e))
-    );
-  }, []);
+    if (updated.recurrenceType) {
+      // 반복 이벤트 수정 시 가상 인스턴스 재생성 필요 — 전체 리페치
+      fetchData();
+    } else {
+      setEvents((prev) =>
+        prev.map((e) => (e.id === updated.id ? updated : e))
+      );
+    }
+  }, [fetchData]);
 
   const handleEventDelete = useCallback((eventId: string) => {
     setEvents((prev) => prev.filter((e) => e.id !== eventId));
@@ -272,6 +278,14 @@ export function useCalendarState(): CalendarState {
     }
   }, [fetchData]);
 
+  const handleInstanceUpdate = useCallback((parentId: string, instanceDate: string, created: CalendarEvent) => {
+    setEvents((prev) => {
+      // 가상 인스턴스 제거 + 새 단독 이벤트 추가
+      const filtered = prev.filter((e) => !(e._originalId === parentId && e._instanceDate === instanceDate));
+      return [...filtered, created];
+    });
+  }, []);
+
   return {
     currentMonth,
     selectedDate,
@@ -313,5 +327,6 @@ export function useCalendarState(): CalendarState {
     handleEventToggle,
     handleExcludeDate,
     handleDeleteAfter,
+    handleInstanceUpdate,
   };
 }
