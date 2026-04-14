@@ -57,7 +57,7 @@ pnpm db:push          # 스키마 직접 push (dev용)
 - API 트레이싱: `withTracing()` 래퍼로 모든 API 라우트 자동 타이밍 측정
 - Server Action 트레이싱: `traceAction()` + `traceQuery()` 래퍼로 DB 쿼리 성능 측정
 - 무거운 컴포넌트: `next/dynamic` + `ssr: false`로 지연 로딩 (TipTap, DnD Kit, EventForm, CategoryManager 등)
-- 캘린더 인터랙션: Optimistic updates 패턴, 데스크톱 2컬럼 (`lg:flex-row`), lane 기반 이벤트 배치 (hazel-admin 스타일, greedy lane 할당 + startTime 순 정렬 + 멀티데이 바 연결), 삭제 시 AlertDialog 확인 모달, 반복 일정 (매주/격주 + 요일 선택, excludedDates로 개별 삭제, recurrenceEndDate로 이후 삭제)
+- 캘린더 인터랙션: Optimistic updates 패턴, 데스크톱 2컬럼 (`lg:flex-row`), lane 기반 이벤트 배치 (hazel-admin 스타일, greedy lane 할당 + startTime 순 정렬 + 멀티데이 바 연결), 삭제 시 AlertDialog 확인 모달, 반복 일정 (매주/격주 + 요일 선택, excludedDates로 개별 삭제, recurrenceEndDate로 이후 삭제), 반복 인스턴스 개별 수정 (Google Calendar 패턴: "이 일정만 수정" → excludedDates 추가 + 단독 이벤트 생성 트랜잭션, "모든 반복 일정 수정" → 부모 이벤트 일괄 업데이트)
 - 투두: DnD 드래그 순서변경 (@dnd-kit, GripVertical 핸들, 모바일 항상 표시), 밀린 투두 칩 (date < 오늘 && 미완료 → amber 칩 + "오늘로" 이동), 완료 애니메이션 (check-bounce), 빈 상태 격려 문구
 - Cron 인증: `lib/cron-auth.ts` — `verifyCronSecret()` (timingSafeEqual, 길이 무관 constant-time 비교) + `getAllUserIds()` (profiles 테이블, 100명 cap, 5분 TTL 캐시) 멀티유저 패턴, 모든 cron 라우트에서 사용. 레거시 `verifyCronAuth()` (단일유저) 호환 유지
 - 푸시 알림 Cron: 데일리 요약 (08:00 KST, 일정+투두 카운트), 일정 리마인더 (5분 간격, 현재~1시간 이내 윈도우, 자정 경계 대응, biweekly 격주 검증, reminderSent 즉시 업데이트, 유저별 병렬 처리)

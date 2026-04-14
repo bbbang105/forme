@@ -67,6 +67,7 @@ export function CalendarClient() {
     handleEventToggle,
     handleExcludeDate,
     handleDeleteAfter,
+    handleInstanceUpdate,
   } = useCalendarState();
 
   const selectedDateStr = format(selectedDate, 'yyyy-MM-dd');
@@ -333,6 +334,7 @@ export function CalendarClient() {
         onManageCategories={() => setShowCategoryManager(true)}
         onExcludeDate={handleExcludeDate}
         onDeleteAfter={handleDeleteAfter}
+        onInstanceUpdate={handleInstanceUpdate}
       />
 
       {/* Category manager dialog */}
