@@ -96,7 +96,11 @@
   text-wrap: balance;
 }
 
-/* Editorial display utility — Instrument Serif italic, notebook accent */
+/* Editorial display utility — Instrument Serif italic.
+ * NOTE: Use on Latin characters only. Korean has no native italic, so
+ * synthetic italic skew overflows glyph boxes and clips on mobile renderers
+ * (reported on iOS Safari/Chrome). Reserve for: logo/wordmark, masthead
+ * accents, English labels. Use Pretendard weights for Korean titles. */
 @utility font-display {
   font-family: var(--font-serif);
   font-style: italic;

@@ -66,7 +66,7 @@ export async function DashboardVideo() {
                 </div>
               )}
               <div className="flex-1 min-w-0 space-y-1">
-                <p className="font-display text-base leading-snug line-clamp-2 text-foreground group-hover:text-primary transition-colors">
+                <p className="text-[15px] font-medium leading-snug tracking-tight line-clamp-2 text-foreground group-hover:text-primary transition-colors">
                   {item.title}
                 </p>
                 {item.channelName && (
