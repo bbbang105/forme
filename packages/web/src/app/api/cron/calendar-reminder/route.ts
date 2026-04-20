@@ -135,6 +135,14 @@ async function processUserReminders(
   const validEvents = events.filter((event) => {
     const eventDate = oneHourLater ? today : (event.startTime! >= currentTime ? today : tomorrow!);
     if (event.excludedDates?.includes(eventDate)) return false;
+
+    // 완료된 일정 스킵: 반복 일정은 completedDates, 단발성은 isCompleted로 판단
+    if (event.recurrenceType) {
+      if (event.completedDates?.includes(eventDate)) return false;
+    } else if (event.isCompleted) {
+      return false;
+    }
+
     if (event.recurrenceType && event.recurrenceDays) {
       if (!event.recurrenceDays.includes(dayOfWeek)) return false;
       if (event.recurrenceEndDate && eventDate > event.recurrenceEndDate) return false;
