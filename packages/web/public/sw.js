@@ -52,7 +52,7 @@ self.addEventListener('activate', (event) => {
 // - /_next/static/: cache-first (콘텐츠 해시 파일)
 // - 폰트 파일: cache-first
 // - /icons/: cache-first
-// - /api/curation, /api/push: network-first
+// - /api/feed, /api/push: network-first
 // - /api/* (기타): network-only
 // - HTML / RSC 페이지: network-first (4초 타임아웃, 오프라인 시 캐시 폴백)
 self.addEventListener('fetch', (event) => {
@@ -129,7 +129,7 @@ self.addEventListener('fetch', (event) => {
 
   // ── 4. Network-first: 최신 데이터가 필수인 API
   if (
-    url.pathname.startsWith('/api/curation') ||
+    url.pathname.startsWith('/api/feed') ||
     url.pathname.startsWith('/api/push')
   ) {
     event.respondWith(

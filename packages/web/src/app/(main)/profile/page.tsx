@@ -204,7 +204,7 @@ export default function ProfilePage() {
         </CardHeader>
         <CardContent className="px-4 py-4">
           <p className="text-xs text-muted-foreground mb-3">
-            관심사를 선택하면 맞춤 큐레이션 추천을 받을 수 있어요.
+            관심사를 선택하면 맞춤 피드 추천을 받을 수 있어요.
           </p>
           <div className="flex flex-wrap gap-1.5">
             {INTEREST_OPTIONS.map((tag) => {

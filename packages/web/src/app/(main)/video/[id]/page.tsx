@@ -7,7 +7,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import {ArrowLeft, ExternalLink} from 'lucide-react';
 import {Button} from '@/components/ui/button';
-import {formatRelativeDate} from '@/lib/curation-utils';
+import {formatRelativeDate} from '@/lib/feed-utils';
 import {MarkdownRendererLazy} from '@/components/features/video/markdown-renderer-lazy';
 
 export default async function VideoDetailPage({

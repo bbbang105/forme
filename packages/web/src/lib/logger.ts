@@ -36,7 +36,7 @@ type RouteHandler = (req: Request, ctx?: unknown) => Promise<Response>;
  * API 라우트 핸들러를 래핑하여 자동으로 타이밍/로깅을 추가합니다.
  *
  * @example
- * export const GET = withTracing('GET /api/curation', async (req) => {
+ * export const GET = withTracing('GET /api/feed', async (req) => {
  *   // ... handler logic
  * });
  */

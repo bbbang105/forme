@@ -4,7 +4,7 @@ import {memo, useCallback, useEffect, useRef, useState} from 'react';
 import Image from 'next/image';
 import {Bookmark, BookmarkCheck, FileText, FolderOpen, MessageSquare, Trash2} from 'lucide-react';
 import {cn} from '@/lib/utils';
-import {formatRelativeDate, getArticleGradient} from '@/lib/curation-utils';
+import {formatRelativeDate, getArticleGradient} from '@/lib/feed-utils';
 
 export interface VideoItemData {
   id: string;

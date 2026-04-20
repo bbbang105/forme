@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: 'forme - 개인 올인원',
     short_name: 'forme',
-    description: '큐레이션, 캘린더, 메모, 유튜브 요약을 한곳에서',
+    description: '피드, 캘린더, 메모, 유튜브 요약을 한곳에서',
     start_url: '/',
     scope: '/',
     display: 'standalone',
@@ -40,9 +40,9 @@ export default function manifest(): MetadataRoute.Manifest {
     ],
     shortcuts: [
       {
-        name: '큐레이션',
-        short_name: '큐레이션',
-        url: '/curation',
+        name: '피드',
+        short_name: '피드',
+        url: '/feed',
         icons: [{ src: '/icons/icon-192x192.png', sizes: '192x192' }],
       },
       {

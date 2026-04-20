@@ -19,7 +19,7 @@ interface ListSkeletonProps {
  *
  * @example
  * <Suspense fallback={<ListSkeleton count={5} showThumbnail />}>
- *   <CurationFeed />
+ *   <FeedList />
  * </Suspense>
  */
 export function ListSkeleton({

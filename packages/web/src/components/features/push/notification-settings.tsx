@@ -194,7 +194,7 @@ export function NotificationSettings() {
           <>
             <p className="text-xs text-muted-foreground">
               {isSubscribed
-                ? '캘린더 리마인더, 큐레이션 알림 등을 받을 수 있습니다.'
+                ? '캘린더 리마인더, 피드 알림 등을 받을 수 있습니다.'
                 : '알림을 활성화하면 리마인더와 알림을 받을 수 있습니다.'}
             </p>
             <div className="flex items-center gap-2">

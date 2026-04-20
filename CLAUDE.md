@@ -1,6 +1,6 @@
 # forme
 
-개인 올인원 PWA - 큐레이션, 캘린더, 메모
+개인 올인원 PWA - 피드, 캘린더, 메모
 
 ## 프로젝트 구조
 
@@ -63,38 +63,38 @@ pnpm db:push          # 스키마 직접 push (dev용)
 - 푸시 알림 Cron: 데일리 요약 (08:00 KST, 일정+투두 카운트), 일정 리마인더 (5분 간격, 현재~1시간 이내 윈도우, 자정 경계 대응, biweekly 격주 검증, reminderSent 즉시 업데이트, 유저별 병렬 처리)
 - 모바일 PWA: viewport `maximumScale: 1, userScalable: false`, 모든 input/textarea/select `text-base`(16px) 이상 (iOS 자동 줌 방지), 크롬 스타일 pull-to-refresh (`overscroll-behavior-y: contain` + DOM 직접 조작 + 컨텐츠 translateY + 인라인 SVG 인디케이터 + `window.location.reload()`)
 - Safari PWA 대응: Dialog `flex flex-col` + `inset-y-0 my-auto` 센터링 (grid+translate 금지), `body[data-scroll-locked]`에서 `overscroll-behavior-y: auto` 해제, pull-to-refresh에서 다이얼로그 열림 감지 스킵
-- 큐레이션 Soft Delete: `deletedAt` 타임스탬프 기반 (NULL = 활성), 모든 SELECT에 `isNull(curationItems.deletedAt)` 필터 필수, 삭제 아이템은 DB에 유지되어 크롤 시 재수집 방지 (title dedup + unique constraint), `add-url`에서 삭제된 URL 재등록 시 UPDATE로 복원
-- 큐레이션 정렬: status=read 탭에서 readAt DESC 정렬 (최근 읽은 순)
-- 큐레이션 삭제: 단건 삭제 (AlertDialog 확인) + 일괄 삭제 (체크박스 선택, 100개 청크), ownership은 curationSources join으로 검증
-- 큐레이션 선택 모드: 읽음 탭에서 일괄 안읽음 되돌리기 (bulk-action API, mark_unread) + 일괄 삭제, aria-live 선택 카운트, itemsRef 패턴
-- 큐레이션 URL 수동 등록: POST /api/curation/add-url (preview 모드 + 저장 모드), "직접 추가" 시스템 소스 자동 생성 (manual://), OG 메타 파싱 (50KB streaming), AddUrlDialog 2단계 플로우 (가져오기→미리보기 편집→등록), INTEREST_OPTIONS 태그 클릭 토글 (최대 5개), 카테고리 선택 (AI/DEV/UXUI/ECONOMY), 즐겨찾기 바에 "직접 추가" 필터 칩
-- 큐레이션 북마크 메모: InlineMemo 컴포넌트 (읽음+북마크 탭, 500자, key prop으로 외부 상태 동기화), 읽음 탭 메모 저장 시 자동 북마크 + 컬렉션 피커 자동 오픈 (비디오 패턴 동일), PATCH API 서버측 메모→자동 북마크 (명시적 isBookmarked 지정 시 덮어쓰지 않음)
-- 큐레이션 북마크 컬렉션: bookmark_collections 테이블 (RLS), 컬렉션 CRUD + DnD 순서변경 (@dnd-kit/sortable, GripVertical), 피커 바텀시트, 피드 컬렉션 칩 필터 (북마크 탭 전용), IDOR 방어 (소유권 검증)
-- 큐레이션 UX: 스와이프 액션 (우→읽음, 좌→삭제), 키보드 네비 (j/k/o/b, ref 기반 리스너 — 아이템 변경 시 재등록 불필요)
+- 피드 Soft Delete: `deletedAt` 타임스탬프 기반 (NULL = 활성), 모든 SELECT에 `isNull(feedItems.deletedAt)` 필터 필수, 삭제 아이템은 DB에 유지되어 크롤 시 재수집 방지 (title dedup + unique constraint), `add-url`에서 삭제된 URL 재등록 시 UPDATE로 복원
+- 피드 정렬: status=read 탭에서 readAt DESC 정렬 (최근 읽은 순)
+- 피드 삭제: 단건 삭제 (AlertDialog 확인) + 일괄 삭제 (체크박스 선택, 100개 청크), ownership은 feedSources join으로 검증
+- 피드 선택 모드: 읽음 탭에서 일괄 안읽음 되돌리기 (bulk-action API, mark_unread) + 일괄 삭제, aria-live 선택 카운트, itemsRef 패턴
+- 피드 URL 수동 등록: POST /api/feed/add-url (preview 모드 + 저장 모드), "직접 추가" 시스템 소스 자동 생성 (manual://), OG 메타 파싱 (50KB streaming), AddUrlDialog 2단계 플로우 (가져오기→미리보기 편집→등록), INTEREST_OPTIONS 태그 클릭 토글 (최대 5개), 카테고리 선택 (AI/DEV/UXUI/ECONOMY), 즐겨찾기 바에 "직접 추가" 필터 칩
+- 피드 북마크 메모: InlineMemo 컴포넌트 (읽음+북마크 탭, 500자, key prop으로 외부 상태 동기화), 읽음 탭 메모 저장 시 자동 북마크 + 컬렉션 피커 자동 오픈 (비디오 패턴 동일), PATCH API 서버측 메모→자동 북마크 (명시적 isBookmarked 지정 시 덮어쓰지 않음)
+- 피드 북마크 컬렉션: bookmark_collections 테이블 (RLS), 컬렉션 CRUD + DnD 순서변경 (@dnd-kit/sortable, GripVertical), 피커 바텀시트, 피드 컬렉션 칩 필터 (북마크 탭 전용), IDOR 방어 (소유권 검증)
+- 피드 UX: 스와이프 액션 (우→읽음, 좌→삭제), 키보드 네비 (j/k/o/b, ref 기반 리스너 — 아이템 변경 시 재등록 불필요)
 - 메모 캐싱: 에디터 뒤로가기 시 `router.refresh()` + MemoList initialMemos props 동기화
 - Discord 웹훅: `lib/discord.ts` — URL 패턴 검증 + 5초 타임아웃 + 에러 내부 흡수
 - DB 커넥션: `max: 1` (Supabase Transaction Pooler가 실제 풀 관리, 서버리스 최적)
-- 성능: `serverExternalPackages`로 서버 전용 패키지 번들 제외, AVIF 이미지 포맷, 병렬 쿼리 (`Promise.all`), SW LRU 캐시 (정적 100개), SW HTML/RSC network-first (4초 타임아웃 + 캐시 폴백), 리스트 아이템 `React.memo` (CurationCard, CurationListRow, MemoCard, VideoCard)
-- 에러 바운더리: 모든 (main) 페이지에 `error.tsx` 배치 (calendar, curation, memo, video), `error` prop 로깅 + 제네릭 메시지만 표출
+- 성능: `serverExternalPackages`로 서버 전용 패키지 번들 제외, AVIF 이미지 포맷, 병렬 쿼리 (`Promise.all`), SW LRU 캐시 (정적 100개), SW HTML/RSC network-first (4초 타임아웃 + 캐시 폴백), 리스트 아이템 `React.memo` (FeedCard, FeedListRow, MemoCard, VideoCard)
+- 에러 바운더리: 모든 (main) 페이지에 `error.tsx` 배치 (calendar, feed, memo, video), `error` prop 로깅 + 제네릭 메시지만 표출
 - 접근성: 탭바 `aria-current="page"`, 검색 input `aria-label`, 이벤트 폼 색상 버튼 `focus-visible:ring-2` + `aria-label`, 폼 라벨 `htmlFor`/`id` 연결 필수, 에러 메시지 `role="alert" aria-live="polite"`, 터치 타겟 최소 44x44px (WCAG 2.5.5), 모든 커스텀 버튼 `focus-visible:ring-2`, `@utility focus-ring` CSS 유틸리티, `prefers-reduced-motion` 미디어 쿼리, 장식 아이콘 `aria-hidden="true"` (라벨 있는 버튼 내부 아이콘)
 - 아이콘 통일: lucide-react 아이콘 사용 (Newspaper, CheckSquare, FileText 등)
 - SSRF 방어: `lib/url-safety.ts` — IPv4/IPv6 사설 대역, IPv4-mapped IPv6, ULA(fc00::/7), Link-Local(fe80::/10) 차단
 - 컴포넌트 분리: 대형 컴포넌트 → 하위 컴포넌트/훅 추출 (source-card, crawl-settings-form, calendar-header, recurrence-form, feed-filter-bar, tag-input, day-cell, lane-utils, use-calendar-state, use-editor-config, useImageUpload, LinkInput)
 - 자동저장 훅: `hooks/use-auto-save.ts` — saveFnRef 패턴, Promise 기반 동시 저장 방어, detach() API, IME 컴포지션 중 저장 스킵
 - 공유 유틸: `lib/format-time.ts` (formatTime, formatDuration), `lib/constants.ts` (앱 전역 상수 — 페이지네이션, 제한값, SW 재시도 설정, VIDEO_FEED_PAGE_SIZE, VIDEO_SUMMARIZE_BATCH_MAX, VIDEO_SUMMARIZING_TIMEOUT_MS)
-- 공유 상수: `packages/shared/src/config/interest-options.ts` (INTEREST_OPTIONS 30개 관심 태그, 큐레이션 소스 + URL 등록에서 공통 사용, `@forme/shared/config`로 import — 클라이언트 번들 안전)
+- 공유 상수: `packages/shared/src/config/interest-options.ts` (INTEREST_OPTIONS 30개 관심 태그, 피드 소스 + URL 등록에서 공통 사용, `@forme/shared/config`로 import — 클라이언트 번들 안전)
 - 공유 UI: `components/ui/list-skeleton.tsx` (피드/메모 목록 스켈레톤, role="status" aria-busy)
 - 캘린더 상태 훅: `use-calendar-state.ts` — 14개 상태 + 핸들러 추출, async/await 데이터 페칭
 - 에디터 설정 훅: `use-editor-config.ts` — TipTap 확장 배열 useMemo로 안정적 참조
 - header 아바타: 서버사이드 fetch (layout.tsx async → avatarUrl prop), 클라이언트 워터폴 제거
 - SW 등록: 지수 백오프 재시도 (최대 3회, constants.ts 참조), 푸시 구독 자동 동기화 (syncPushSubscription, sessionStorage 중복 방지)
-- RSS 크롤 중복 방지: 크로스소스 제목 dedup (동일 제목 → DB 미저장, curationSources join으로 유저별 기존 제목 조회)
-- 유튜브 요약: video_sources (채널 소스) + video_items (수집/요약 영상, sourceId nullable — 수동 URL 추가 지원) + video_bookmark_collections (컬렉션) 테이블, 수집과 요약 분리 (수집: RSS 무료, 요약: Gemini API), @handle URL → 페이지 파싱으로 channelId 추출 (한글 핸들 decodeURIComponent 대응, 100자 제한), youtube.com/channel/ URL도 지원, SSE 스트리밍 요약 (api/curation/crawl 패턴), 자막 추출: Innertube ANDROID client (POT 불필요, WEB client는 빈 응답), 실패 시 description 폴백 (summarySource 플래그), 자막 최대 80,000자, 마크다운 렌더러 next/dynamic 지연 로딩, 최대 5개 배치 요약 (VIDEO_SUMMARIZE_BATCH_MAX), YouTube Data API v3로 duration 조회 → Shorts/2분 미만 필터, GEMINI_MODEL 환경변수 (기본 gemini-2.5-flash), 영상 길이별 동적 프롬프트 (10분 미만/10~30분/30~60분/60분+ 분량 가이드), 자막 URL SSRF 방어 (isSafeUrl), videoId 정규식 검증, 북마크 컬렉션 (DnD 순서변경 + 피커 바텀시트 + 피드 칩 필터), optimistic updates + 에러 롤백
+- RSS 크롤 중복 방지: 크로스소스 제목 dedup (동일 제목 → DB 미저장, feedSources join으로 유저별 기존 제목 조회)
+- 유튜브 요약: video_sources (채널 소스) + video_items (수집/요약 영상, sourceId nullable — 수동 URL 추가 지원) + video_bookmark_collections (컬렉션) 테이블, 수집과 요약 분리 (수집: RSS 무료, 요약: Gemini API), @handle URL → 페이지 파싱으로 channelId 추출 (한글 핸들 decodeURIComponent 대응, 100자 제한), youtube.com/channel/ URL도 지원, SSE 스트리밍 요약 (api/feed/crawl 패턴), 자막 추출: Innertube ANDROID client (POT 불필요, WEB client는 빈 응답), 실패 시 description 폴백 (summarySource 플래그), 자막 최대 80,000자, 마크다운 렌더러 next/dynamic 지연 로딩, 최대 5개 배치 요약 (VIDEO_SUMMARIZE_BATCH_MAX), YouTube Data API v3로 duration 조회 → Shorts/2분 미만 필터, GEMINI_MODEL 환경변수 (기본 gemini-2.5-flash), 영상 길이별 동적 프롬프트 (10분 미만/10~30분/30~60분/60분+ 분량 가이드), 자막 URL SSRF 방어 (isSafeUrl), videoId 정규식 검증, 북마크 컬렉션 (DnD 순서변경 + 피커 바텀시트 + 피드 칩 필터), optimistic updates + 에러 롤백
 - 유튜브 URL 직접 추가: 피드 탭 태그 칩 우측 + 버튼 → AddUrlDialog (SSE 원스텝: 메타 → 자막 → 요약 → DB), 기존 영상 있으면 트랜잭션으로 삭제 후 재등록, cancel 시 orphan DB 정리
-- 유튜브 피드 2탭 구조: "피드" (세그먼트 탭, 요약 완료 영상) + "생성" (수집/요약 실행), 피드 탭 내 상태 칩 (안읽음/읽음/북마크 — 큐레이션 동일 패턴), 피드 탭 검색 (escapeIlike + raw SQL ESCAPE), 탭 전환 시 하위 필터 전체 초기화, itemsRef 패턴 (useCallback + ref로 stale closure 방지), 읽음 탭 readAt DESC 정렬 (최근 읽은 순)
+- 유튜브 피드 2탭 구조: "피드" (세그먼트 탭, 요약 완료 영상) + "생성" (수집/요약 실행), 피드 탭 내 상태 칩 (안읽음/읽음/북마크 — 피드 동일 패턴), 피드 탭 검색 (escapeIlike + raw SQL ESCAPE), 탭 전환 시 하위 필터 전체 초기화, itemsRef 패턴 (useCallback + ref로 stale closure 방지), 읽음 탭 readAt DESC 정렬 (최근 읽은 순)
 - 유튜브 선택 모드: 피드 탭 상태 칩 우측 "선택" 버튼, 생성 탭 수집 라인 우측 "선택" 버튼, 일괄 삭제 (bulk-action API), 읽음 탭에서 일괄 안읽음 되돌리기 (mark_unread)
 - 유튜브 즐겨찾기 소스: DnD 순서변경 (@dnd-kit/sortable, GripVertical 핸들, /api/video/sources/reorder 배치 업데이트)
-- 큐레이션 필터 순서: 카테고리 세그먼트 → 상태 칩 (+ statusActions 슬롯) → 검색 → 즐겨찾기 소스 → 정렬, 헤더 제거 (선택/소스관리 버튼을 상태 칩 우측에 배치)
+- 피드 필터 순서: 카테고리 세그먼트 → 상태 칩 (+ statusActions 슬롯) → 검색 → 즐겨찾기 소스 → 정렬, 헤더 제거 (선택/소스관리 버튼을 상태 칩 우측에 배치)
 - 테스트: Vitest + `vi.hoisted()` Proxy 기반 DB 목 패턴 (`packages/web/src/__tests__/`)
 
 ## 핵심 파일
@@ -107,7 +107,7 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/app/auth/callback/route.ts` | OAuth 콜백 (open redirect 방어) |
 | `packages/web/src/lib/supabase/middleware.ts` | 세션 갱신 유틸 |
 | `packages/web/src/lib/supabase/server.ts` | 서버 Supabase 클라이언트 |
-| `packages/web/src/components/layout/tab-bar.tsx` | 하단 탭바 (4탭: 큐레이션/유튜브/캘린더/메모) |
+| `packages/web/src/components/layout/tab-bar.tsx` | 하단 탭바 (4탭: 피드/유튜브/캘린더/메모) |
 | `packages/web/src/components/layout/header.tsx` | 헤더 (forme 로고 + 다크모드 토글 + 서버 전달 avatarUrl prop) |
 | `packages/web/src/components/ui/logo.tsx` | 레트로 {f} 픽토그램 로고마크 (useId 패턴 ID, 다크모드 대응) |
 | `packages/shared/src/schema/calendar-events.ts` | 캘린더 이벤트 스키마 (반복: recurrenceType/Days/EndDate, excludedDates, reminderSent) |
@@ -124,19 +124,19 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/components/layout/pull-to-refresh.tsx` | 크롬 스타일 Pull-to-Refresh (컨텐츠 translateY + 인라인 SVG 인디케이터) |
 | `packages/web/src/hooks/use-pull-to-refresh.ts` | Pull-to-Refresh 훅 (DOM 직접 조작, 스크롤 컨테이너 감지, window.location.reload, 다이얼로그 열림 감지 스킵) |
 | `packages/web/src/lib/push.ts` | 푸시 알림 발송 (sendPushToUser) |
-| `packages/web/src/app/api/curation/add-url/route.ts` | 큐레이션 URL 수동 등록 API (preview/save 2모드, OG 메타 파싱, "직접 추가" 시스템 소스) |
-| `packages/web/src/components/features/curation/add-url-dialog.tsx` | URL 직접 추가 다이얼로그 (2단계 미리보기 폼, INTEREST_OPTIONS 태그 토글, 카테고리 선택) |
-| `packages/web/src/app/api/curation/crawl/route.ts` | SSE 수동 크롤 API |
-| `packages/web/src/app/api/curation/sources/reorder/route.ts` | 즐겨찾기 소스 순서 배치 업데이트 |
+| `packages/web/src/app/api/feed/add-url/route.ts` | 피드 URL 수동 등록 API (preview/save 2모드, OG 메타 파싱, "직접 추가" 시스템 소스) |
+| `packages/web/src/components/features/feed/add-url-dialog.tsx` | URL 직접 추가 다이얼로그 (2단계 미리보기 폼, INTEREST_OPTIONS 태그 토글, 카테고리 선택) |
+| `packages/web/src/app/api/feed/crawl/route.ts` | SSE 수동 크롤 API |
+| `packages/web/src/app/api/feed/sources/reorder/route.ts` | 즐겨찾기 소스 순서 배치 업데이트 |
 | `packages/web/src/lib/cron-auth.ts` | Cron 인증 유틸 (verifyCronSecret + getAllUserIds 멀티유저, constant-time safeCompare, 5분 TTL 캐시, 레거시 verifyCronAuth 호환) |
-| `packages/web/src/app/api/cron/curation/route.ts` | Cron 자동 크롤 + 푸시 알림 (verifyCronSecret 멀티유저 인증, 응답에 내부 상세 미노출) |
+| `packages/web/src/app/api/cron/feed/route.ts` | Cron 자동 크롤 + 푸시 알림 (verifyCronSecret 멀티유저 인증, 응답에 내부 상세 미노출) |
 | `packages/web/src/app/api/cron/calendar-daily/route.ts` | Cron 데일리 요약 푸시 (08:00 KST, 일정+투두 카운트, reminderSent 리셋) |
 | `packages/web/src/app/api/cron/calendar-reminder/route.ts` | 일정 리마인더 푸시 (Supabase pg_cron 5분 호출, 현재~1시간 이내 윈도우, 자정 경계 대응, biweekly 검증, GET+POST 지원) |
 | `supabase/pg-cron-setup.sql` | Supabase pg_cron + pg_net 설정 SQL (calendar-reminder 5분 스케줄, 플레이스홀더 가드) |
 | `packages/web/src/app/api/push/subscribe/route.ts` | 푸시 구독 등록/해제/조회 |
 | `packages/web/src/lib/discord.ts` | Discord 웹훅 전송 유틸 (sendDiscordMessage, sendDiscordEmbed) |
 | `packages/web/src/components/features/memo/memo-editor-lazy.tsx` | MemoEditor 지연 로딩 래퍼 (next/dynamic, ssr: false) |
-| `packages/web/src/components/features/curation/mini-card-thumbnail.tsx` | 대시보드 큐레이션 썸네일 (클라이언트 onError 폴백) |
+| `packages/web/src/components/features/feed/mini-card-thumbnail.tsx` | 대시보드 피드 썸네일 (클라이언트 onError 폴백) |
 | `packages/web/public/sw.js` | Service Worker (PWA + 푸시 + 전략별 캐싱 + LRU trimCache) |
 | `packages/web/src/app/manifest.ts` | PWA 매니페스트 (MetadataRoute) |
 | `packages/web/src/lib/actions/calendar.ts` | 캘린더 이벤트 Server Actions (CRUD + 반복 확장 + excludeRecurringDate/deleteRecurringAfter) |
@@ -172,21 +172,21 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/components/features/memo/dashboard-memo.tsx` | 대시보드 최근 메모 위젯 (에러 폴백) |
 | `packages/web/src/components/features/memo/task-list-sort.ts` | ProseMirror 플러그인 (체크된 아이템 하단 자동정렬) |
 | `packages/web/src/app/api/memo/image/route.ts` | 메모 이미지 R2 업로드 API (5MB, JPEG/PNG/GIF/WebP) |
-| `packages/web/src/components/features/curation/source-card.tsx` | 소스 카드 (DnD, 즐겨찾기, 활성/비활성 토글) |
-| `packages/web/src/components/features/curation/crawl-settings-form.tsx` | 크롤 설정 폼 (기간 선택, 수집 시작) |
-| `packages/web/src/components/features/curation/feed-filter-bar.tsx` | 피드 필터 바 (카테고리 → 상태칩+statusActions → 검색 → 즐겨찾기 → 정렬 순서) |
-| `packages/web/src/components/features/curation/mini-card-link.tsx` | 대시보드 큐레이션 클릭 시 읽음 처리 래퍼 |
-| `packages/web/src/app/api/curation/[id]/route.ts` | 큐레이션 아이템 PATCH (읽음/북마크/메모/컬렉션) + DELETE (단건 삭제, ownership join 검증) |
-| `packages/web/src/app/api/curation/bulk-delete/route.ts` | 큐레이션 일괄 삭제 (POST, max 100개, UUID 전수 검증) |
-| `packages/web/src/app/api/curation/bulk-action/route.ts` | 큐레이션 일괄 액션 (mark_unread/delete, max 100개, ownership join 검증) |
+| `packages/web/src/components/features/feed/source-card.tsx` | 소스 카드 (DnD, 즐겨찾기, 활성/비활성 토글) |
+| `packages/web/src/components/features/feed/crawl-settings-form.tsx` | 크롤 설정 폼 (기간 선택, 수집 시작) |
+| `packages/web/src/components/features/feed/feed-filter-bar.tsx` | 피드 필터 바 (카테고리 → 상태칩+statusActions → 검색 → 즐겨찾기 → 정렬 순서) |
+| `packages/web/src/components/features/feed/mini-card-link.tsx` | 대시보드 피드 클릭 시 읽음 처리 래퍼 |
+| `packages/web/src/app/api/feed/[id]/route.ts` | 피드 아이템 PATCH (읽음/북마크/메모/컬렉션) + DELETE (단건 삭제, ownership join 검증) |
+| `packages/web/src/app/api/feed/bulk-delete/route.ts` | 피드 일괄 삭제 (POST, max 100개, UUID 전수 검증) |
+| `packages/web/src/app/api/feed/bulk-action/route.ts` | 피드 일괄 액션 (mark_unread/delete, max 100개, ownership join 검증) |
 | `packages/web/src/hooks/use-swipe-action.ts` | 터치 스와이프 제스처 훅 (axis-lock, damped swipe, ref 기반 콜백, 타이머 cleanup) |
 | `packages/web/src/lib/format-time.ts` | 공유 시간 포맷 유틸 (formatTime, formatDuration) |
 | `packages/web/src/lib/constants.ts` | 앱 전역 상수 (페이지네이션, 제한값, SW 재시도 설정) |
 | `packages/web/src/components/ui/list-skeleton.tsx` | 공유 목록 스켈레톤 (role="status", aria-busy, count/showThumbnail props) |
 | `packages/shared/src/schema/bookmark-collections.ts` | 북마크 컬렉션 스키마 (id, userId, name, color, sortOrder, RLS) |
 | `packages/web/src/lib/actions/collections.ts` | 컬렉션 Server Actions (CRUD + DnD reorder + assignCollection, 소유권 검증) |
-| `packages/web/src/components/features/curation/collection-manager.tsx` | 컬렉션 관리 다이얼로그 (DnD sortable 순서변경, 색상/이름 편집, 삭제) |
-| `packages/web/src/components/features/curation/collection-picker.tsx` | 컬렉션 선택 바텀시트 (ARIA listbox, 키보드 접근성) |
+| `packages/web/src/components/features/feed/collection-manager.tsx` | 컬렉션 관리 다이얼로그 (DnD sortable 순서변경, 색상/이름 편집, 삭제) |
+| `packages/web/src/components/features/feed/collection-picker.tsx` | 컬렉션 선택 바텀시트 (ARIA listbox, 키보드 접근성) |
 | `packages/web/src/components/sw-register.tsx` | Service Worker 등록 (지수 백오프 재시도 최대 3회) + 푸시 구독 자동 동기화 (syncPushSubscription) |
 | `packages/shared/src/schema/video-sources.ts` | 유튜브 채널 소스 스키마 |
 | `packages/shared/src/schema/video-items.ts` | 유튜브 영상 수집/요약 스키마 (status: collected/summarizing/summarized/failed) |
@@ -236,7 +236,7 @@ study-admin 스타일: Sky Blue `#0ea5e9` 포인트, Pretendard 폰트, 다크�
 
 | 프로젝트 | 경로 | 참고 대상 |
 |----------|------|-----------|
-| study-admin | `/Users/hansangho/Desktop/study-admin` | Discord OAuth, RSS/큐레이션, UXUI 전체, 디자인 시스템 |
+| study-admin | `/Users/hansangho/Desktop/study-admin` | Discord OAuth, RSS/피드, UXUI 전체, 디자인 시스템 |
 | hazel-admin | `/Users/hansangho/Desktop/hazel-admin` | 캘린더, 푸시알림, PWA 설정, Server Actions 패턴 |
 
 구현 시 기능/UI 적극 참고할 것. study-admin의 UXUI를 거의 동일한 구조로 맞출 것.
@@ -255,7 +255,7 @@ study-admin 스타일: Sky Blue `#0ea5e9` 포인트, Pretendard 폰트, 다크�
 | `docs/26-03-08-safari-dialog-scroll-fix.md` | Safari 다이얼로그 스크롤 수정 (Chrome vs Safari 차이, 해결책) |
 | `docs/plans/26-03-08-calendar-push-ux-design.md` | 캘린더 푸시알림 + UX 개선 설계 (데일리 요약, 리마인더, 밀린 투두, 애니메이션) |
 | `docs/plans/26-03-12-bookmark-collections.md` | 북마크 컬렉션 기능 설계 (스키마, CRUD, DnD, 피드 필터) |
-| `docs/plans/26-03-26-curation-url-add-memo-flow.md` | 큐레이션 URL 수동 등록 + 메모→북마크 플로우 설계 |
+| `docs/plans/26-03-26-curation-url-add-memo-flow.md` | 피드 URL 수동 등록 + 메모→북마크 플로우 설계 (히스토리) |
 
 ## docs 파일명 컨벤션
 
