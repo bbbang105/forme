@@ -803,8 +803,8 @@ export function FeedList() {
         </div>
       ) : (
         <>
-          {/* Card grid (mobile/tablet) */}
-          <div className="lg:hidden grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Card grid (mobile/tablet) — editorial flat, hairline via parent divider on mobile single col */}
+          <div className="lg:hidden grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-10">
             {items.map((item, i) => (
               <div
                 key={item.id}
