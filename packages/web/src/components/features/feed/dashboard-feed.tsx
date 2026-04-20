@@ -80,7 +80,7 @@ export async function DashboardFeed() {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-foreground">최신 큐레이션</h3>
+        <h3 className="text-sm font-semibold text-foreground">최신 피드</h3>
         <Link
           href="/feed"
           className="flex items-center gap-1 text-xs text-primary hover:underline"

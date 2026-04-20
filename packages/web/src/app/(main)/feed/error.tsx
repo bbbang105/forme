@@ -11,7 +11,7 @@ export default function CurationError({ error, reset }: { error: Error & { diges
       <div className="w-12 h-12 rounded-2xl bg-destructive/10 flex items-center justify-center mb-4">
         <Newspaper className="h-6 w-6 text-destructive" />
       </div>
-      <h2 className="text-lg font-semibold mb-1">큐레이션을 불러올 수 없습니다</h2>
+      <h2 className="text-lg font-semibold mb-1">피드를 불러올 수 없습니다</h2>
       <p className="text-sm text-muted-foreground mb-4">
         일시적인 오류가 발생했습니다
       </p>

@@ -61,7 +61,7 @@ export const GET = withTracing('GET /api/cron/feed', async (request) => {
         '☕ 좋은 아침이에요!',
         '🌅 오늘도 좋은 하루 되세요!',
         '📬 새로운 소식이 도착했어요!',
-        '✨ 오늘의 큐레이션이 준비됐어요!',
+        '✨ 오늘의 피드가 준비됐어요!',
       ];
       const greeting = greetings[Math.floor(Math.random() * greetings.length)]!;
 

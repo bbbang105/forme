@@ -1,5 +1,5 @@
 /**
- * 큐레이션 UI 유틸리티
+ * 피드 UI 유틸리티
  */
 
 const GRADIENTS = [
