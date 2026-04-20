@@ -50,9 +50,9 @@ function highlightTextWithRegex(text: string, query: string, regex: RegExp | nul
   );
 }
 
-export const MemoCard = memo(function MemoCard({ memo, highlight = '' }: MemoCardProps) {
+export const MemoCard = memo(function MemoCard({memo, highlight = ''}: MemoCardProps) {
   const displayTitle = memo.title?.trim() || '제목 없음';
-  const preview = memo.contentText.slice(0, 100);
+  const preview = memo.contentText.slice(0, 140);
 
   // Memoize the compiled RegExp separately so it is created once per highlight value change
   // rather than inside each highlightText call (which would re-create the regex every render).
@@ -69,38 +69,33 @@ export const MemoCard = memo(function MemoCard({ memo, highlight = '' }: MemoCar
     <Link
       href={`/memo/${memo.id}`}
       className={cn(
-        'block px-4 py-3 hover:bg-accent/50 active:bg-accent transition-colors',
-        'border-b border-border/50 last:border-b-0',
+        'group block px-4 sm:px-5 py-4 border-b border-border/60 last:border-b-0',
+        'hover:bg-accent/30 transition-colors',
       )}
     >
-      <div className="flex items-start gap-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5 mb-0.5">
-            {memo.isPinned && (
-              <Pin className="h-3 w-3 text-primary shrink-0" />
-            )}
-            <h3 className={cn(
-              'text-sm font-semibold truncate',
+      <div className="flex items-baseline justify-between gap-3 mb-1.5 min-w-0">
+        <div className="flex items-baseline gap-1.5 min-w-0">
+          {memo.isPinned && (
+            <Pin className="h-3 w-3 text-primary shrink-0 relative top-0.5" aria-hidden="true" />
+          )}
+          <h3
+            className={cn(
+              'font-display text-lg leading-snug truncate group-hover:text-primary transition-colors',
               !memo.title?.trim() && 'text-muted-foreground',
-            )}>
-              {titleNode}
-            </h3>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground shrink-0">
-              {formatRelativeDate(new Date(memo.updatedAt))}
-            </span>
-            {preview && (
-              <>
-                <span className="text-xs text-muted-foreground/50">·</span>
-                <p className="text-xs text-muted-foreground truncate">
-                  {previewNode}
-                </p>
-              </>
             )}
-          </div>
+          >
+            {titleNode}
+          </h3>
         </div>
+        <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground shrink-0">
+          {formatRelativeDate(new Date(memo.updatedAt))}
+        </span>
       </div>
+      {preview && (
+        <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2">
+          {previewNode}
+        </p>
+      )}
     </Link>
   );
 });
