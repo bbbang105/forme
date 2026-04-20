@@ -10,7 +10,7 @@ interface MiniCardThumbnailProps {
 }
 
 /**
- * MiniCardThumbnail — minimal client island for the dashboard curation widget.
+ * MiniCardThumbnail — minimal client island for the dashboard feed widget.
  *
  * 외부 RSS 이미지 URL은 hostname이 무한히 다양하므로 unoptimized 사용.
  * onError 폴백으로 깨진 이미지 → 그라데이션 플레이스홀더 전환.

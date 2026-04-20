@@ -23,7 +23,7 @@ export default function DashboardPage() {
         <DashboardCalendar />
       </Suspense>
 
-      {/* Latest curation items */}
+      {/* Latest feed items */}
       <Suspense fallback={<WidgetSkeleton />}>
         <DashboardFeed />
       </Suspense>

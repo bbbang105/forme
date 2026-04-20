@@ -17,7 +17,7 @@ interface PatchBody {
 /**
  * DELETE /api/feed/[id]
  *
- * Deletes a single curation item.
+ * Deletes a single feed item.
  * Ownership is verified by joining through feed_sources.user_id.
  */
 export const DELETE = withTracing('DELETE /api/feed/[id]', async (_request, ctx) => {
@@ -76,7 +76,7 @@ export const DELETE = withTracing('DELETE /api/feed/[id]', async (_request, ctx)
 /**
  * PATCH /api/feed/[id]
  *
- * Updates read/bookmark status on a single curation item.
+ * Updates read/bookmark status on a single feed item.
  * Ownership is verified by joining through feed_sources.user_id.
  *
  * Body: { isRead?: boolean, isBookmarked?: boolean }

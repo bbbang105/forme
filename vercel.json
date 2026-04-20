@@ -2,7 +2,7 @@
   "regions": ["icn1"],
   "crons": [
     {
-      "path": "/api/cron/curation",
+      "path": "/api/cron/feed",
       "schedule": "0 13 * * *"
     },
     {
