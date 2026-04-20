@@ -53,6 +53,9 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
 
+  /* Editorial display serif — loaded via next/font in layout.tsx */
+  --font-serif: var(--font-instrument-serif), Georgia, "Times New Roman", serif;
+
   --animate-accordion-down: accordion-down 0.2s ease-out;
   --animate-accordion-up: accordion-up 0.2s ease-out;
 
@@ -93,59 +96,68 @@
   text-wrap: balance;
 }
 
+/* Editorial display utility — Instrument Serif italic, notebook accent */
+@utility font-display {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.015em;
+}
+
 @layer base {
   :root {
-    /* Vercel-inspired white/black + Sky Blue accent */
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 199 89% 48%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 100%;
-    --success: 142 71% 45%;
-    --success-foreground: 0 0% 100%;
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 100%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 199 89% 48%;
-    --radius: 0.75rem;
+    /* Phase 3 — Cream Paper + Burnt Ember (editorial / notebook) */
+    --background: 40 35% 94%;            /* cream 100  #F7F2E8 */
+    --foreground: 30 19% 10%;            /* ink 900    #1F1A15 */
+    --card: 42 59% 97%;                  /* cream 50   #FDFAF3 */
+    --card-foreground: 30 19% 10%;
+    --popover: 42 59% 97%;
+    --popover-foreground: 30 19% 10%;
+    --primary: 18 68% 54%;               /* ember 500  #D96B3B */
+    --primary-foreground: 42 59% 97%;    /* cream 50 on ember */
+    --secondary: 41 36% 89%;             /* cream 200  #EFE7D6 */
+    --secondary-foreground: 30 19% 10%;
+    --muted: 41 36% 89%;                 /* cream 200 */
+    --muted-foreground: 32 9% 39%;       /* ink 500    #6B635A */
+    --accent: 30 62% 89%;                /* ember 100  #F4E4D4 */
+    --accent-foreground: 17 63% 30%;     /* ember 800 for legibility on wash */
+    --destructive: 6 68% 50%;            /* warm red (harmonizes with ember) */
+    --destructive-foreground: 42 59% 97%;
+    --success: 90 30% 38%;               /* warm olive green */
+    --success-foreground: 42 59% 97%;
+    --warning: 36 80% 48%;               /* warm amber */
+    --warning-foreground: 42 59% 97%;
+    --border: 39 30% 85%;                /* hairline   #E5DCCB */
+    --input: 39 30% 85%;
+    --ring: 18 68% 54%;                  /* ember 500 focus ring */
+    --radius: 0.5rem;                    /* editorial — slightly sharper */
   }
 
   .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 199 89% 65%;
-    --primary-foreground: 240 10% 3.9%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --success: 142 71% 35%;
-    --success-foreground: 0 0% 98%;
-    --warning: 38 92% 40%;
-    --warning-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 199 89% 65%;
+    /* warm black + cream text (notebook after dark) */
+    --background: 24 11% 9%;             /* warm ink   #1A1714 */
+    --foreground: 36 29% 91%;            /* cream      #F0EBE1 */
+    --card: 26 13% 12%;                  /* raised surface */
+    --card-foreground: 36 29% 91%;
+    --popover: 26 13% 12%;
+    --popover-foreground: 36 29% 91%;
+    --primary: 18 72% 60%;               /* ember bumped up for dark contrast */
+    --primary-foreground: 24 11% 9%;
+    --secondary: 28 12% 18%;
+    --secondary-foreground: 36 29% 91%;
+    --muted: 28 12% 18%;
+    --muted-foreground: 34 14% 66%;
+    --accent: 20 25% 22%;                /* warm wash (dark) */
+    --accent-foreground: 28 60% 85%;
+    --destructive: 6 56% 50%;
+    --destructive-foreground: 36 29% 91%;
+    --success: 90 25% 48%;
+    --success-foreground: 24 11% 9%;
+    --warning: 36 72% 56%;
+    --warning-foreground: 24 11% 9%;
+    --border: 30 15% 17%;
+    --input: 30 15% 17%;
+    --ring: 18 72% 60%;
   }
 }
 

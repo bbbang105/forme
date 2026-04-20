@@ -1,7 +1,16 @@
 import type {Metadata, Viewport} from 'next';
+import {Instrument_Serif} from 'next/font/google';
 import {ThemeProvider} from 'next-themes';
 import {ServiceWorkerRegister} from '@/components/sw-register';
 import './globals.css';
+
+const instrumentSerif = Instrument_Serif({
+  subsets: ['latin'],
+  weight: '400',
+  style: ['normal', 'italic'],
+  variable: '--font-instrument-serif',
+  display: 'swap',
+});
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -32,9 +41,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ko" suppressHydrationWarning>
+    <html lang="ko" suppressHydrationWarning className={instrumentSerif.variable}>
       <head>
-        <meta name="theme-color" content="#0ea5e9" />
+        <meta name="theme-color" content="#F7F2E8" media="(prefers-color-scheme: light)" />
+        <meta name="theme-color" content="#1A1714" media="(prefers-color-scheme: dark)" />
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
         <link rel="preconnect" href="https://cdn.jsdelivr.net" crossOrigin="anonymous" />
