@@ -11,7 +11,7 @@ interface ListSkeletonProps {
 }
 
 /**
- * ListSkeleton — shared loading placeholder for feed/memo list views.
+ * ListSkeleton — shared loading placeholder for feed/note list views.
  *
  * Renders a stack of animated skeleton rows that mimic a typical list item
  * layout (optional thumbnail + two lines of text). Use inside a Suspense

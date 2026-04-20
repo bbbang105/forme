@@ -38,7 +38,7 @@ interface RawItem {
   isBookmarked: boolean;
   collectedAt: Date;
   sourceName: string | null;
-  memo: string | null;
+  note: string | null;
   pinnedAt: Date | null;
 }
 
@@ -59,7 +59,7 @@ function serializeItem(item: RawItem) {
     isBookmarked: item.isBookmarked,
     collectedAt: item.collectedAt.toISOString(),
     sourceName: item.sourceName ?? null,
-    memo: item.memo ?? null,
+    note: item.note ?? null,
     pinnedAt: item.pinnedAt?.toISOString() ?? null,
   };
 }
@@ -323,7 +323,7 @@ export const GET = withTracing('GET /api/feed', async (request) => {
           isBookmarked: feedItems.isBookmarked,
           collectedAt: feedItems.collectedAt,
           sourceName: feedSources.name,
-          memo: feedItems.memo,
+          note: feedItems.note,
           pinnedAt: feedItems.pinnedAt,
         })
         .from(feedItems)
@@ -357,7 +357,7 @@ export const GET = withTracing('GET /api/feed', async (request) => {
           isBookmarked: feedItems.isBookmarked,
           collectedAt: feedItems.collectedAt,
           sourceName: feedSources.name,
-          memo: feedItems.memo,
+          note: feedItems.note,
           pinnedAt: feedItems.pinnedAt,
           score: scoreExpr!.as('score'),
           sortDate: sortDateExpr.as('sort_date'),
@@ -408,7 +408,7 @@ export const GET = withTracing('GET /api/feed', async (request) => {
         isBookmarked: feedItems.isBookmarked,
         collectedAt: feedItems.collectedAt,
         sourceName: feedSources.name,
-        memo: feedItems.memo,
+        note: feedItems.note,
         pinnedAt: feedItems.pinnedAt,
         sortDate: sortDateExpr.as('sort_date'),
       })

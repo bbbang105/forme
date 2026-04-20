@@ -53,7 +53,7 @@ function LoginForm() {
             로그인
           </h1>
           <p className="text-sm text-muted-foreground leading-relaxed">
-            나만의 피드, 캘린더, 메모
+            나만의 피드, 캘린더, 노트
           </p>
         </div>
       </CardHeader>

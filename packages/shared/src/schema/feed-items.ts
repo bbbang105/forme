@@ -15,7 +15,7 @@ export const feedItems = pgTable('feed_items', {
   isBookmarked: boolean('is_bookmarked').notNull().default(false),
   collectedAt: timestamp('collected_at', { withTimezone: true }).notNull().defaultNow(),
   readAt: timestamp('read_at', { withTimezone: true }),
-  memo: text('memo'),
+  note: text('note'),
   /** Non-null timestamp when the bookmark is pinned to the top of the Saved view. Max 3 per user enforced at API layer. */
   pinnedAt: timestamp('pinned_at', { withTimezone: true }),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
