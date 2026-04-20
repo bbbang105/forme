@@ -1,6 +1,6 @@
 'use client';
 
-import {Clock, Link2, Sparkles, Star} from 'lucide-react';
+import {Link2, Star} from 'lucide-react';
 import {cn} from '@/lib/utils';
 import {FeedFilters, type StatusFilter} from './feed-filters';
 import {FeedSearch} from './feed-search';
@@ -21,7 +21,7 @@ export interface FeedFilterBarProps {
   onSortChange: (sort: SortMode) => void;
   sourceId: string;
   onSourceIdChange: (sourceId: string) => void;
-  favoriteSources: { id: string; name: string }[];
+  favoriteSources: {id: string; name: string}[];
   manualSourceId?: string | null;
   statusActions?: React.ReactNode;
 }
@@ -44,89 +44,64 @@ export function FeedFilterBar({
   manualSourceId,
   statusActions,
 }: FeedFilterBarProps) {
+  const hasFavorites = manualSourceId || favoriteSources.length > 0;
+
   return (
-    <>
-      {/* Category segment tabs (맨 위) */}
-      <div className="mb-3">
-        <FeedFilters
-          categories={categories}
-          selectedCategory={selectedCategory}
-          onCategoryChange={onCategoryChange}
-          status={status}
-          onStatusChange={onStatusChange}
-          selectedTags={selectedTags}
-          onTagsChange={onTagsChange}
-          statusActions={statusActions}
-        />
-      </div>
+    <div className="space-y-4 mb-6">
+      <FeedFilters
+        categories={categories}
+        selectedCategory={selectedCategory}
+        onCategoryChange={onCategoryChange}
+        status={status}
+        onStatusChange={onStatusChange}
+        selectedTags={selectedTags}
+        onTagsChange={onTagsChange}
+        statusActions={statusActions}
+      />
 
-      {/* Search */}
-      <div className="mb-3">
-        <FeedSearch
-          value={search}
-          onChange={onSearchChange}
-        />
-      </div>
+      <FeedSearch value={search} onChange={onSearchChange} />
 
-      {/* Favorite sources bar */}
-      {(manualSourceId || favoriteSources.length > 0) && (
-        <div className="mb-3 flex gap-2 overflow-x-auto scrollbar-hide">
+      {hasFavorites && (
+        <div className="flex gap-1.5 overflow-x-auto scrollbar-hide pb-0.5">
           {manualSourceId && (
-            <button
+            <FavoriteChip
+              active={sourceId === manualSourceId}
               onClick={() =>
                 onSourceIdChange(sourceId === manualSourceId ? '' : manualSourceId)
               }
-              className={cn(
-                'inline-flex items-center gap-1 shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer border',
-                sourceId === manualSourceId
-                  ? 'bg-primary/15 text-primary border-primary/30'
-                  : 'bg-background text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground'
-              )}
-            >
-              <Link2 className="h-3 w-3" />
-              직접 추가
-            </button>
+              icon={<Link2 className="h-3 w-3" aria-hidden="true" />}
+              label="직접 추가"
+            />
           )}
           {favoriteSources.map((src) => (
-            <button
+            <FavoriteChip
               key={src.id}
-              onClick={() =>
-                onSourceIdChange(sourceId === src.id ? '' : src.id)
-              }
-              className={cn(
-                'inline-flex items-center gap-1 shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer border',
-                sourceId === src.id
-                  ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30'
-                  : 'bg-background text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground'
-              )}
-            >
-              <Star className="h-3 w-3 text-amber-500" fill="currentColor" />
-              {src.name}
-            </button>
+              active={sourceId === src.id}
+              onClick={() => onSourceIdChange(sourceId === src.id ? '' : src.id)}
+              icon={<Star className="h-3 w-3 fill-current" aria-hidden="true" />}
+              label={src.name}
+            />
           ))}
         </div>
       )}
 
-      {/* Sort toggle */}
-      <div className="flex items-center gap-1.5 mb-4">
+      <div className="flex items-center gap-5">
         <SortButton
           active={sort === 'latest'}
           onClick={() => onSortChange('latest')}
-          icon={<Clock className="h-3.5 w-3.5" />}
-          label={status === 'read' ? '최근 읽은 순' : '최신순'}
+          label={status === 'read' ? 'Recently read' : 'Latest'}
         />
         <SortButton
           active={sort === 'recommended'}
           onClick={() => onSortChange('recommended')}
-          icon={<Sparkles className="h-3.5 w-3.5" />}
-          label="추천순"
+          label="Recommended"
         />
       </div>
-    </>
+    </div>
   );
 }
 
-export function SortButton({
+function FavoriteChip({
   active,
   onClick,
   icon,
@@ -139,16 +114,47 @@ export function SortButton({
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium',
-        'transition-colors cursor-pointer',
+        'inline-flex items-center gap-1.5 shrink-0 rounded-sm px-2.5 py-1.5 text-xs',
+        'transition-colors cursor-pointer border',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background',
         active
-          ? 'bg-foreground text-background'
-          : 'border border-border text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+          ? 'bg-primary/10 text-primary border-primary/40'
+          : 'bg-background text-muted-foreground border-border hover:text-foreground hover:border-muted-foreground',
       )}
     >
       {icon}
+      {label}
+    </button>
+  );
+}
+
+export function SortButton({
+  active,
+  onClick,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'font-mono text-[11px] uppercase tracking-[0.1em] transition-colors cursor-pointer',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm',
+        active ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
+      )}
+    >
+      {active && (
+        <span className="mr-1.5" aria-hidden="true">
+          —
+        </span>
+      )}
       {label}
     </button>
   );
