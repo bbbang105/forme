@@ -4,6 +4,7 @@ import {memo, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import Image from 'next/image';
 import {Bookmark, BookmarkCheck, Check, FileText, FolderOpen, MessageSquare, Trash2} from 'lucide-react';
 import {cn} from '@/lib/utils';
+import {ITEM_MEMO_MAX_LENGTH} from '@/lib/constants';
 import {formatRelativeDate, getArticleGradient, getCategoryStyle} from '@/lib/feed-utils';
 import {Checkbox} from '@/components/ui/checkbox';
 import {useSwipeAction} from '@/hooks/use-swipe-action';
@@ -176,7 +177,7 @@ function InlineMemo({
             setEditing(false);
           }
         }}
-        maxLength={500}
+        maxLength={ITEM_MEMO_MAX_LENGTH}
         rows={2}
         placeholder="메모를 입력하세요…"
         aria-label="메모 입력"
@@ -184,7 +185,7 @@ function InlineMemo({
       />
       <div className="flex items-center justify-between mt-1">
         <span className="font-mono text-[10px] text-muted-foreground/50">
-          {value.length}/500
+          {value.length}/{ITEM_MEMO_MAX_LENGTH}
         </span>
         <div className="flex gap-3">
           <button

@@ -128,10 +128,6 @@ export function VideoCollectionPicker({
                 currentCollectionId === col.id ? 'bg-primary/10 text-primary' : 'hover:bg-muted/50'
               )}
             >
-              <span
-                className="w-3 h-3 rounded-full shrink-0"
-                style={{backgroundColor: col.color}}
-              />
               <span>{col.name}</span>
               {currentCollectionId === col.id && <Check className="h-4 w-4 ml-auto text-primary" aria-hidden="true" />}
             </button>

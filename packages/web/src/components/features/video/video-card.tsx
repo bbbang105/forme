@@ -4,6 +4,7 @@ import {memo, useCallback, useEffect, useRef, useState} from 'react';
 import Image from 'next/image';
 import {Bookmark, BookmarkCheck, FileText, FolderOpen, MessageSquare, Trash2} from 'lucide-react';
 import {cn} from '@/lib/utils';
+import {ITEM_MEMO_MAX_LENGTH} from '@/lib/constants';
 import {formatRelativeDate, getArticleGradient} from '@/lib/feed-utils';
 
 export interface VideoItemData {
@@ -204,14 +205,14 @@ function InlineMemo({
             setEditing(false);
           }
         }}
-        maxLength={500}
+        maxLength={ITEM_MEMO_MAX_LENGTH}
         rows={2}
         placeholder="메모를 입력하세요…"
         aria-label="메모 입력"
         className="w-full text-base sm:text-sm px-2.5 py-1.5 rounded-md bg-muted/50 border border-primary/30 text-foreground placeholder:text-muted-foreground/50 resize-none focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
       />
       <div className="flex items-center justify-between mt-1">
-        <span className="text-[10px] text-muted-foreground/50">{value.length}/500</span>
+        <span className="text-[10px] text-muted-foreground/50">{value.length}/{ITEM_MEMO_MAX_LENGTH}</span>
         <div className="flex gap-1">
           <button
             type="button"
