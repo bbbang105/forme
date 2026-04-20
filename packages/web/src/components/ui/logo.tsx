@@ -1,14 +1,14 @@
-import { useId } from 'react';
+/**
+ * Phase 3 forme 워드마크 / 마크
+ * 베이스: Instrument Serif 이탤릭 + 번트 오렌지 마침표.
+ * "for me" 개인성을 타이포 자체로 드러내고, 장식은 ember 마침표 하나로 끝.
+ */
 
 /**
- * 로고 마크 — 레트로 {f} 픽토그램
- * 중괄호 안의 f — "내 안의 모든 것"
- * square caps + scanline 텍스처로 레트로 개발자 감성
+ * LogoMark — compact `f.` 마크 (32x32 viewBox).
+ * 헤더 아이콘/파비콘 용도. rounded cream card + italic serif f + ember period.
  */
-export function LogoMark({ size = 24 }: { size?: number }) {
-  const uid = useId();
-  const scanId = `lm-scan-${uid}`;
-
+export function LogoMark({size = 24}: {size?: number}) {
   return (
     <svg
       width={size}
@@ -19,21 +19,40 @@ export function LogoMark({ size = 24 }: { size?: number }) {
       className="shrink-0"
       aria-hidden="true"
     >
-      <defs>
-        <pattern id={scanId} width="4" height="4" patternUnits="userSpaceOnUse">
-          <rect width="4" height="2" className="fill-primary" opacity="0.04" />
-        </pattern>
-      </defs>
-      <rect width="32" height="32" rx="7" className="fill-zinc-900" />
-      <rect width="32" height="32" rx="7" fill={`url(#${scanId})`} />
-      {/* {f} — square caps for retro pixel feel */}
-      <g className="stroke-primary" strokeWidth="2.4" strokeLinecap="square" strokeLinejoin="miter" fill="none">
-        <polyline points="9,8 7,8 7,14 5.5,16 7,18 7,24 9,24" />
-        <line x1="16" y1="11" x2="16" y2="24" />
-        <line x1="13" y1="16.5" x2="19.5" y2="16.5" />
-        <polyline points="16,11 16,9.5 18.5,8" />
-        <polyline points="23,8 25,8 25,14 26.5,16 25,18 25,24 23,24" />
-      </g>
+      <rect
+        width="32"
+        height="32"
+        rx="7"
+        className="fill-card stroke-border"
+        strokeWidth="1"
+      />
+      <text
+        x="7"
+        y="25"
+        className="fill-foreground font-display"
+        style={{fontSize: 26}}
+      >
+        f<tspan className="fill-primary">.</tspan>
+      </text>
     </svg>
+  );
+}
+
+/**
+ * Wordmark — 전체 `forme.` 워드마크.
+ * 헤더 로고(텍스트형) / 히어로 / 푸터에 사용.
+ */
+export function Wordmark({size = 28}: {size?: number}) {
+  return (
+    <span
+      className="font-display text-foreground inline-flex items-baseline leading-none"
+      style={{fontSize: size}}
+      aria-label="forme"
+    >
+      forme
+      <span className="text-primary" aria-hidden="true">
+        .
+      </span>
+    </span>
   );
 }
