@@ -3,7 +3,6 @@
 import {format} from 'date-fns';
 import {ko} from 'date-fns/locale';
 import {ChevronLeft, ChevronRight} from 'lucide-react';
-import {Button} from '@/components/ui/button';
 
 export interface CalendarHeaderProps {
   currentMonth: Date;
@@ -20,28 +19,47 @@ export function CalendarHeader({
   onNextMonth,
   onToday,
 }: CalendarHeaderProps) {
+  const monthLabel = format(currentMonth, 'yyyy년 M월', {locale: ko});
+  const monthMono = format(currentMonth, 'yyyy.MM').toUpperCase();
+
   return (
-    <div className="flex items-center justify-between px-4 sm:px-0">
-      <div className="flex items-center gap-2">
-        <h2 className="text-lg font-bold tracking-tight">
-          {format(currentMonth, 'yyyy년 M월', { locale: ko })}
+    <div className="flex items-center justify-between px-4 sm:px-0 pb-3 border-b border-border">
+      <div className="flex items-baseline gap-4 min-w-0">
+        <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground shrink-0">
+          <span className="text-primary" aria-hidden="true">—</span> {monthMono}
+        </span>
+        <h2 className="font-display text-2xl sm:text-3xl leading-none text-foreground truncate">
+          {monthLabel}
         </h2>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onToday}
-          className="text-xs text-primary font-medium px-2 py-0.5 rounded-full bg-primary/10 hover:bg-primary/20 h-auto"
-        >
-          오늘
-        </Button>
       </div>
-      <div className="flex items-center gap-1">
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onPrevMonth} disabled={isFetching}>
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onNextMonth} disabled={isFetching}>
-          <ChevronRight className="h-4 w-4" />
-        </Button>
+      <div className="flex items-center gap-3 shrink-0">
+        <button
+          type="button"
+          onClick={onToday}
+          className="font-mono text-[11px] uppercase tracking-[0.1em] text-muted-foreground hover:text-primary transition-colors cursor-pointer"
+        >
+          Today
+        </button>
+        <div className="flex items-center gap-0.5">
+          <button
+            type="button"
+            onClick={onPrevMonth}
+            disabled={isFetching}
+            aria-label="이전 달"
+            className="p-1.5 rounded-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40 cursor-pointer"
+          >
+            <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={onNextMonth}
+            disabled={isFetching}
+            aria-label="다음 달"
+            className="p-1.5 rounded-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40 cursor-pointer"
+          >
+            <ChevronRight className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </div>
       </div>
     </div>
   );

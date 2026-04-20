@@ -30,7 +30,7 @@ interface CalendarGridProps {
 // Constants
 // ---------------------------------------------------------------------------
 
-const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'] as const;
+const WEEKDAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'] as const;
 
 // ---------------------------------------------------------------------------
 // CalendarGrid — root export
@@ -89,8 +89,8 @@ export function CalendarGrid({
           <div
             key={label}
             className={cn(
-              'text-center text-xs font-medium py-2',
-              i === 0 ? 'text-red-400' : i === 6 ? 'text-blue-400' : 'text-muted-foreground',
+              'text-center font-mono text-[10px] uppercase tracking-[0.1em] py-2',
+              i === 0 ? 'text-red-400/80' : i === 6 ? 'text-blue-400/80' : 'text-muted-foreground',
               i < 6 && 'border-r border-border/30',
             )}
           >
