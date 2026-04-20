@@ -8,10 +8,6 @@
     {
       "path": "/api/cron/calendar-daily",
       "schedule": "0 23 * * *"
-    },
-    {
-      "path": "/api/cron/podcast-reminder",
-      "schedule": "0 14 * * *"
     }
   ]
 }
