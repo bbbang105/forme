@@ -1,6 +1,6 @@
 import {boolean, index, integer, pgTable, text, timestamp, uuid, varchar} from 'drizzle-orm/pg-core';
 
-export const feedSources = pgTable('curation_sources', {
+export const feedSources = pgTable('feed_sources', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').notNull(),
   name: varchar('name', { length: 200 }).notNull(),

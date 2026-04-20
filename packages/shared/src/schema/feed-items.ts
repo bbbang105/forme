@@ -2,7 +2,7 @@ import {boolean, index, pgTable, text, timestamp, uniqueIndex, uuid, varchar} fr
 import {feedSources} from './feed-sources';
 import {bookmarkCollections} from './bookmark-collections';
 
-export const feedItems = pgTable('curation_items', {
+export const feedItems = pgTable('feed_items', {
   id: uuid('id').primaryKey().defaultRandom(),
   sourceId: uuid('source_id').notNull().references(() => feedSources.id, { onDelete: 'cascade' }),
   title: varchar('title', { length: 500 }).notNull(),

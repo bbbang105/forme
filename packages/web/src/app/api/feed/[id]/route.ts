@@ -18,7 +18,7 @@ interface PatchBody {
  * DELETE /api/feed/[id]
  *
  * Deletes a single curation item.
- * Ownership is verified by joining through curation_sources.user_id.
+ * Ownership is verified by joining through feed_sources.user_id.
  */
 export const DELETE = withTracing('DELETE /api/feed/[id]', async (_request, ctx) => {
   const { id } = await (ctx as { params: Promise<{ id: string }> }).params;
@@ -77,7 +77,7 @@ export const DELETE = withTracing('DELETE /api/feed/[id]', async (_request, ctx)
  * PATCH /api/feed/[id]
  *
  * Updates read/bookmark status on a single curation item.
- * Ownership is verified by joining through curation_sources.user_id.
+ * Ownership is verified by joining through feed_sources.user_id.
  *
  * Body: { isRead?: boolean, isBookmarked?: boolean }
  *
@@ -153,7 +153,7 @@ export const PATCH = withTracing('PATCH /api/feed/[id]', async (request, ctx) =>
 
   try {
     // ── Verify ownership ──
-    // curation_items has no user_id directly; ownership flows through curation_sources
+    // feed_items has no user_id directly; ownership flows through feed_sources
     const [existing] = await db
       .select({
         id: feedItems.id,

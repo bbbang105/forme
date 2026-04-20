@@ -209,8 +209,8 @@ export const GET = withTracing('GET /api/feed', async (request) => {
       SELECT SUM(LEAST(rtf.freq, 5))::int
       FROM (
         SELECT unnest(ri.tags) AS tag, COUNT(*)::int AS freq
-        FROM curation_items ri
-        JOIN curation_sources rs ON ri.source_id = rs.id
+        FROM feed_items ri
+        JOIN feed_sources rs ON ri.source_id = rs.id
         WHERE rs.user_id = ${user.id} AND ri.is_read = true AND ri.deleted_at IS NULL
         GROUP BY 1
       ) rtf
@@ -221,8 +221,8 @@ export const GET = withTracing('GET /api/feed', async (request) => {
       SELECT LEAST(rcf.freq, 10)
       FROM (
         SELECT ri.category, COUNT(*)::int AS freq
-        FROM curation_items ri
-        JOIN curation_sources rs ON ri.source_id = rs.id
+        FROM feed_items ri
+        JOIN feed_sources rs ON ri.source_id = rs.id
         WHERE rs.user_id = ${user.id} AND ri.is_read = true AND ri.deleted_at IS NULL
         GROUP BY 1
       ) rcf
