@@ -10,7 +10,7 @@ interface MiniCardLinkProps {
 }
 
 /**
- * Curation MiniCard 링크 래퍼.
+ * Feed MiniCard 링크 래퍼.
  * 클릭 시 외부 URL을 열고, 동시에 PATCH로 읽음 처리(readAt 포함).
  */
 export function MiniCardLink({itemId, href, className, children}: MiniCardLinkProps) {

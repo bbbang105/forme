@@ -4,7 +4,7 @@ import {useEffect} from 'react';
 import {Newspaper} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 
-export default function CurationError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+export default function FeedError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => { console.error(error); }, [error]);
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 text-center">
