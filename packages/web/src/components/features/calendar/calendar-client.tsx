@@ -3,9 +3,7 @@
 import {useEffect, useMemo, useState} from 'react';
 import {format} from 'date-fns';
 import {ko} from 'date-fns/locale';
-import {CalendarDays, Circle, Plus} from 'lucide-react';
-import {Button} from '@/components/ui/button';
-import {Card} from '@/components/ui/card';
+import {Circle, Plus} from 'lucide-react';
 import {Skeleton} from '@/components/ui/skeleton';
 import dynamic from 'next/dynamic';
 import {CalendarGrid} from './calendar-grid';
@@ -134,66 +132,47 @@ export function CalendarClient() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col lg:flex-row lg:gap-6">
-        {/* Left: Skeleton calendar */}
-        <div className="lg:flex-1 lg:min-w-0 space-y-4">
-          <div className="flex items-center justify-between px-4 sm:px-0">
-            <Skeleton className="h-7 w-32" />
+      <div className="flex flex-col lg:flex-row lg:gap-10">
+        <div className="lg:flex-1 lg:min-w-0 space-y-6">
+          <div className="flex items-center justify-between pb-3 border-b border-border px-4 sm:px-0">
+            <Skeleton className="h-8 w-48" />
             <div className="flex items-center gap-1">
-              <Skeleton className="h-8 w-8 rounded-md" />
-              <Skeleton className="h-8 w-8 rounded-md" />
+              <Skeleton className="h-8 w-8 rounded-sm" />
+              <Skeleton className="h-8 w-8 rounded-sm" />
             </div>
           </div>
-          <Card className="p-1 sm:p-3 rounded-none sm:rounded-xl border-x-0 sm:border-x">
-            {/* Day headers */}
-            <div className="grid grid-cols-7 gap-0 mb-1">
-              {Array.from({ length: 7 }).map((_, i) => (
-                <div key={i} className="flex justify-center py-1">
-                  <Skeleton className="h-4 w-6" />
+          <div className="grid grid-cols-7 gap-0 pb-2 border-b border-border/40">
+            {Array.from({length: 7}).map((_, i) => (
+              <div key={i} className="flex justify-center py-1"><Skeleton className="h-3 w-8" /></div>
+            ))}
+          </div>
+          {Array.from({length: 6}).map((_, row) => (
+            <div key={row} className="grid grid-cols-7 gap-0">
+              {Array.from({length: 7}).map((_, col) => (
+                <div key={col} className="aspect-square p-1">
+                  <Skeleton className="h-4 w-4 mx-auto mb-1 rounded-full" />
                 </div>
               ))}
             </div>
-            {/* Calendar cells (6 rows x 7 cols) */}
-            {Array.from({ length: 6 }).map((_, row) => (
-              <div key={row} className="grid grid-cols-7 gap-0">
-                {Array.from({ length: 7 }).map((_, col) => (
-                  <div key={col} className="aspect-square p-1">
-                    <Skeleton className="h-4 w-4 mx-auto mb-1" />
-                    {row < 3 && col % 3 === 0 && <Skeleton className="h-1.5 w-full rounded-full" />}
-                  </div>
-                ))}
-              </div>
-            ))}
-          </Card>
+          ))}
         </div>
-        {/* Right: Skeleton detail */}
-        <div className="lg:w-[380px] lg:shrink-0 space-y-3 px-4 sm:px-0 mt-4 lg:mt-0">
-          <div className="flex items-center justify-between">
-            <Skeleton className="h-5 w-36" />
-            <Skeleton className="h-7 w-16 rounded-md" />
-          </div>
-          <Card className="p-3 space-y-2">
-            <Skeleton className="h-4 w-20" />
-            <Skeleton className="h-10 w-full rounded-md" />
-            <Skeleton className="h-10 w-full rounded-md" />
-          </Card>
-          <Card className="p-3 space-y-2">
-            <Skeleton className="h-4 w-16" />
-            <Skeleton className="h-1.5 w-full rounded-full" />
-            <Skeleton className="h-8 w-full rounded-md" />
-            <Skeleton className="h-8 w-full rounded-md" />
-            <Skeleton className="h-8 w-full rounded-md" />
-          </Card>
+        <div className="lg:w-[380px] lg:shrink-0 space-y-6 px-4 sm:px-0 mt-4 lg:mt-0">
+          <Skeleton className="h-8 w-40" />
+          <Skeleton className="h-24 w-full rounded-sm" />
+          <Skeleton className="h-24 w-full rounded-sm" />
         </div>
       </div>
     );
   }
 
+  const selectedDateDisplay = format(selectedDate, 'M월 d일', {locale: ko});
+  const selectedDateWeekday = format(selectedDate, 'EEEE', {locale: ko});
+  const selectedDateMono = format(selectedDate, 'MM.dd').toUpperCase();
+
   return (
-    <div className="flex flex-col lg:flex-row lg:gap-6">
+    <div className="flex flex-col lg:flex-row lg:gap-10">
       {/* Left: Month navigation + Calendar grid */}
-      <div className="lg:flex-1 lg:min-w-0 space-y-4">
-        {/* Month navigation */}
+      <div className="lg:flex-1 lg:min-w-0 space-y-5">
         <CalendarHeader
           currentMonth={currentMonth}
           isFetching={isFetching}
@@ -202,41 +181,44 @@ export function CalendarClient() {
           onToday={handleToday}
         />
 
-        {/* Calendar grid */}
-        <Card className="p-1 sm:p-3 rounded-none sm:rounded-xl border-x-0 sm:border-x overflow-hidden">
-          <div
-            className={[
-              slideDirection === 'left'
-                ? 'animate-slide-left'
-                : slideDirection === 'right'
-                  ? 'animate-slide-right'
-                  : '',
-              isFetching ? 'opacity-60 transition-opacity' : '',
-            ].filter(Boolean).join(' ')}
-          >
-            <CalendarGrid
-              currentMonth={currentMonth}
-              selectedDate={selectedDate}
-              onSelectDate={handleSelectDate}
-              events={events}
-              todos={todos}
-              categories={categories}
-            />
-          </div>
-        </Card>
+        <div
+          className={[
+            slideDirection === 'left' ? 'animate-slide-left' : slideDirection === 'right' ? 'animate-slide-right' : '',
+            isFetching ? 'opacity-60 transition-opacity' : '',
+          ].filter(Boolean).join(' ')}
+        >
+          <CalendarGrid
+            currentMonth={currentMonth}
+            selectedDate={selectedDate}
+            onSelectDate={handleSelectDate}
+            events={events}
+            todos={todos}
+            categories={categories}
+          />
+        </div>
       </div>
 
       {/* Right: Selected date detail */}
-      <div className="lg:w-[380px] lg:shrink-0 space-y-3 px-4 sm:px-0 mt-4 lg:mt-0">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold flex items-center gap-1.5">
-            <CalendarDays className="h-4 w-4 text-primary" />
-            {format(selectedDate, 'M월 d일 (EEEE)', { locale: ko })}
-          </h3>
-          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleAddEvent}>
-            <Plus className="h-3.5 w-3.5 mr-1" />
-            일정
-          </Button>
+      <div className="lg:w-[380px] lg:shrink-0 space-y-8 px-4 sm:px-0 mt-8 lg:mt-0">
+        {/* Date masthead */}
+        <div className="flex items-baseline justify-between pb-3 border-b border-border">
+          <div className="flex items-baseline gap-3 min-w-0">
+            <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground shrink-0">
+              <span className="text-primary" aria-hidden="true">—</span> {selectedDateMono}
+            </span>
+            <h3 className="font-display text-2xl leading-none text-foreground truncate">
+              {selectedDateDisplay}{' '}
+              <span className="text-muted-foreground">{selectedDateWeekday}</span>
+            </h3>
+          </div>
+          <button
+            type="button"
+            onClick={handleAddEvent}
+            className="inline-flex items-center gap-1 font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground hover:text-primary transition-colors cursor-pointer shrink-0"
+          >
+            <Plus className="h-3 w-3" aria-hidden="true" />
+            New
+          </button>
         </div>
 
         {/* Events for selected date */}
@@ -253,36 +235,37 @@ export function CalendarClient() {
 
         {/* Empty state */}
         {dayEvents.length === 0 && totalCount === 0 && (
-          <Card className="p-6 text-center animate-fade-in">
-            <p className="text-2xl mb-1">(&#x25D5;&#x203F;&#x25D5;)</p>
-            <p className="text-sm text-muted-foreground">
+          <div className="py-10 text-center animate-fade-in space-y-3">
+            <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+              <span className="text-primary" aria-hidden="true">—</span> Open day
+            </p>
+            <p className="font-display text-xl leading-snug text-foreground">
               {EMPTY_DAY_MESSAGES[selectedDate.getDate() % EMPTY_DAY_MESSAGES.length]}
             </p>
-            <Button variant="outline" size="sm" className="mt-3" onClick={handleAddEvent}>
-              <Plus className="h-3.5 w-3.5 mr-1" />
-              일정 추가
-            </Button>
-          </Card>
+            <button
+              type="button"
+              onClick={handleAddEvent}
+              className="inline-flex items-center gap-1 font-mono text-[11px] uppercase tracking-[0.08em] text-primary hover:text-primary/80 transition-colors cursor-pointer"
+            >
+              <Plus className="h-3 w-3" aria-hidden="true" />
+              Add event
+            </button>
+          </div>
         )}
 
         {/* Todos for selected date */}
-        <Card className="p-3">
-          <div className="flex items-center justify-between mb-2 px-1">
-            <p className="text-xs font-medium text-muted-foreground">
-              할 일
-              {totalCount > 0 && (
-                <span className="ml-1.5 text-foreground/70">
-                  {completedCount}/{totalCount}
-                </span>
-              )}
-            </p>
+        <section className="space-y-3">
+          <div className="flex items-baseline justify-between pb-2 border-b border-border/60">
+            <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+              <span className="text-primary" aria-hidden="true">—</span> Tasks{totalCount > 0 ? ` · ${completedCount}/${totalCount}` : ''}
+            </span>
           </div>
 
           {/* Progress bar */}
           {totalCount > 0 && (
-            <div className="mx-1 mb-3">
+            <div>
               <div
-                className="h-1.5 bg-muted rounded-full overflow-hidden"
+                className="h-px bg-border overflow-hidden"
                 role="progressbar"
                 aria-valuenow={completedCount}
                 aria-valuemin={0}
@@ -290,8 +273,8 @@ export function CalendarClient() {
                 aria-label={`할 일 진행률: ${completedCount}/${totalCount}`}
               >
                 <div
-                  className="h-full bg-primary rounded-full transition-all duration-500 ease-out"
-                  style={{ width: `${(completedCount / totalCount) * 100}%` }}
+                  className="h-full bg-primary transition-all duration-500 ease-out"
+                  style={{width: `${(completedCount / totalCount) * 100}%`}}
                 />
               </div>
             </div>
@@ -315,7 +298,7 @@ export function CalendarClient() {
             onUpdate={handleTodoUpdate}
             onReorder={handleTodoReorder}
           />
-        </Card>
+        </section>
       </div>
 
       {/* Event form dialog */}
@@ -362,45 +345,45 @@ function OverdueTodoChip({
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <div className="mb-2">
+    <div>
       <button
         onClick={() => setIsOpen(!isOpen)}
         aria-expanded={isOpen}
         aria-label={`밀린 할 일 ${todos.length}개 - 클릭하여 ${isOpen ? '닫기' : '열기'}`}
-        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/25 transition-colors"
+        className="inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.08em] text-primary hover:text-primary/80 transition-colors cursor-pointer"
       >
-        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" aria-hidden="true" />
-        밀린 할 일 {todos.length}개
+        <span className="w-1 h-1 rounded-full bg-primary animate-pulse" aria-hidden="true" />
+        <span aria-hidden="true">—</span> Overdue · {todos.length}
       </button>
 
       {isOpen && (
-        <div className="mt-2 space-y-1 animate-fade-in">
+        <ul className="mt-3 space-y-1.5 animate-fade-in">
           {todos.map((todo) => (
-            <div
+            <li
               key={todo.id}
-              className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-amber-500/5 border border-amber-500/20"
+              className="flex items-center gap-2 py-1.5 pl-3 border-l-2 border-primary/40"
             >
               <button
                 onClick={() => onToggle(todo.id)}
                 aria-label={`${todo.content} 완료 처리`}
-                className="shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center focus-visible:ring-2 focus-visible:ring-ring rounded"
+                className="shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
               >
-                <Circle className="h-4 w-4 text-muted-foreground/40 hover:text-muted-foreground/60" />
+                <Circle className="h-4 w-4 text-muted-foreground/40 hover:text-muted-foreground/60" aria-hidden="true" />
               </button>
-              <span className="text-xs text-amber-600 dark:text-amber-400 shrink-0 font-medium">
+              <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-primary shrink-0">
                 {todo.date.slice(5).replace('-', '/')}
               </span>
               <span className="flex-1 text-sm truncate">{todo.content}</span>
               <button
                 onClick={() => onMoveToToday(todo.id)}
                 aria-label={`${todo.content} 오늘로 이동`}
-                className="shrink-0 text-xs text-primary hover:text-primary/80 font-medium px-2 py-0.5 rounded hover:bg-primary/10 transition-colors focus-visible:ring-2 focus-visible:ring-ring min-h-[44px] flex items-center"
+                className="shrink-0 font-mono text-[10px] uppercase tracking-[0.08em] text-primary hover:text-primary/80 transition-colors focus-visible:ring-2 focus-visible:ring-ring min-h-[44px] flex items-center cursor-pointer"
               >
-                오늘로
+                Today →
               </button>
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </div>
   );

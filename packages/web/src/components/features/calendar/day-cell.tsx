@@ -102,15 +102,15 @@ export const DayCell = React.memo(function DayCell({
       )}
     >
       {/* Date number */}
-      <div className="flex flex-col items-center pt-0.5 pb-px">
+      <div className="flex flex-col items-center pt-1 pb-px">
         <span
           className={cn(
-            'flex items-center justify-center w-6 h-6 rounded-full text-xs font-medium',
-            isCurrent && 'bg-primary text-primary-foreground font-bold',
+            'flex items-center justify-center w-6 h-6 rounded-full text-xs transition-colors',
+            isCurrent && 'ring-2 ring-primary text-primary font-semibold',
             isSelectedDay && !isCurrent && 'bg-foreground text-background font-semibold',
-            !isSelectedDay && !isCurrent && dayOfWeek === 0 && 'text-red-400',
-            !isSelectedDay && !isCurrent && dayOfWeek === 6 && 'text-blue-400',
-            !isSelectedDay && !isCurrent && dayOfWeek !== 0 && dayOfWeek !== 6 && 'text-foreground',
+            !isSelectedDay && !isCurrent && dayOfWeek === 0 && 'text-red-400 font-medium',
+            !isSelectedDay && !isCurrent && dayOfWeek === 6 && 'text-blue-400 font-medium',
+            !isSelectedDay && !isCurrent && dayOfWeek !== 0 && dayOfWeek !== 6 && 'text-foreground font-medium',
           )}
         >
           {format(day, 'd')}
