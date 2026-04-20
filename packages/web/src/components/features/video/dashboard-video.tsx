@@ -3,6 +3,7 @@ import {desc, eq, and} from 'drizzle-orm';
 import {db, videoItems} from '@forme/shared';
 import {getAuthUser} from '@/lib/auth';
 import {PlayCircle} from 'lucide-react';
+import {SectionHeader} from '@/components/ui/section-header';
 
 const LIMIT = 5;
 
@@ -16,27 +17,20 @@ export async function DashboardVideo() {
       thumbnailUrl: videoItems.thumbnailUrl,
     })
     .from(videoItems)
-    .where(
-      and(
-        eq(videoItems.userId, user.id),
-        eq(videoItems.status, 'summarized')
-      )
-    )
+    .where(and(eq(videoItems.userId, user.id), eq(videoItems.status, 'summarized')))
     .orderBy(desc(videoItems.summarizedAt))
     .limit(LIMIT);
 
   if (items.length === 0) {
     return (
-      <section aria-labelledby="dashboard-video-heading" className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 id="dashboard-video-heading" className="text-sm font-semibold">
-            최근 유튜브 요약
-          </h3>
-          <Link href="/video" className="text-xs text-muted-foreground hover:text-foreground">
-            전체 보기
-          </Link>
-        </div>
-        <p className="text-sm text-muted-foreground rounded-xl border border-border/60 p-6 text-center">
+      <section aria-labelledby="dashboard-video-heading" className="space-y-4">
+        <SectionHeader
+          eyebrow="YouTube"
+          title="최근 요약"
+          actionHref="/video"
+          actionLabel="View all"
+        />
+        <p className="text-sm text-muted-foreground border-t border-border/60 py-8 text-center">
           아직 요약된 영상이 없습니다.
         </p>
       </section>
@@ -44,39 +38,39 @@ export async function DashboardVideo() {
   }
 
   return (
-    <section aria-labelledby="dashboard-video-heading" className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h3 id="dashboard-video-heading" className="text-sm font-semibold">
-          최근 유튜브 요약
-        </h3>
-        <Link href="/video" className="text-xs text-muted-foreground hover:text-foreground">
-          전체 보기
-        </Link>
-      </div>
-      <ul className="space-y-2">
+    <section aria-labelledby="dashboard-video-heading" className="space-y-4">
+      <SectionHeader
+        eyebrow="YouTube"
+        title="최근 요약"
+        actionHref="/video"
+        actionLabel="View all"
+      />
+      <ul>
         {items.map((item) => (
           <li key={item.id}>
             <Link
               href={`/video/${item.id}`}
-              className="flex gap-3 rounded-xl border border-border/60 p-3 hover:bg-accent/40 transition-colors"
+              className="group flex gap-3 py-3 border-b border-border/60 last:border-b-0 transition-colors"
             >
               {item.thumbnailUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={item.thumbnailUrl}
                   alt=""
-                  className="h-14 w-24 rounded-md object-cover bg-muted"
+                  className="h-14 w-24 rounded-sm object-cover bg-muted shrink-0"
                   loading="lazy"
                 />
               ) : (
-                <div className="h-14 w-24 rounded-md bg-muted flex items-center justify-center">
+                <div className="h-14 w-24 rounded-sm bg-muted flex items-center justify-center shrink-0">
                   <PlayCircle className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
                 </div>
               )}
               <div className="flex-1 min-w-0 space-y-1">
-                <p className="text-sm font-medium line-clamp-2">{item.title}</p>
+                <p className="font-display text-base leading-snug line-clamp-2 text-foreground group-hover:text-primary transition-colors">
+                  {item.title}
+                </p>
                 {item.channelName && (
-                  <p className="text-xs text-muted-foreground truncate">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground truncate">
                     {item.channelName}
                   </p>
                 )}
