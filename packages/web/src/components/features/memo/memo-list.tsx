@@ -2,16 +2,16 @@
 
 import {useCallback, useEffect, useMemo, useRef, useState, useTransition} from 'react';
 import {useRouter} from 'next/navigation';
-import {ArrowUpDown, Plus, Search, StickyNote, Tag, X} from 'lucide-react';
+import {Plus, Search, StickyNote, X} from 'lucide-react';
 import {createMemo, getMemosPage, searchMemos} from '@/lib/actions/memos';
 import {MemoCard} from './memo-card';
 import {cn} from '@/lib/utils';
 
 type SortKey = 'updatedAt' | 'createdAt' | 'title';
 const SORT_LABELS: Record<SortKey, string> = {
-  updatedAt: '수정일순',
-  createdAt: '생성일순',
-  title: '제목순',
+  updatedAt: 'Updated',
+  createdAt: 'Created',
+  title: 'Title',
 };
 
 interface Memo {
@@ -160,35 +160,40 @@ export function MemoList({ initialMemos, initialHasMore, initialNextOffset }: Me
   }, [router]);
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="px-4 pt-6 pb-3">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-lg font-semibold">메모</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {memos.length}개의 메모
-            </p>
+    <div className="flex flex-col h-full max-w-3xl mx-auto w-full">
+      {/* Masthead */}
+      <div className="px-4 sm:px-5 pt-8 pb-5 space-y-4">
+        <div className="flex items-baseline justify-between gap-3 pb-3 border-b border-border">
+          <div className="flex items-baseline gap-3 min-w-0">
+            <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground shrink-0">
+              <span className="text-primary" aria-hidden="true">—</span> Notes{memos.length > 0 ? ` · ${memos.length}` : ''}
+            </span>
+            <h2 className="font-display text-2xl sm:text-3xl leading-none text-foreground truncate">
+              메모
+            </h2>
           </div>
           {/* Sort */}
-          <div className="relative" ref={sortRef}>
+          <div className="relative shrink-0" ref={sortRef}>
             <button
+              type="button"
               onClick={() => setShowSortMenu((v) => !v)}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1.5 rounded-lg hover:bg-accent"
+              className="font-mono text-[11px] uppercase tracking-[0.1em] text-muted-foreground hover:text-primary transition-colors cursor-pointer"
             >
-              <ArrowUpDown className="h-3.5 w-3.5" />
-              {SORT_LABELS[sortKey]}
+              {SORT_LABELS[sortKey]} ↕
             </button>
             {showSortMenu && (
-              <div className="absolute right-0 top-full mt-1 bg-popover border border-border rounded-lg shadow-lg py-1 z-20 min-w-[120px]">
+              <div className="absolute right-0 top-full mt-1 bg-popover border border-border py-1 z-20 min-w-[120px] rounded-sm">
                 {(Object.keys(SORT_LABELS) as SortKey[]).map((key) => (
                   <button
+                    type="button"
                     key={key}
                     onClick={() => { setSortKey(key); setShowSortMenu(false); }}
-                    className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
-                      sortKey === key ? 'text-primary font-medium bg-accent/50' : 'text-foreground hover:bg-accent'
-                    }`}
+                    className={cn(
+                      'w-full text-left px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.1em] transition-colors',
+                      sortKey === key ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+                    )}
                   >
+                    {sortKey === key && <span className="mr-1" aria-hidden="true">—</span>}
                     {SORT_LABELS[key]}
                   </button>
                 ))}
@@ -197,44 +202,61 @@ export function MemoList({ initialMemos, initialHasMore, initialNextOffset }: Me
           </div>
         </div>
 
-        {/* Search */}
+        {/* Search (hairline input) */}
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search
+            className="absolute left-0 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground"
+            aria-hidden="true"
+          />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="메모 검색..."
-            className="w-full pl-9 pr-4 py-2.5 text-base bg-accent/50 rounded-xl border-0 outline-none focus:ring-2 focus:ring-primary/20 placeholder:text-muted-foreground/60 transition-shadow"
+            placeholder="Search notes…"
+            aria-label="메모 검색"
+            className={cn(
+              'w-full h-10 pl-6 pr-7 bg-transparent',
+              'border-b border-border',
+              'text-base placeholder:text-muted-foreground',
+              'focus:outline-none focus:border-primary',
+              'transition-colors',
+            )}
           />
           {isSearching && (
-            <div className="absolute right-3 top-1/2 -translate-y-1/2">
-              <div className="h-4 w-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+            <div className="absolute right-0 top-1/2 -translate-y-1/2">
+              <div className="h-3.5 w-3.5 border border-primary/30 border-t-primary rounded-full animate-spin" />
             </div>
           )}
         </div>
 
-        {/* Tag filter chips */}
+        {/* Tag filter */}
         {allTags.length > 0 && (
-          <div className="flex items-center gap-1.5 mt-3 overflow-x-auto scrollbar-hide pb-0.5">
-            <Tag className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            {allTags.map((tag) => (
-              <button
-                key={tag}
-                onClick={() => setActiveTag((prev) => (prev === tag ? null : tag))}
-                className={cn(
-                  'inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs transition-colors shrink-0',
-                  activeTag === tag
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-accent text-accent-foreground hover:bg-accent/80',
-                )}
-              >
-                {tag}
-                {activeTag === tag && (
-                  <X className="h-3 w-3" />
-                )}
-              </button>
-            ))}
+          <div className="flex items-center gap-5 overflow-x-auto scrollbar-hide pb-0.5">
+            <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground shrink-0">
+              Tags
+            </span>
+            {allTags.map((tag) => {
+              const active = activeTag === tag;
+              return (
+                <button
+                  type="button"
+                  key={tag}
+                  onClick={() => setActiveTag((prev) => (prev === tag ? null : tag))}
+                  className={cn(
+                    'shrink-0 inline-flex items-baseline gap-1.5 text-xs transition-colors cursor-pointer',
+                    active ? 'text-primary font-medium' : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  {active && (
+                    <span aria-hidden="true" className="font-mono text-[11px] tracking-[0.1em]">
+                      —
+                    </span>
+                  )}
+                  <span>{tag}</span>
+                  {active && <X className="h-3 w-3" aria-hidden="true" />}
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
@@ -242,30 +264,36 @@ export function MemoList({ initialMemos, initialHasMore, initialNextOffset }: Me
       {/* Memo list */}
       <div className="flex-1 overflow-y-auto">
         {memos.length === 0 ? (
-          <div className="flex flex-col items-center justify-center min-h-[40vh] text-center px-4">
-            <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
-              <StickyNote className="h-6 w-6 text-primary" />
-            </div>
-            <h3 className="text-base font-semibold mb-1">메모가 없습니다</h3>
-            <p className="text-sm text-muted-foreground">
-              새 메모를 작성해보세요
+          <div className="flex flex-col items-center justify-center min-h-[40vh] text-center px-4 max-w-sm mx-auto">
+            <StickyNote className="h-6 w-6 text-primary mb-5" aria-hidden="true" />
+            <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-3">
+              <span className="text-primary" aria-hidden="true">—</span> Empty notebook
+            </p>
+            <h3 className="font-display text-2xl leading-snug text-foreground mb-3">
+              Start a blank page.
+            </h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              첫 메모를 작성하면 이 책장에 순서대로 쌓입니다.
             </p>
           </div>
         ) : sorted.length === 0 ? (
-          <div className="flex flex-col items-center justify-center min-h-[30vh] text-center px-4">
-            <p className="text-sm text-muted-foreground">
+          <div className="flex flex-col items-center justify-center min-h-[30vh] text-center px-4 max-w-sm mx-auto">
+            <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-3">
+              <span className="text-primary" aria-hidden="true">—</span> Nothing here
+            </p>
+            <p className="font-display text-xl leading-snug text-foreground">
               {activeTag
-                ? `'${activeTag}' 태그가 달린 메모가 없습니다`
-                : `"${searchQuery}" 검색 결과가 없습니다`}
+                ? `'${activeTag}' 태그가 달린 메모가 없습니다.`
+                : `"${searchQuery}" 검색 결과가 없습니다.`}
             </p>
           </div>
         ) : (
           <>
             {pinned.length > 0 && (
               <div>
-                <div className="px-4 py-2">
-                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    고정됨
+                <div className="px-4 sm:px-5 py-2 border-b border-border/60">
+                  <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                    <span className="text-primary" aria-hidden="true">—</span> Pinned
                   </span>
                 </div>
                 {pinned.map((m) => (
@@ -276,9 +304,9 @@ export function MemoList({ initialMemos, initialHasMore, initialNextOffset }: Me
             {unpinned.length > 0 && (
               <div>
                 {pinned.length > 0 && (
-                  <div className="px-4 py-2">
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      메모
+                  <div className="px-4 sm:px-5 py-2 border-b border-border/60">
+                    <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                      <span className="text-primary" aria-hidden="true">—</span> All notes
                     </span>
                   </div>
                 )}
@@ -289,13 +317,14 @@ export function MemoList({ initialMemos, initialHasMore, initialNextOffset }: Me
             )}
             {/* Load more */}
             {hasMore && !searchQuery.trim() && !activeTag && (
-              <div className="px-4 py-4 text-center">
+              <div className="px-4 sm:px-5 py-6 text-center">
                 <button
+                  type="button"
                   onClick={loadMore}
                   disabled={isLoadingMore}
-                  className="text-sm text-primary hover:underline disabled:opacity-50"
+                  className="font-mono text-[11px] uppercase tracking-[0.1em] text-primary hover:text-primary/80 transition-colors disabled:opacity-50 cursor-pointer"
                 >
-                  {isLoadingMore ? '불러오는 중...' : '더 보기'}
+                  {isLoadingMore ? 'Loading…' : '— Load more'}
                 </button>
               </div>
             )}
@@ -305,12 +334,13 @@ export function MemoList({ initialMemos, initialHasMore, initialNextOffset }: Me
 
       {/* FAB - New Memo */}
       <button
+        type="button"
         onClick={handleNewMemo}
         disabled={isPending}
         aria-label="새 메모 작성"
         className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-5 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 active:scale-95 transition-all flex items-center justify-center z-20 disabled:opacity-50"
       >
-        <Plus className="h-6 w-6" />
+        <Plus className="h-6 w-6" aria-hidden="true" />
       </button>
     </div>
   );
