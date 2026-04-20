@@ -34,27 +34,32 @@ export function FeedSearch({ value, onChange }: FeedSearchProps) {
 
   return (
     <div className="relative">
-      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+      <Search
+        className="absolute left-0 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground"
+        aria-hidden="true"
+      />
       <input
         type="text"
         value={local}
         onChange={(e) => handleChange(e.target.value)}
-        placeholder="제목이나 내용으로 검색..."
+        placeholder="Search articles…"
         aria-label="피드 검색"
         className={cn(
-          'w-full h-10 pl-9 pr-9 rounded-lg border border-border bg-background',
+          'w-full h-10 pl-6 pr-7 bg-transparent',
+          'border-b border-border',
           'text-base placeholder:text-muted-foreground',
-          'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1',
-          'transition-colors'
+          'focus:outline-none focus:border-primary',
+          'transition-colors',
         )}
       />
       {local && (
         <button
+          type="button"
           onClick={handleClear}
-          className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-muted transition-colors"
+          className="absolute right-0 top-1/2 -translate-y-1/2 p-0.5 rounded-full text-muted-foreground hover:text-primary transition-colors"
           aria-label="검색어 지우기"
         >
-          <X className="h-3.5 w-3.5 text-muted-foreground" />
+          <X className="h-3.5 w-3.5" />
         </button>
       )}
     </div>

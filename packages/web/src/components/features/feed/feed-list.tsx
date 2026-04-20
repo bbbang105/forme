@@ -583,17 +583,21 @@ export function FeedList() {
   // Empty state: no sources
   if (!loading && !hasSources) {
     return (
-      <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto">
-        <div className="flex items-center justify-end mb-6">
+      <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-7xl mx-auto">
+        <div className="flex items-center justify-end mb-8">
           <SourceManager onCrawlComplete={handleCrawlComplete} onFavoritesChange={handleFavoritesChange} />
         </div>
-        <div className="flex flex-col items-center justify-center min-h-[40vh] text-center">
-          <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
-            <Newspaper className="h-6 w-6 text-primary" />
-          </div>
-          <h3 className="text-base font-semibold mb-1">소스를 추가해보세요</h3>
-          <p className="text-sm text-muted-foreground mb-4">
+        <div className="flex flex-col items-center justify-center min-h-[50vh] text-center max-w-md mx-auto">
+          <Newspaper className="h-6 w-6 text-primary mb-6" aria-hidden="true" />
+          <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-3">
+            <span className="text-primary" aria-hidden="true">—</span> Getting started
+          </p>
+          <h3 className="font-display text-3xl leading-tight text-foreground mb-4">
+            Let&apos;s begin with a source.
+          </h3>
+          <p className="text-sm text-muted-foreground leading-relaxed">
             RSS 피드 소스를 등록하면 자동으로 글을 수집합니다.
+            우측 상단 <span className="font-mono text-foreground">Source</span> 버튼에서 시작하세요.
           </p>
         </div>
       </div>
@@ -601,19 +605,24 @@ export function FeedList() {
   }
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto">
-      {/* Select mode action bar */}
+    <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-7xl mx-auto">
+      {/* Select mode action bar — editorial hairline style */}
       {selectMode && (
-        <div className="flex items-center justify-between gap-3 mb-4 px-3 py-2.5 rounded-lg bg-muted/60 border border-border/60">
-          <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between gap-3 mb-6 pb-3 border-b border-border">
+          <div className="flex items-baseline gap-4">
             <button
+              type="button"
               onClick={toggleSelectAll}
-              className="text-sm font-medium text-primary hover:underline"
+              className="font-mono text-[11px] uppercase tracking-[0.1em] text-primary hover:text-primary/80 transition-colors cursor-pointer"
             >
-              {selectedIds.size === items.length ? '전체 해제' : '전체 선택'}
+              {selectedIds.size === items.length ? 'Clear all' : 'Select all'}
             </button>
-            <span className="text-sm text-muted-foreground" aria-live="polite" aria-atomic="true">
-              {selectedIds.size}개 선택됨
+            <span
+              className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground"
+              aria-live="polite"
+              aria-atomic="true"
+            >
+              <span className="text-primary" aria-hidden="true">—</span> {selectedIds.size} selected
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -624,7 +633,11 @@ export function FeedList() {
                 disabled={selectedIds.size === 0 || bulkUnreading}
                 onClick={() => setBulkUnreadOpen(true)}
               >
-                {bulkUnreading ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" aria-hidden="true" /> : <MailX className="h-4 w-4 mr-1.5" aria-hidden="true" />}
+                {bulkUnreading ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-1.5" aria-hidden="true" />
+                ) : (
+                  <MailX className="h-4 w-4 mr-1.5" aria-hidden="true" />
+                )}
                 {bulkUnreading ? '이동 중...' : '안읽음으로'}
               </Button>
             )}
@@ -634,7 +647,11 @@ export function FeedList() {
               disabled={selectedIds.size === 0 || deleting}
               onClick={() => setBulkDeleteOpen(true)}
             >
-              {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" aria-hidden="true" /> : <Trash2 className="h-4 w-4 mr-1.5" aria-hidden="true" />}
+              {deleting ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1.5" aria-hidden="true" />
+              ) : (
+                <Trash2 className="h-4 w-4 mr-1.5" aria-hidden="true" />
+              )}
               {deleting ? '삭제 중...' : '삭제'}
             </Button>
           </div>
@@ -702,52 +719,61 @@ export function FeedList() {
 
       {/* Collection chips (bookmark tab only) */}
       {isBookmarkTab && (
-        <div className="flex items-center gap-2 mb-4 overflow-x-auto scrollbar-hide pb-0.5">
+        <div className="flex items-center gap-1.5 mb-4 overflow-x-auto scrollbar-hide pb-0.5">
           {collections.length > 0 && (
             <>
               <button
+                type="button"
                 onClick={() => setSelectedCollectionId('')}
                 className={cn(
-                  'shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+                  'shrink-0 px-2.5 py-1.5 rounded-sm text-xs border transition-colors cursor-pointer',
                   selectedCollectionId === ''
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+                    ? 'bg-primary/10 text-primary border-primary/40'
+                    : 'bg-background text-muted-foreground border-border hover:text-foreground hover:border-muted-foreground',
                 )}
               >
-                전체
+                All
               </button>
               {collections.map((col) => (
                 <button
+                  type="button"
                   key={col.id}
-                  onClick={() => setSelectedCollectionId(col.id === selectedCollectionId ? '' : col.id)}
+                  onClick={() =>
+                    setSelectedCollectionId(col.id === selectedCollectionId ? '' : col.id)
+                  }
                   className={cn(
-                    'shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+                    'shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-sm text-xs border transition-colors cursor-pointer',
                     selectedCollectionId === col.id
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+                      ? 'bg-primary/10 text-primary border-primary/40'
+                      : 'bg-background text-muted-foreground border-border hover:text-foreground hover:border-muted-foreground',
                   )}
                 >
-                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: col.color }} />
+                  <span
+                    className="w-2 h-2 rounded-full shrink-0"
+                    style={{backgroundColor: col.color}}
+                    aria-hidden="true"
+                  />
                   {col.name}
                   {col.count !== undefined && col.count > 0 && (
-                    <span className="text-[10px] opacity-70">{col.count}</span>
+                    <span className="font-mono text-[10px] opacity-70">{col.count}</span>
                   )}
                 </button>
               ))}
             </>
           )}
           <button
+            type="button"
             onClick={() => setCollectionManagerOpen(true)}
             className={cn(
-              'shrink-0 flex items-center gap-1.5 rounded-full text-xs font-medium transition-colors',
+              'shrink-0 flex items-center gap-1.5 rounded-sm text-xs transition-colors cursor-pointer',
               collections.length === 0
-                ? 'px-3 py-1.5 bg-muted/60 text-muted-foreground hover:bg-muted'
-                : 'p-1.5 text-muted-foreground/60 hover:text-foreground hover:bg-muted'
+                ? 'px-2.5 py-1.5 border border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground'
+                : 'p-1.5 text-muted-foreground/60 hover:text-foreground',
             )}
             aria-label="컬렉션 관리"
           >
-            <Settings2 className="h-3.5 w-3.5" />
-            {collections.length === 0 && <span>컬렉션 만들기</span>}
+            <Settings2 className="h-3.5 w-3.5" aria-hidden="true" />
+            {collections.length === 0 && <span>New collection</span>}
           </button>
         </div>
       )}
@@ -757,19 +783,22 @@ export function FeedList() {
       {loading ? (
         <FeedSkeleton />
       ) : items.length === 0 ? (
-        <div className="flex flex-col items-center justify-center min-h-[30vh] text-center">
-          <p className="text-sm text-muted-foreground">
+        <div className="flex flex-col items-center justify-center min-h-[40vh] text-center max-w-sm mx-auto">
+          <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-3">
+            <span className="text-primary" aria-hidden="true">—</span> Nothing here
+          </p>
+          <p className="font-display text-2xl leading-snug text-foreground">
             {search
               ? `"${search.slice(0, 100)}" 검색 결과가 없습니다.`
               : selectedTags.length > 0
                 ? '선택한 태그에 맞는 글이 없습니다.'
                 : status === 'unread'
-                  ? '안읽은 글이 없어요. 모두 읽었어요!'
+                  ? '안읽은 글이 없어요. 모두 읽었어요.'
                   : status === 'read'
                     ? '읽은 글이 없어요.'
                     : status === 'bookmarked'
                       ? '북마크한 글이 없습니다.'
-                      : '수집된 글이 없습니다. 소스를 추가하고 수집해보세요.'}
+                      : '수집된 글이 없습니다.'}
           </p>
         </div>
       ) : (
