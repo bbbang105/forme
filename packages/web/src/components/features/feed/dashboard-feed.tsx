@@ -1,4 +1,3 @@
-import {ExternalLink} from 'lucide-react';
 import {cn} from '@/lib/utils';
 import {formatRelativeDate, getArticleGradient, getCategoryStyle} from '@/lib/feed-utils';
 import {getAuthUser} from '@/lib/auth';
@@ -7,40 +6,21 @@ import {and, desc, eq, isNull, sql} from 'drizzle-orm';
 import {SectionHeader} from '@/components/ui/section-header';
 import {MiniCardLink} from './mini-card-link';
 import {MiniCardThumbnail} from './mini-card-thumbnail';
+import {FeedHeroRotator, type HeroItem} from './dashboard-feed-hero';
+
+const FETCH_LIMIT = 12;
+const HERO_COUNT = 4;
 
 /**
- * Server-side shape mirroring the serialized API response used by
- * MiniCard. Dates are pre-formatted strings for display.
- */
-interface MiniCardItem {
-  id: string;
-  title: string;
-  url: string;
-  thumbnailUrl: string | null;
-  publishedAt: string | null;
-  category: string;
-  sourceName: string | null;
-}
-
-/**
- * DashboardFeed — async server component.
+ * DashboardFeed — feed-first magazine layout.
  *
- * Fetches the 3 most recent unread feed items directly via Drizzle ORM,
- * bypassing the HTTP round-trip that the previous 'use client' version made
- * to /api/feed. Rendering happens server-side: zero client JS, no
- * loading state, no layout shift from a useEffect fetch, and the data is
- * available the moment the Suspense boundary resolves.
- *
- * The only interactive sub-component is MiniCardThumbnail (image error
- * fallback), which is a small 'use client' island. Everything else is plain
- * server-rendered HTML.
+ * 최상단 히어로 로테이터(4편 자동 전환) + 하단 그리드(최대 8편 카드).
+ * Unread 피드를 최대 12건 받아 4/8로 분할한다. 소량일 때는 갖고 있는 만큼만 렌더.
  */
 export async function DashboardFeed() {
   const user = await getAuthUser();
 
-  // Replicate the /api/feed?status=unread&limit=3 query used previously.
-  // COALESCE(publishedAt, collectedAt) matches the sort date expression in the
-  // full feed API route so results stay consistent.
+  // COALESCE(publishedAt, collectedAt)로 RSS가 날짜 없을 때도 정렬 안정화.
   const sortDateExpr = sql`COALESCE(${feedItems.publishedAt}, ${feedItems.collectedAt})`;
 
   const rows = await db
@@ -52,6 +32,7 @@ export async function DashboardFeed() {
       publishedAt: feedItems.publishedAt,
       category: feedItems.category,
       sourceName: feedSources.name,
+      description: feedItems.description,
     })
     .from(feedItems)
     .innerJoin(feedSources, eq(feedItems.sourceId, feedSources.id))
@@ -63,11 +44,11 @@ export async function DashboardFeed() {
       )
     )
     .orderBy(sql`${sortDateExpr} DESC`, desc(feedItems.id))
-    .limit(3);
+    .limit(FETCH_LIMIT);
 
   if (rows.length === 0) return null;
 
-  const items: MiniCardItem[] = rows.map((row) => ({
+  const items: HeroItem[] = rows.map((row) => ({
     id: row.id,
     title: row.title,
     url: row.url,
@@ -75,30 +56,40 @@ export async function DashboardFeed() {
     publishedAt: row.publishedAt ? row.publishedAt.toISOString() : null,
     category: row.category,
     sourceName: row.sourceName ?? null,
+    description: row.description ?? null,
   }));
 
+  const heroItems = items.slice(0, HERO_COUNT);
+  const gridItems = items.slice(HERO_COUNT);
+
   return (
-    <section className="space-y-4">
+    <section className="space-y-8">
       <SectionHeader
         eyebrow="Feed"
-        title="최신 읽을거리"
+        title="오늘의 읽을거리"
         actionHref="/feed"
         actionLabel="View all"
       />
 
-      <ul className="space-y-2">
-        {items.map((item) => (
-          <li key={item.id}>
-            <MiniCard item={item} />
-          </li>
-        ))}
-      </ul>
+      {heroItems.length > 0 && (
+        <div className="pb-8 border-b border-border">
+          <FeedHeroRotator items={heroItems} />
+        </div>
+      )}
+
+      {gridItems.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-8">
+          {gridItems.map((item) => (
+            <FeedGridCard key={item.id} item={item} />
+          ))}
+        </div>
+      )}
     </section>
   );
 }
 
-/** Server-rendered mini card — no client state except the thumbnail island. */
-function MiniCard({ item }: { item: MiniCardItem }) {
+/** 히어로 밑 8개 카드 그리드의 단일 카드. 썸네일 위, 메타 + 제목 아래. */
+function FeedGridCard({item}: {item: HeroItem}) {
   const catStyle = getCategoryStyle(item.category);
   const relativeDate = formatRelativeDate(item.publishedAt);
   const gradient = getArticleGradient(item.title);
@@ -107,22 +98,16 @@ function MiniCard({ item }: { item: MiniCardItem }) {
     <MiniCardLink
       itemId={item.id}
       href={item.url}
-      className={cn(
-        'group flex items-start gap-3 py-3 border-b border-border/60 last:border-b-0',
-        'transition-colors',
-      )}
+      className="group flex flex-col gap-3"
     >
-      {/* Thumbnail — client island handles img error fallback */}
-      <div className="w-20 h-20 rounded-sm overflow-hidden bg-muted shrink-0">
+      <div className="aspect-[16/10] overflow-hidden rounded-sm bg-muted">
         <MiniCardThumbnail src={item.thumbnailUrl} gradient={gradient} />
       </div>
-
-      {/* Content */}
-      <div className="flex-1 min-w-0 space-y-1.5">
-        <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+      <div className="space-y-2 min-w-0">
+        <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground min-w-0">
           <span
             className={cn(
-              'inline-flex rounded-sm px-1.5 py-0.5 ring-1 ring-inset normal-case tracking-normal',
+              'inline-flex rounded-sm px-1.5 py-0.5 ring-1 ring-inset normal-case tracking-normal shrink-0',
               catStyle.bg,
               catStyle.text,
               catStyle.ring,
@@ -130,22 +115,20 @@ function MiniCard({ item }: { item: MiniCardItem }) {
           >
             {catStyle.label}
           </span>
-          {item.sourceName && (
-            <span className="truncate">{item.sourceName}</span>
-          )}
+          {item.sourceName && <span className="truncate">{item.sourceName}</span>}
           {relativeDate && (
             <>
-              <span className="text-primary shrink-0" aria-hidden="true">·</span>
+              <span className="text-primary shrink-0" aria-hidden="true">
+                ·
+              </span>
               <span className="shrink-0">{relativeDate}</span>
             </>
           )}
         </div>
-        <h4 className="font-display text-base leading-snug text-foreground line-clamp-2 group-hover:text-primary transition-colors">
+        <h4 className="font-display text-lg leading-snug text-foreground line-clamp-2 group-hover:text-primary transition-colors">
           {item.title}
         </h4>
       </div>
-
-      <ExternalLink className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-primary transition-colors shrink-0 mt-1" aria-hidden="true" />
     </MiniCardLink>
   );
 }
