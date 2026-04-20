@@ -15,7 +15,7 @@ export const metadata: Metadata = {
     default: 'forme',
     template: '%s | forme',
   },
-  description: '개인 올인원 PWA - 큐레이션, 캘린더, 메모, 팟캐스트',
+  description: '개인 올인원 PWA - 큐레이션, 캘린더, 메모',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',

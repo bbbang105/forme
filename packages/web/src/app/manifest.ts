@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: 'forme - 개인 올인원',
     short_name: 'forme',
-    description: '큐레이션, 캘린더, 메모, 팟캐스트를 한곳에서',
+    description: '큐레이션, 캘린더, 메모, 유튜브 요약을 한곳에서',
     start_url: '/',
     scope: '/',
     display: 'standalone',

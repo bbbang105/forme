@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import {usePathname} from 'next/navigation';
-import {Calendar, Headphones, Newspaper, PlayCircle, StickyNote} from 'lucide-react';
+import {Calendar, Newspaper, PlayCircle, StickyNote} from 'lucide-react';
 import {cn} from '@/lib/utils';
 
 const tabs = [
@@ -10,7 +10,6 @@ const tabs = [
   { href: '/video', label: '유튜브', icon: PlayCircle },
   { href: '/calendar', label: '캘린더', icon: Calendar },
   { href: '/memo', label: '메모', icon: StickyNote },
-  { href: '/podcast', label: '팟캐스트', icon: Headphones },
 ];
 
 export function TabBar() {

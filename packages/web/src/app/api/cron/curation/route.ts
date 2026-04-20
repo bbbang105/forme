@@ -110,7 +110,7 @@ export const GET = withTracing('GET /api/cron/curation', async (request) => {
           : '';
 
         await sendDiscordEmbed(
-          `NotebookLM 팟캐스트 소스 (${totalNewItems}개)`,
+          `NotebookLM 소스 (${totalNewItems}개)`,
           `아래 URL을 NotebookLM에 붙여넣으세요${countNote}:\n\n${urlList}`,
         );
       } catch (err) {

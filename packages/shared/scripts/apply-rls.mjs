@@ -27,16 +27,6 @@ const statements = [
   `CREATE POLICY "items_select" ON curation_items FOR SELECT USING (EXISTS (SELECT 1 FROM curation_sources WHERE id = source_id AND user_id = auth.uid()))`,
   `CREATE POLICY "items_update" ON curation_items FOR UPDATE USING (EXISTS (SELECT 1 FROM curation_sources WHERE id = source_id AND user_id = auth.uid()))`,
   `CREATE POLICY "items_delete" ON curation_items FOR DELETE USING (EXISTS (SELECT 1 FROM curation_sources WHERE id = source_id AND user_id = auth.uid()))`,
-  // Podcast Episodes RLS
-  `ALTER TABLE podcast_episodes ENABLE ROW LEVEL SECURITY`,
-  `DROP POLICY IF EXISTS "episodes_select" ON podcast_episodes`,
-  `DROP POLICY IF EXISTS "episodes_insert" ON podcast_episodes`,
-  `DROP POLICY IF EXISTS "episodes_update" ON podcast_episodes`,
-  `DROP POLICY IF EXISTS "episodes_delete" ON podcast_episodes`,
-  `CREATE POLICY "episodes_select" ON podcast_episodes FOR SELECT USING (auth.uid() = user_id)`,
-  `CREATE POLICY "episodes_insert" ON podcast_episodes FOR INSERT WITH CHECK (auth.uid() = user_id)`,
-  `CREATE POLICY "episodes_update" ON podcast_episodes FOR UPDATE USING (auth.uid() = user_id)`,
-  `CREATE POLICY "episodes_delete" ON podcast_episodes FOR DELETE USING (auth.uid() = user_id)`,
   // Push Subscriptions RLS
   `ALTER TABLE push_subscriptions ENABLE ROW LEVEL SECURITY`,
   `DROP POLICY IF EXISTS "push_subs_select" ON push_subscriptions`,

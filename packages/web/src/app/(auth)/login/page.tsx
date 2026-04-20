@@ -53,7 +53,7 @@ function LoginForm() {
             로그인
           </h1>
           <p className="text-sm text-muted-foreground leading-relaxed">
-            나만의 큐레이션, 메모, 팟캐스트
+            나만의 큐레이션, 캘린더, 메모
           </p>
         </div>
       </CardHeader>

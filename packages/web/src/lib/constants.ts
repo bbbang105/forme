@@ -1,9 +1,8 @@
 /**
  * Application-wide constants shared across features.
  *
- * Other worktrees (curation, calendar/memo, podcast) will extend this file
- * with their own feature-specific constants. Centralising them here avoids
- * magic numbers scattered across the codebase and makes global tuning easy.
+ * Centralising constants here avoids magic numbers scattered across the
+ * codebase and makes global tuning easy.
  */
 
 // ── Pagination ──────────────────────────────────────────────────────────────
