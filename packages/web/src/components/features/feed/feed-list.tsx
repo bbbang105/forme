@@ -717,58 +717,72 @@ export function FeedList() {
         }
       />
 
-      {/* Collection chips (bookmark tab only) */}
+      {/* Collection chips (bookmark tab only) — editorial text buttons with em-dash marker */}
       {isBookmarkTab && (
-        <div className="flex items-center gap-1.5 mb-4 overflow-x-auto scrollbar-hide pb-0.5">
+        <div className="flex items-center gap-5 mb-4 overflow-x-auto scrollbar-hide pb-0.5">
           {collections.length > 0 && (
             <>
               <button
                 type="button"
                 onClick={() => setSelectedCollectionId('')}
                 className={cn(
-                  'shrink-0 px-2.5 py-1.5 rounded-sm text-xs border transition-colors cursor-pointer',
+                  'shrink-0 font-mono text-[11px] uppercase tracking-[0.1em] transition-colors cursor-pointer',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm',
                   selectedCollectionId === ''
-                    ? 'bg-primary/10 text-primary border-primary/40'
-                    : 'bg-background text-muted-foreground border-border hover:text-foreground hover:border-muted-foreground',
+                    ? 'text-primary'
+                    : 'text-muted-foreground hover:text-foreground',
                 )}
               >
+                {selectedCollectionId === '' && (
+                  <span aria-hidden="true" className="mr-1.5">
+                    —
+                  </span>
+                )}
                 All
               </button>
-              {collections.map((col) => (
-                <button
-                  type="button"
-                  key={col.id}
-                  onClick={() =>
-                    setSelectedCollectionId(col.id === selectedCollectionId ? '' : col.id)
-                  }
-                  className={cn(
-                    'shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-sm text-xs border transition-colors cursor-pointer',
-                    selectedCollectionId === col.id
-                      ? 'bg-primary/10 text-primary border-primary/40'
-                      : 'bg-background text-muted-foreground border-border hover:text-foreground hover:border-muted-foreground',
-                  )}
-                >
-                  <span
-                    className="w-2 h-2 rounded-full shrink-0"
-                    style={{backgroundColor: col.color}}
-                    aria-hidden="true"
-                  />
-                  {col.name}
-                  {col.count !== undefined && col.count > 0 && (
-                    <span className="font-mono text-[10px] opacity-70">{col.count}</span>
-                  )}
-                </button>
-              ))}
+              {collections.map((col) => {
+                const active = col.id === selectedCollectionId;
+                return (
+                  <button
+                    type="button"
+                    key={col.id}
+                    onClick={() =>
+                      setSelectedCollectionId(col.id === selectedCollectionId ? '' : col.id)
+                    }
+                    className={cn(
+                      'shrink-0 inline-flex items-baseline gap-1.5 text-xs transition-colors cursor-pointer',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm',
+                      active
+                        ? 'text-primary font-medium'
+                        : 'text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    {active && (
+                      <span
+                        aria-hidden="true"
+                        className="font-mono text-[11px] tracking-[0.1em]"
+                      >
+                        —
+                      </span>
+                    )}
+                    <span>{col.name}</span>
+                    {col.count !== undefined && col.count > 0 && (
+                      <span className="font-mono text-[10px] opacity-60">{col.count}</span>
+                    )}
+                  </button>
+                );
+              })}
             </>
           )}
           <button
             type="button"
             onClick={() => setCollectionManagerOpen(true)}
             className={cn(
-              'shrink-0 flex items-center gap-1.5 rounded-sm text-xs transition-colors cursor-pointer',
+              'shrink-0 inline-flex items-center gap-1.5 transition-colors cursor-pointer',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm',
               collections.length === 0
-                ? 'px-2.5 py-1.5 border border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground'
-                : 'p-1.5 text-muted-foreground/60 hover:text-foreground',
+                ? 'font-mono text-[11px] uppercase tracking-[0.1em] text-muted-foreground hover:text-foreground'
+                : 'p-1 text-muted-foreground/50 hover:text-foreground ml-auto',
             )}
             aria-label="컬렉션 관리"
           >
