@@ -4,7 +4,7 @@ import {memo, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import Image from 'next/image';
 import {Bookmark, BookmarkCheck, Check, FileText, MessageSquare, Pin, PinOff, Trash2} from 'lucide-react';
 import {cn} from '@/lib/utils';
-import {ITEM_MEMO_MAX_LENGTH} from '@/lib/constants';
+import {ITEM_NOTE_MAX_LENGTH} from '@/lib/constants';
 import {formatRelativeDate, getArticleGradient, getCategoryStyle} from '@/lib/feed-utils';
 import {Checkbox} from '@/components/ui/checkbox';
 import {useSwipeAction} from '@/hooks/use-swipe-action';
@@ -29,7 +29,7 @@ export interface FeedItemData {
   isBookmarked: boolean;
   collectedAt: string;
   sourceName: string | null;
-  memo: string | null;
+  note: string | null;
   /** ISO string if the bookmark is pinned to the top of the Saved view, otherwise null. */
   pinnedAt: string | null;
 }
@@ -39,7 +39,7 @@ interface FeedCardProps {
   onToggleBookmark: (id: string, isBookmarked: boolean) => void;
   onMarkRead: (id: string) => void;
   onDelete?: (id: string) => void;
-  onMemoChange?: (id: string, memo: string | null) => void;
+  onMemoChange?: (id: string, note: string | null) => void;
   /** Toggle pin state. When omitted, the pin button isn't rendered. */
   onTogglePin?: (id: string, pinned: boolean) => void;
   /** When true, a *new* pin is blocked (already 3 pinned). Has no effect on items that are already pinned. */
@@ -49,7 +49,7 @@ interface FeedCardProps {
   selected?: boolean;
   onToggleSelect?: (id: string) => void;
   compact?: boolean;
-  /** Render the saved-view variant: ember border when pinned, full memo body, no description. */
+  /** Render the saved-view variant: ember border when pinned, full note body, no description. */
   savedVariant?: boolean;
 }
 
@@ -95,7 +95,7 @@ function InlineMemo({
 }: {
   itemId: string;
   initialMemo: string | null;
-  onMemoChange: (id: string, memo: string | null) => void;
+  onMemoChange: (id: string, note: string | null) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(initialMemo ?? '');
@@ -176,15 +176,15 @@ function InlineMemo({
             setEditing(false);
           }
         }}
-        maxLength={ITEM_MEMO_MAX_LENGTH}
+        maxLength={ITEM_NOTE_MAX_LENGTH}
         rows={2}
-        placeholder="메모를 입력하세요…"
-        aria-label="메모 입력"
+        placeholder="노트를 입력하세요…"
+        aria-label="노트 입력"
         className="w-full text-base sm:text-sm bg-transparent text-foreground placeholder:text-muted-foreground/50 resize-none focus:outline-none"
       />
       <div className="flex items-center justify-between mt-1">
         <span className="font-mono text-[10px] text-muted-foreground/50">
-          {value.length}/{ITEM_MEMO_MAX_LENGTH}
+          {value.length}/{ITEM_NOTE_MAX_LENGTH}
         </span>
         <div className="flex gap-3">
           <button
@@ -474,7 +474,7 @@ export const FeedCard = memo(function FeedCard({
 
   // Default: magazine grid card (thumbnail on top, body below).
   // savedVariant (Saved tab) adds ember border + `pinned` label when pinned,
-  // and promotes memo to the body (no description shown).
+  // and promotes note to the body (no description shown).
   return (
     <div className="relative overflow-hidden">
       <SwipeBackground direction="right" />
@@ -538,12 +538,12 @@ export const FeedCard = memo(function FeedCard({
               </p>
             )}
 
-            {/* Inline memo (bookmark / read tabs) */}
+            {/* Inline note (bookmark / read tabs) */}
             {showMemo && !selectMode && onMemoChange && (
               <InlineMemo
-                key={item.memo ?? ''}
+                key={item.note ?? ''}
                 itemId={item.id}
-                initialMemo={item.memo}
+                initialMemo={item.note}
                 onMemoChange={onMemoChange}
               />
             )}
@@ -664,12 +664,12 @@ export const FeedListRow = memo(function FeedListRow({
           </p>
         )}
 
-        {/* Inline memo (bookmark / read tabs) */}
+        {/* Inline note (bookmark / read tabs) */}
         {showMemo && !selectMode && onMemoChange && (
           <InlineMemo
-            key={item.memo ?? ''}
+            key={item.note ?? ''}
             itemId={item.id}
-            initialMemo={item.memo}
+            initialMemo={item.note}
             onMemoChange={onMemoChange}
           />
         )}

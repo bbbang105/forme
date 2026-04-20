@@ -84,7 +84,7 @@ export function withTracing(label: string, handler: RouteHandler): RouteHandler 
  * 서버 액션의 실행 시간을 측정합니다.
  *
  * @example
- * const { result, duration } = await traceAction('getMemos', async () => {
+ * const { result, duration } = await traceAction('getNotes', async () => {
  *   return db.select()...
  * });
  */
@@ -127,8 +127,8 @@ export async function traceAction<T>(
  * DB 쿼리 실행 시간을 측정합니다.
  *
  * @example
- * const rows = await traceQuery('memos.list', () =>
- *   db.select().from(memos).where(eq(memos.userId, user.id))
+ * const rows = await traceQuery('notes.list', () =>
+ *   db.select().from(notes).where(eq(notes.userId, user.id))
  * );
  */
 export async function traceQuery<T>(

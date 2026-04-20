@@ -4,7 +4,7 @@ import {feedItems, feedSources, db} from '@forme/shared';
 import {and, count, eq, isNotNull, isNull, ne} from 'drizzle-orm';
 import {withTracing} from '@/lib/logger';
 import {UUID_REGEX} from '@/lib/validators';
-import {ITEM_MEMO_MAX_LENGTH} from '@/lib/constants';
+import {ITEM_NOTE_MAX_LENGTH} from '@/lib/constants';
 
 /** Max items a user can pin to the top of the Saved view. */
 const MAX_PINNED = 3;
@@ -14,7 +14,7 @@ const MAX_PINNED = 3;
 interface PatchBody {
   isRead?: boolean;
   isBookmarked?: boolean;
-  memo?: string | null;
+  note?: string | null;
   /** When `true`, sets `pinned_at = now()`. When `false`, clears it. Enforces MAX_PINNED. */
   pinned?: boolean;
 }
@@ -74,10 +74,10 @@ export const DELETE = withTracing('DELETE /api/feed/[id]', async (_request, ctx)
 /**
  * PATCH /api/feed/[id]
  *
- * Updates read / bookmark / memo / pinned on a single feed item.
+ * Updates read / bookmark / note / pinned on a single feed item.
  * Ownership verified by joining through feed_sources.user_id.
  *
- * Body: { isRead?, isBookmarked?, memo?, pinned? }
+ * Body: { isRead?, isBookmarked?, note?, pinned? }
  */
 export const PATCH = withTracing('PATCH /api/feed/[id]', async (request, ctx) => {
   const { id } = await (ctx as { params: Promise<{ id: string }> }).params;
@@ -106,9 +106,9 @@ export const PATCH = withTracing('PATCH /api/feed/[id]', async (request, ctx) =>
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const { isRead, isBookmarked, memo, pinned } = body;
+  const { isRead, isBookmarked, note, pinned } = body;
 
-  if (isRead === undefined && isBookmarked === undefined && memo === undefined && pinned === undefined) {
+  if (isRead === undefined && isBookmarked === undefined && note === undefined && pinned === undefined) {
     return NextResponse.json(
       { error: 'At least one field must be provided' },
       { status: 400 }
@@ -121,8 +121,8 @@ export const PATCH = withTracing('PATCH /api/feed/[id]', async (request, ctx) =>
   if (isBookmarked !== undefined && typeof isBookmarked !== 'boolean') {
     return NextResponse.json({ error: 'isBookmarked must be a boolean' }, { status: 400 });
   }
-  if (memo !== undefined && memo !== null && typeof memo !== 'string') {
-    return NextResponse.json({ error: 'memo must be a string or null' }, { status: 400 });
+  if (note !== undefined && note !== null && typeof note !== 'string') {
+    return NextResponse.json({ error: 'note must be a string or null' }, { status: 400 });
   }
   if (pinned !== undefined && typeof pinned !== 'boolean') {
     return NextResponse.json({ error: 'pinned must be a boolean' }, { status: 400 });
@@ -155,7 +155,7 @@ export const PATCH = withTracing('PATCH /api/feed/[id]', async (request, ctx) =>
       isRead: boolean;
       isBookmarked: boolean;
       readAt: Date | null;
-      memo: string | null;
+      note: string | null;
       pinnedAt: Date | null;
     }> = {};
 
@@ -164,10 +164,10 @@ export const PATCH = withTracing('PATCH /api/feed/[id]', async (request, ctx) =>
       updateValues.readAt = isRead ? new Date() : null;
     }
     if (isBookmarked !== undefined) updateValues.isBookmarked = isBookmarked;
-    if (memo !== undefined) {
-      updateValues.memo = memo ? memo.slice(0, ITEM_MEMO_MAX_LENGTH) : null;
-      // 메모 추가 시 자동 북마크 (단, 명시적 isBookmarked 지정 시 덮어쓰지 않음)
-      if (memo && isBookmarked === undefined) updateValues.isBookmarked = true;
+    if (note !== undefined) {
+      updateValues.note = note ? note.slice(0, ITEM_NOTE_MAX_LENGTH) : null;
+      // 노트 추가 시 자동 북마크 (단, 명시적 isBookmarked 지정 시 덮어쓰지 않음)
+      if (note && isBookmarked === undefined) updateValues.isBookmarked = true;
     }
 
     if (pinned !== undefined) {
@@ -225,7 +225,7 @@ export const PATCH = withTracing('PATCH /api/feed/[id]', async (request, ctx) =>
       isRead: updated.isRead,
       isBookmarked: updated.isBookmarked,
       collectedAt: updated.collectedAt.toISOString(),
-      memo: updated.memo ?? null,
+      note: updated.note ?? null,
       pinnedAt: updated.pinnedAt?.toISOString() ?? null,
     });
   } catch (err) {

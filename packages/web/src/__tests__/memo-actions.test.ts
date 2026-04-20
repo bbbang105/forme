@@ -40,7 +40,7 @@ const { mockDb } = vi.hoisted(() => {
 
 vi.mock('@forme/shared', () => ({
   db: mockDb,
-  memos: {
+  notes: {
     id: 'id', userId: 'user_id', title: 'title',
     content: 'content', contentText: 'content_text',
     isPinned: 'is_pinned', createdAt: 'created_at', updatedAt: 'updated_at',
@@ -61,77 +61,77 @@ describe('Memo Actions', () => {
     setDbResolve([{ id: 'test-id', isPinned: false, title: '', contentText: '' }]);
   });
 
-  describe('createMemo', () => {
+  describe('createNote', () => {
     it('should throw if not authenticated', async () => {
       setMockUser(null);
-      const { createMemo } = await import('@/lib/actions/memos');
-      await expect(createMemo()).rejects.toThrow('Unauthorized');
+      const { createNote } = await import('@/lib/actions/notes');
+      await expect(createNote()).rejects.toThrow('Unauthorized');
     });
 
     it('should succeed when authenticated', async () => {
       setMockUser('user-123');
       setDbResolve([{ id: 'new-id', title: '', content: {}, contentText: '' }]);
-      const { createMemo } = await import('@/lib/actions/memos');
-      const result = await createMemo();
+      const { createNote } = await import('@/lib/actions/notes');
+      const result = await createNote();
       expect(result).toBeDefined();
       expect(result.id).toBe('new-id');
     });
   });
 
-  describe('getMemo', () => {
+  describe('getNote', () => {
     it('should throw if not authenticated', async () => {
       setMockUser(null);
-      const { getMemo } = await import('@/lib/actions/memos');
-      await expect(getMemo('550e8400-e29b-41d4-a716-446655440000')).rejects.toThrow('Unauthorized');
+      const { getNote } = await import('@/lib/actions/notes');
+      await expect(getNote('550e8400-e29b-41d4-a716-446655440000')).rejects.toThrow('Unauthorized');
     });
 
     it('should throw if id is not valid UUID', async () => {
       setMockUser('user-123');
-      const { getMemo } = await import('@/lib/actions/memos');
-      await expect(getMemo('invalid-id')).rejects.toThrow('잘못된 ID입니다');
+      const { getNote } = await import('@/lib/actions/notes');
+      await expect(getNote('invalid-id')).rejects.toThrow('잘못된 ID입니다');
     });
 
-    it('should return null if memo not found', async () => {
+    it('should return null if note not found', async () => {
       setMockUser('user-123');
       setDbResolve([]);
-      const { getMemo } = await import('@/lib/actions/memos');
-      const result = await getMemo('550e8400-e29b-41d4-a716-446655440000');
+      const { getNote } = await import('@/lib/actions/notes');
+      const result = await getNote('550e8400-e29b-41d4-a716-446655440000');
       expect(result).toBeNull();
     });
   });
 
-  describe('updateMemo', () => {
+  describe('updateNote', () => {
     it('should throw if not authenticated', async () => {
       setMockUser(null);
-      const { updateMemo } = await import('@/lib/actions/memos');
+      const { updateNote } = await import('@/lib/actions/notes');
       await expect(
-        updateMemo('550e8400-e29b-41d4-a716-446655440000', { title: 'Test' })
+        updateNote('550e8400-e29b-41d4-a716-446655440000', { title: 'Test' })
       ).rejects.toThrow('Unauthorized');
     });
 
     it('should throw if title exceeds 200 characters', async () => {
       setMockUser('user-123');
-      const { updateMemo } = await import('@/lib/actions/memos');
+      const { updateNote } = await import('@/lib/actions/notes');
       const longTitle = 'a'.repeat(201);
       await expect(
-        updateMemo('550e8400-e29b-41d4-a716-446655440000', { title: longTitle })
+        updateNote('550e8400-e29b-41d4-a716-446655440000', { title: longTitle })
       ).rejects.toThrow('제목은 200자 이내여야 합니다');
     });
 
     it('should throw if contentText exceeds limit', async () => {
       setMockUser('user-123');
-      const { updateMemo } = await import('@/lib/actions/memos');
+      const { updateNote } = await import('@/lib/actions/notes');
       const longContent = 'a'.repeat(50001);
       await expect(
-        updateMemo('550e8400-e29b-41d4-a716-446655440000', { contentText: longContent })
-      ).rejects.toThrow('메모 내용은');
+        updateNote('550e8400-e29b-41d4-a716-446655440000', { contentText: longContent })
+      ).rejects.toThrow('노트 내용은');
     });
 
     it('should throw if content is not valid TipTap JSON', async () => {
       setMockUser('user-123');
-      const { updateMemo } = await import('@/lib/actions/memos');
+      const { updateNote } = await import('@/lib/actions/notes');
       await expect(
-        updateMemo('550e8400-e29b-41d4-a716-446655440000', {
+        updateNote('550e8400-e29b-41d4-a716-446655440000', {
           content: { type: 'invalid' },
         })
       ).rejects.toThrow('잘못된 콘텐츠 형식입니다');
@@ -140,8 +140,8 @@ describe('Memo Actions', () => {
     it('should sanitize javascript: links in content', async () => {
       setMockUser('user-123');
       setDbResolve([{ id: 'test-id', title: 'Test' }]);
-      const { updateMemo } = await import('@/lib/actions/memos');
-      const result = await updateMemo('550e8400-e29b-41d4-a716-446655440000', {
+      const { updateNote } = await import('@/lib/actions/notes');
+      const result = await updateNote('550e8400-e29b-41d4-a716-446655440000', {
         content: {
           type: 'doc',
           content: [{
@@ -160,8 +160,8 @@ describe('Memo Actions', () => {
     it('should succeed with valid data', async () => {
       setMockUser('user-123');
       setDbResolve([{ id: 'test-id', title: 'Updated' }]);
-      const { updateMemo } = await import('@/lib/actions/memos');
-      const result = await updateMemo('550e8400-e29b-41d4-a716-446655440000', {
+      const { updateNote } = await import('@/lib/actions/notes');
+      const result = await updateNote('550e8400-e29b-41d4-a716-446655440000', {
         title: 'Updated',
       });
       expect(result).toBeDefined();
@@ -169,39 +169,39 @@ describe('Memo Actions', () => {
 
     it('should throw if id is not valid UUID', async () => {
       setMockUser('user-123');
-      const { updateMemo } = await import('@/lib/actions/memos');
+      const { updateNote } = await import('@/lib/actions/notes');
       await expect(
-        updateMemo('bad-id', { title: 'Test' })
+        updateNote('bad-id', { title: 'Test' })
       ).rejects.toThrow('잘못된 ID입니다');
     });
   });
 
-  describe('deleteMemo', () => {
+  describe('deleteNote', () => {
     it('should throw if not authenticated', async () => {
       setMockUser(null);
-      const { deleteMemo } = await import('@/lib/actions/memos');
-      await expect(deleteMemo('550e8400-e29b-41d4-a716-446655440000')).rejects.toThrow('Unauthorized');
+      const { deleteNote } = await import('@/lib/actions/notes');
+      await expect(deleteNote('550e8400-e29b-41d4-a716-446655440000')).rejects.toThrow('Unauthorized');
     });
 
     it('should succeed when authenticated', async () => {
       setMockUser('user-123');
-      const { deleteMemo } = await import('@/lib/actions/memos');
+      const { deleteNote } = await import('@/lib/actions/notes');
       await expect(
-        deleteMemo('550e8400-e29b-41d4-a716-446655440000')
+        deleteNote('550e8400-e29b-41d4-a716-446655440000')
       ).resolves.not.toThrow();
     });
 
     it('should throw if id is not valid UUID', async () => {
       setMockUser('user-123');
-      const { deleteMemo } = await import('@/lib/actions/memos');
-      await expect(deleteMemo('bad-id')).rejects.toThrow('잘못된 ID입니다');
+      const { deleteNote } = await import('@/lib/actions/notes');
+      await expect(deleteNote('bad-id')).rejects.toThrow('잘못된 ID입니다');
     });
   });
 
   describe('toggleMemoPin', () => {
     it('should throw if not authenticated', async () => {
       setMockUser(null);
-      const { toggleMemoPin } = await import('@/lib/actions/memos');
+      const { toggleMemoPin } = await import('@/lib/actions/notes');
       await expect(
         toggleMemoPin('550e8400-e29b-41d4-a716-446655440000')
       ).rejects.toThrow('Unauthorized');
@@ -210,46 +210,46 @@ describe('Memo Actions', () => {
     it('should toggle pin when authenticated', async () => {
       setMockUser('user-123');
       setDbResolve([{ id: 'test-id', isPinned: true }]);
-      const { toggleMemoPin } = await import('@/lib/actions/memos');
+      const { toggleMemoPin } = await import('@/lib/actions/notes');
       const result = await toggleMemoPin('550e8400-e29b-41d4-a716-446655440000');
       expect(result).toBeDefined();
     });
   });
 
-  describe('searchMemos', () => {
+  describe('searchNotes', () => {
     it('should throw if not authenticated', async () => {
       setMockUser(null);
-      const { searchMemos } = await import('@/lib/actions/memos');
-      await expect(searchMemos('test')).rejects.toThrow('Unauthorized');
+      const { searchNotes } = await import('@/lib/actions/notes');
+      await expect(searchNotes('test')).rejects.toThrow('Unauthorized');
     });
 
-    it('should return all memos for empty query', async () => {
+    it('should return all notes for empty query', async () => {
       setMockUser('user-123');
       setDbResolve([{ id: '1', title: 'Test', contentText: 'text' }]);
-      const { searchMemos } = await import('@/lib/actions/memos');
-      const result = await searchMemos('  ');
+      const { searchNotes } = await import('@/lib/actions/notes');
+      const result = await searchNotes('  ');
       expect(result).toBeDefined();
     });
 
     it('should throw if query exceeds max length', async () => {
       setMockUser('user-123');
-      const { searchMemos } = await import('@/lib/actions/memos');
+      const { searchNotes } = await import('@/lib/actions/notes');
       const longQuery = 'a'.repeat(201);
-      await expect(searchMemos(longQuery)).rejects.toThrow('검색어는');
+      await expect(searchNotes(longQuery)).rejects.toThrow('검색어는');
     });
   });
 
   describe('getRecentMemos', () => {
     it('should throw if not authenticated', async () => {
       setMockUser(null);
-      const { getRecentMemos } = await import('@/lib/actions/memos');
+      const { getRecentMemos } = await import('@/lib/actions/notes');
       await expect(getRecentMemos()).rejects.toThrow('Unauthorized');
     });
 
     it('should clamp limit to max 20', async () => {
       setMockUser('user-123');
       setDbResolve([]);
-      const { getRecentMemos } = await import('@/lib/actions/memos');
+      const { getRecentMemos } = await import('@/lib/actions/notes');
       const result = await getRecentMemos(100);
       expect(result).toBeDefined();
     });

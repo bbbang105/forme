@@ -520,17 +520,17 @@ function EventFormContent({
             </div>
           </div>
 
-          {/* 메모 */}
+          {/* 노트 */}
           <div className="space-y-1">
-            <Label htmlFor="event-description" className="text-xs text-muted-foreground">메모 (선택)</Label>
+            <Label htmlFor="event-description" className="text-xs text-muted-foreground">노트 (선택)</Label>
             <textarea
               id="event-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="간단한 메모..."
+              placeholder="간단한 노트..."
               rows={1}
               maxLength={2000}
-              aria-label="일정 메모"
+              aria-label="일정 노트"
               className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
             />
           </div>

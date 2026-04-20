@@ -268,17 +268,17 @@ export function FeedList() {
     if (!res.ok) fetchItems(null, false);
   }, [status, fetchItems]);
 
-  const handleMemoChange = useCallback(async (id: string, memo: string | null) => {
+  const handleMemoChange = useCallback(async (id: string, note: string | null) => {
     const previousItem =
       itemsRef.current.find((i) => i.id === id) ??
       pinnedItemsRef.current.find((i) => i.id === id);
-    const prevMemo = previousItem?.memo ?? null;
+    const prevMemo = previousItem?.note ?? null;
     const wasBookmarked = previousItem?.isBookmarked ?? false;
 
     const apply = (list: FeedItemData[]) =>
       list.map((i) =>
         i.id === id
-          ? { ...i, memo, isBookmarked: memo ? true : i.isBookmarked }
+          ? { ...i, note, isBookmarked: note ? true : i.isBookmarked }
           : i
       );
     setItems(apply);
@@ -288,12 +288,12 @@ export function FeedList() {
       const res = await fetch(`/api/feed/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ memo }),
+        body: JSON.stringify({ note }),
       });
       if (!res.ok) throw new Error();
     } catch {
       const revert = (list: FeedItemData[]) =>
-        list.map((i) => i.id === id ? { ...i, memo: prevMemo, isBookmarked: wasBookmarked } : i);
+        list.map((i) => i.id === id ? { ...i, note: prevMemo, isBookmarked: wasBookmarked } : i);
       setItems(revert);
       setPinnedItems(revert);
     }

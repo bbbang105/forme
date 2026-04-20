@@ -7,9 +7,9 @@ import {cn} from '@/lib/utils';
 
 const tabs = [
   { href: '/feed', label: 'Feed', icon: Newspaper },
-  { href: '/video', label: 'YouTube', icon: PlayCircle },
+  { href: '/youtube', label: 'YouTube', icon: PlayCircle },
   { href: '/calendar', label: 'Calendar', icon: Calendar },
-  { href: '/memo', label: 'Notes', icon: StickyNote },
+  { href: '/note', label: 'Notes', icon: StickyNote },
 ];
 
 export function TabBar() {

@@ -1,7 +1,7 @@
 import {Suspense} from 'react';
 import {DashboardFeed} from '@/components/features/feed/dashboard-feed';
 import {DashboardCalendar} from '@/components/features/calendar/dashboard-calendar';
-import {DashboardVideo} from '@/components/features/video/dashboard-video';
+import {DashboardYoutube} from '@/components/features/youtube/dashboard-youtube';
 
 function FeedSkeleton() {
   return (
@@ -96,7 +96,7 @@ export default function DashboardPage() {
           <DashboardCalendar />
         </Suspense>
         <Suspense fallback={<SideWidgetSkeleton />}>
-          <DashboardVideo />
+          <DashboardYoutube />
         </Suspense>
       </div>
     </div>
