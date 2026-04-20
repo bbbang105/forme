@@ -1,5 +1,5 @@
 import type {Metadata, Viewport} from 'next';
-import {Instrument_Serif} from 'next/font/google';
+import {Instrument_Serif, Noto_Serif_KR} from 'next/font/google';
 import {ThemeProvider} from 'next-themes';
 import {ServiceWorkerRegister} from '@/components/sw-register';
 import './globals.css';
@@ -9,6 +9,16 @@ const instrumentSerif = Instrument_Serif({
   weight: '400',
   style: ['normal', 'italic'],
   variable: '--font-instrument-serif',
+  display: 'swap',
+});
+
+// Korean serif fallback — used when Instrument Serif has no Korean glyph.
+// Pairs with `font-synthesis: none` on .font-display so Korean renders upright
+// (no synthetic italic skew that was clipping last chars on iOS).
+const notoSerifKR = Noto_Serif_KR({
+  subsets: ['latin'],
+  weight: '400',
+  variable: '--font-noto-serif-kr',
   display: 'swap',
 });
 
@@ -41,7 +51,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ko" suppressHydrationWarning className={instrumentSerif.variable}>
+    <html
+      lang="ko"
+      suppressHydrationWarning
+      className={`${instrumentSerif.variable} ${notoSerifKR.variable}`}
+    >
       <head>
         <meta name="theme-color" content="#F7F2E8" media="(prefers-color-scheme: light)" />
         <meta name="theme-color" content="#1A1714" media="(prefers-color-scheme: dark)" />
