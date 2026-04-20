@@ -9,11 +9,11 @@
 /** Default number of items per page for list views. */
 export const DEFAULT_PAGE_SIZE = 20;
 
-// ── Curation ─────────────────────────────────────────────────────────────────
-/** Maximum number of curation items allowed in a bulk-delete operation. */
-export const CURATION_BULK_DELETE_MAX = 100;
-/** Maximum length for a curation item memo/note field. */
-export const CURATION_MEMO_MAX_LENGTH = 500;
+// ── Feed ─────────────────────────────────────────────────────────────────────
+/** Maximum number of feed items allowed in a bulk-delete operation. */
+export const FEED_BULK_DELETE_MAX = 100;
+/** Maximum length for a feed item memo/note field. */
+export const FEED_MEMO_MAX_LENGTH = 500;
 
 // ── Memo ─────────────────────────────────────────────────────────────────────
 /** Maximum number of tags per memo. */

@@ -6,7 +6,7 @@ import {Calendar, Newspaper, PlayCircle, StickyNote} from 'lucide-react';
 import {cn} from '@/lib/utils';
 
 const tabs = [
-  { href: '/curation', label: '큐레이션', icon: Newspaper },
+  { href: '/feed', label: '큐레이션', icon: Newspaper },
   { href: '/video', label: '유튜브', icon: PlayCircle },
   { href: '/calendar', label: '캘린더', icon: Calendar },
   { href: '/memo', label: '메모', icon: StickyNote },

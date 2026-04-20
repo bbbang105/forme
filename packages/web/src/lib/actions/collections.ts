@@ -3,7 +3,7 @@
 import {getAuthUser} from '@/lib/auth';
 import {traceAction, traceQuery} from '@/lib/logger';
 import {HEX_COLOR_REGEX, UUID_REGEX} from '@/lib/validators';
-import {bookmarkCollections, curationItems, curationSources, db} from '@forme/shared';
+import {bookmarkCollections, feedItems, feedSources, db} from '@forme/shared';
 import {and, asc, eq, isNull, sql} from 'drizzle-orm';
 import {revalidatePath} from 'next/cache';
 
@@ -29,17 +29,17 @@ export async function getCollectionsWithCount() {
 
     const counts = await traceQuery('count_per_collection', () =>
       db.select({
-        collectionId: curationItems.collectionId,
+        collectionId: feedItems.collectionId,
         count: sql<number>`count(*)::int`,
       })
-        .from(curationItems)
-        .innerJoin(curationSources, eq(curationItems.sourceId, curationSources.id))
+        .from(feedItems)
+        .innerJoin(feedSources, eq(feedItems.sourceId, feedSources.id))
         .where(and(
-          sql`${curationItems.collectionId} IS NOT NULL`,
-          eq(curationSources.userId, user.id),
-          isNull(curationItems.deletedAt)
+          sql`${feedItems.collectionId} IS NOT NULL`,
+          eq(feedSources.userId, user.id),
+          isNull(feedItems.deletedAt)
         ))
-        .groupBy(curationItems.collectionId)
+        .groupBy(feedItems.collectionId)
     );
 
     const countMap = new Map(counts.map((c) => [c.collectionId, c.count]));
@@ -74,7 +74,7 @@ export async function createCollection(data: { name: string; color: string }) {
       }).returning()
     );
 
-    revalidatePath('/curation');
+    revalidatePath('/feed');
     return created;
   });
 }
@@ -103,7 +103,7 @@ export async function updateCollection(id: string, data: { name?: string; color?
         .returning()
     );
 
-    revalidatePath('/curation');
+    revalidatePath('/feed');
     return updated;
   });
 }
@@ -118,7 +118,7 @@ export async function deleteCollection(id: string) {
       db.delete(bookmarkCollections)
         .where(and(eq(bookmarkCollections.id, id), eq(bookmarkCollections.userId, user.id)))
     );
-    revalidatePath('/curation');
+    revalidatePath('/feed');
   });
 }
 
@@ -139,7 +139,7 @@ export async function reorderCollections(orderedIds: string[]) {
         )
       )
     );
-    revalidatePath('/curation');
+    revalidatePath('/feed');
   });
 }
 
@@ -166,21 +166,21 @@ export async function assignCollection(itemId: string, collectionId: string | nu
       updates.isBookmarked = true;
     }
 
-    // ownership은 curationSources join으로 검증
+    // ownership은 feedSources join으로 검증
     const [existing] = await traceQuery('verify_ownership', () =>
-      db.select({ id: curationItems.id })
-        .from(curationItems)
-        .innerJoin(curationSources, eq(curationItems.sourceId, curationSources.id))
-        .where(and(eq(curationItems.id, itemId), eq(curationSources.userId, user.id), isNull(curationItems.deletedAt)))
+      db.select({ id: feedItems.id })
+        .from(feedItems)
+        .innerJoin(feedSources, eq(feedItems.sourceId, feedSources.id))
+        .where(and(eq(feedItems.id, itemId), eq(feedSources.userId, user.id), isNull(feedItems.deletedAt)))
         .limit(1)
     );
 
     if (!existing) throw new Error('아이템을 찾을 수 없습니다.');
 
     await traceQuery('assign_collection', () =>
-      db.update(curationItems).set(updates).where(eq(curationItems.id, itemId))
+      db.update(feedItems).set(updates).where(eq(feedItems.id, itemId))
     );
 
-    revalidatePath('/curation');
+    revalidatePath('/feed');
   });
 }

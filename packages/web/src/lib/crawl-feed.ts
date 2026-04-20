@@ -3,7 +3,7 @@
  */
 import {and, eq, inArray} from 'drizzle-orm';
 import {parseFeed} from 'feedsmith';
-import {curationItems, curationSources, db} from '@forme/shared';
+import {feedItems as feedItemsTable, feedSources, db} from '@forme/shared';
 import {isSafeUrl} from './url-safety';
 
 export interface CrawlSourceResult {
@@ -218,12 +218,12 @@ export async function crawlSource(source: CrawlSource, options?: CrawlOptions): 
     for (let i = 0; i < titles.length; i += 100) {
       const chunk = titles.slice(i, i + 100);
       const rows = await db
-        .select({ title: curationItems.title })
-        .from(curationItems)
-        .innerJoin(curationSources, eq(curationItems.sourceId, curationSources.id))
+        .select({ title: feedItemsTable.title })
+        .from(feedItemsTable)
+        .innerJoin(feedSources, eq(feedItemsTable.sourceId, feedSources.id))
         .where(and(
-          eq(curationSources.userId, source.userId),
-          inArray(curationItems.title, chunk)
+          eq(feedSources.userId, source.userId),
+          inArray(feedItemsTable.title, chunk)
         ));
       for (const row of rows) existingTitles.add(row.title);
     }
@@ -285,10 +285,10 @@ export async function crawlSource(source: CrawlSource, options?: CrawlOptions): 
 
     // Batch insert with conflict handling (unique on source_id + url)
     const inserted = await db
-      .insert(curationItems)
+      .insert(feedItemsTable)
       .values(insertValues)
       .onConflictDoNothing()
-      .returning({ id: curationItems.id });
+      .returning({ id: feedItemsTable.id });
 
     return {
       sourceId: source.id,
@@ -317,8 +317,8 @@ export async function crawlSource(source: CrawlSource, options?: CrawlOptions): 
 export async function getActiveSourcesForUser(userId: string) {
   const allSources = await db
     .select()
-    .from(curationSources)
-    .where(and(eq(curationSources.userId, userId), eq(curationSources.isActive, true)))
+    .from(feedSources)
+    .where(and(eq(feedSources.userId, userId), eq(feedSources.isActive, true)))
     .limit(50);
 
   return allSources

@@ -5,7 +5,7 @@ import {createClient} from '@/lib/supabase/server';
 import {withTracing} from '@/lib/logger';
 import {UUID_REGEX} from '@/lib/validators';
 import {VIDEO_FEED_PAGE_SIZE, VIDEO_SUMMARIZING_TIMEOUT_MS} from '@/lib/constants';
-import {escapeIlike} from '@/lib/curation-utils';
+import {escapeIlike} from '@/lib/feed-utils';
 
 type Tab = 'feed' | 'create';
 type Status = 'unread' | 'read' | 'bookmarked';

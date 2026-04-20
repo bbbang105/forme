@@ -1,5 +1,5 @@
 import {Suspense} from 'react';
-import {DashboardCuration} from '@/components/features/curation/dashboard-curation';
+import {DashboardFeed} from '@/components/features/feed/dashboard-feed';
 import {DashboardCalendar} from '@/components/features/calendar/dashboard-calendar';
 import {DashboardVideo} from '@/components/features/video/dashboard-video';
 
@@ -25,7 +25,7 @@ export default function DashboardPage() {
 
       {/* Latest curation items */}
       <Suspense fallback={<WidgetSkeleton />}>
-        <DashboardCuration />
+        <DashboardFeed />
       </Suspense>
 
       {/* Latest YouTube summaries */}
