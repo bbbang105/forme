@@ -3,13 +3,11 @@
 // forme - Service Worker (Offline Cache + Push Notifications)
 
 const CACHE_NAME = 'forme-v4';
-const AUDIO_CACHE_NAME = 'forme-audio-v1';
 const STATIC_ASSETS = [
   '/icons/icon-192x192.png',
   '/icons/icon-512x512.png',
 ];
 
-const MAX_AUDIO_CACHE_ITEMS = 50;
 const MAX_STATIC_CACHE_ITEMS = 100;
 const NETWORK_TIMEOUT_MS = 4000;
 
@@ -38,9 +36,9 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// Activate: 이전 캐시 정리 (오디오 캐시는 보존)
+// Activate: 이전 캐시 정리
 self.addEventListener('activate', (event) => {
-  const keepCaches = [CACHE_NAME, AUDIO_CACHE_NAME];
+  const keepCaches = [CACHE_NAME];
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(
@@ -51,7 +49,6 @@ self.addEventListener('activate', (event) => {
 });
 
 // Fetch: 전략별 캐싱
-// - 오디오(R2): cache-first (팟캐스트 오프라인 재생)
 // - /_next/static/: cache-first (콘텐츠 해시 파일)
 // - 폰트 파일: cache-first
 // - /icons/: cache-first
@@ -61,26 +58,6 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
-
-  // ── 0. Cache-first: 오디오 파일 (R2 외부 도메인, 팟캐스트 오프라인 재생)
-  if (request.destination === 'audio' || /\.(mp3|m4a|wav|ogg|webm|aac|mp4)(\?.*)?$/i.test(request.url)) {
-    event.respondWith(
-      caches.open(AUDIO_CACHE_NAME).then((cache) =>
-        cache.match(request).then((cached) => {
-          if (cached) return cached;
-          return fetch(request).then((response) => {
-            if (response.ok) {
-              cache.put(request, response.clone()).then(() =>
-                trimCache(AUDIO_CACHE_NAME, MAX_AUDIO_CACHE_ITEMS)
-              );
-            }
-            return response;
-          });
-        })
-      )
-    );
-    return;
-  }
 
   // same-origin만 이후 전략 적용
   if (!request.url.startsWith(self.location.origin)) return;
