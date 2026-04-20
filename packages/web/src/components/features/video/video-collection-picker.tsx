@@ -7,7 +7,7 @@ import type {VideoCollection} from './video-collection-manager';
 import {createVideoCollection} from '@/lib/actions/video-collections';
 
 const QUICK_COLORS = [
-  '#0ea5e9', '#a855f7', '#22c55e', '#f59e0b',
+  '#D96B3B', '#a855f7', '#22c55e', '#f59e0b',
   '#ef4444', '#ec4899', '#6366f1', '#14b8a6',
 ];
 

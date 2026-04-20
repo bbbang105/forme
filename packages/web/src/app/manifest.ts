@@ -2,15 +2,15 @@ import type { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'forme - 개인 올인원',
+    name: 'forme',
     short_name: 'forme',
-    description: '피드, 캘린더, 메모, 유튜브 요약을 한곳에서',
+    description: 'Your quiet reader & warm notebook.',
     start_url: '/',
     scope: '/',
     display: 'standalone',
     orientation: 'portrait-primary',
-    background_color: '#ffffff',
-    theme_color: '#0ea5e9',
+    background_color: '#F7F2E8',
+    theme_color: '#F7F2E8',
     categories: ['productivity', 'lifestyle'],
     icons: [
       {
@@ -40,14 +40,14 @@ export default function manifest(): MetadataRoute.Manifest {
     ],
     shortcuts: [
       {
-        name: '피드',
-        short_name: '피드',
+        name: 'Feed',
+        short_name: 'Feed',
         url: '/feed',
         icons: [{ src: '/icons/icon-192x192.png', sizes: '192x192' }],
       },
       {
-        name: '캘린더',
-        short_name: '캘린더',
+        name: 'Calendar',
+        short_name: 'Calendar',
         url: '/calendar',
         icons: [{ src: '/icons/icon-192x192.png', sizes: '192x192' }],
       },

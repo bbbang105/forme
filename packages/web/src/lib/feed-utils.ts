@@ -3,12 +3,12 @@
  */
 
 const GRADIENTS = [
-  'from-sky-100 to-sky-200 dark:from-sky-900/30 dark:to-sky-800/30',
-  'from-violet-100 to-violet-200 dark:from-violet-900/30 dark:to-violet-800/30',
-  'from-emerald-100 to-emerald-200 dark:from-emerald-900/30 dark:to-emerald-800/30',
   'from-amber-100 to-amber-200 dark:from-amber-900/30 dark:to-amber-800/30',
+  'from-orange-100 to-orange-200 dark:from-orange-900/30 dark:to-orange-800/30',
   'from-rose-100 to-rose-200 dark:from-rose-900/30 dark:to-rose-800/30',
-  'from-indigo-100 to-indigo-200 dark:from-indigo-900/30 dark:to-indigo-800/30',
+  'from-stone-100 to-stone-200 dark:from-stone-900/30 dark:to-stone-800/30',
+  'from-emerald-100 to-emerald-200 dark:from-emerald-900/30 dark:to-emerald-800/30',
+  'from-slate-100 to-slate-200 dark:from-slate-900/30 dark:to-slate-800/30',
 ] as const;
 
 export function getArticleGradient(seed: string): string {
@@ -34,21 +34,21 @@ export function formatRelativeDate(dateStr: string | null): string | null {
 export const DEFAULT_CATEGORY_STYLES: Record<string, { label: string; bg: string; text: string; ring: string }> = {
   ai: {
     label: 'AI',
-    bg: 'bg-violet-100 dark:bg-violet-500/20',
-    text: 'text-violet-700 dark:text-violet-300',
-    ring: 'ring-violet-200 dark:ring-violet-500/30',
+    bg: 'bg-rose-100 dark:bg-rose-500/20',
+    text: 'text-rose-700 dark:text-rose-300',
+    ring: 'ring-rose-200 dark:ring-rose-500/30',
   },
   dev: {
     label: 'DEV',
-    bg: 'bg-blue-100 dark:bg-blue-500/20',
-    text: 'text-blue-700 dark:text-blue-300',
-    ring: 'ring-blue-200 dark:ring-blue-500/30',
+    bg: 'bg-stone-100 dark:bg-stone-500/20',
+    text: 'text-stone-700 dark:text-stone-300',
+    ring: 'ring-stone-200 dark:ring-stone-500/30',
   },
   uxui: {
     label: 'UXUI',
-    bg: 'bg-sky-100 dark:bg-sky-500/20',
-    text: 'text-sky-700 dark:text-sky-300',
-    ring: 'ring-sky-200 dark:ring-sky-500/30',
+    bg: 'bg-emerald-100 dark:bg-emerald-500/20',
+    text: 'text-emerald-700 dark:text-emerald-300',
+    ring: 'ring-emerald-200 dark:ring-emerald-500/30',
   },
   economy: {
     label: 'ECONOMY',
