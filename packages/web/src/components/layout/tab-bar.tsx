@@ -33,29 +33,25 @@ export function TabBar() {
               href={href}
               aria-current={isActive ? 'page' : undefined}
               className={cn(
-                'flex flex-col items-center justify-center gap-1 flex-1 h-full',
-                'transition-all duration-150',
-                'active:scale-[0.92] active:opacity-70',
+                'relative flex flex-col items-center justify-center gap-1 flex-1 h-full',
+                'transition-colors duration-150',
+                'active:scale-[0.96]',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset',
                 isActive
                   ? 'text-primary'
                   : 'text-muted-foreground hover:text-foreground'
               )}
             >
-              <span className="relative flex items-center justify-center w-8 h-8">
+              {isActive && (
                 <span
-                  className={cn(
-                    'absolute inset-0 rounded-full transition-all duration-200',
-                    isActive
-                      ? 'bg-primary/10 scale-100 opacity-100'
-                      : 'bg-primary/10 scale-50 opacity-0'
-                  )}
+                  aria-hidden="true"
+                  className="absolute top-0 left-1/2 -translate-x-1/2 h-[2px] w-7 rounded-full bg-primary"
                 />
-                <Icon
-                  className="relative z-10 h-5 w-5"
-                  strokeWidth={isActive ? 2.5 : 2}
-                />
-              </span>
+              )}
+              <Icon
+                className="h-5 w-5 transition-transform duration-150"
+                strokeWidth={isActive ? 2.25 : 1.75}
+              />
               <span
                 className={cn(
                   'text-[11px] leading-none tracking-tight',

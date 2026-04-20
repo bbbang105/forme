@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {useTheme} from 'next-themes';
 import {Moon, Sun, User} from 'lucide-react';
 import {Button} from '@/components/ui/button';
-import {LogoMark} from '@/components/ui/logo';
+import {Wordmark} from '@/components/ui/logo';
 import {cn} from '@/lib/utils';
 
 interface HeaderProps {
@@ -25,9 +25,12 @@ export function Header({ avatarUrl }: HeaderProps) {
       )}
     >
       <div className="flex items-center justify-between h-14 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-        <Link href="/dashboard" aria-label="대시보드로 이동" className="flex items-center gap-2">
-          <LogoMark size={28} />
-          <span className="text-base font-mono font-bold text-muted-foreground tracking-wide">forme</span>
+        <Link
+          href="/dashboard"
+          aria-label="대시보드로 이동"
+          className="inline-flex items-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        >
+          <Wordmark size={26} />
         </Link>
         <div className="flex items-center gap-1">
           <Button
