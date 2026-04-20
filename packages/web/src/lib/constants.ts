@@ -12,8 +12,11 @@ export const DEFAULT_PAGE_SIZE = 20;
 // ── Feed ─────────────────────────────────────────────────────────────────────
 /** Maximum number of feed items allowed in a bulk-delete operation. */
 export const FEED_BULK_DELETE_MAX = 100;
-/** Maximum length for a feed item memo/note field. */
-export const FEED_MEMO_MAX_LENGTH = 500;
+
+// ── Item memo (feed + video) ────────────────────────────────────────────────
+/** Maximum length for an item's inline memo/note field.
+ *  Shared by feed items and video items — same UX affordance, same cap. */
+export const ITEM_MEMO_MAX_LENGTH = 1000;
 
 // ── Memo ─────────────────────────────────────────────────────────────────────
 /** Maximum number of tags per memo. */

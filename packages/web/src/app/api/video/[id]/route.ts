@@ -4,6 +4,7 @@ import {db, videoBookmarkCollections, videoItems} from '@forme/shared';
 import {createClient} from '@/lib/supabase/server';
 import {withTracing} from '@/lib/logger';
 import {UUID_REGEX} from '@/lib/validators';
+import {ITEM_MEMO_MAX_LENGTH} from '@/lib/constants';
 
 interface PatchBody {
   isRead?: boolean;
@@ -66,7 +67,7 @@ export const PATCH = withTracing('PATCH /api/video/[id]', async (request, ctx) =
     }
     if (isBookmarked !== undefined) updateValues.isBookmarked = isBookmarked;
     if (memo !== undefined) {
-      updateValues.memo = memo ? memo.slice(0, 500) : null;
+      updateValues.memo = memo ? memo.slice(0, ITEM_MEMO_MAX_LENGTH) : null;
       if (memo) updateValues.isBookmarked = true;
     }
     if (collectionId !== undefined) {

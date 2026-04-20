@@ -4,6 +4,7 @@ import {bookmarkCollections, feedItems, feedSources, db} from '@forme/shared';
 import {and, eq, isNull} from 'drizzle-orm';
 import {withTracing} from '@/lib/logger';
 import {UUID_REGEX} from '@/lib/validators';
+import {ITEM_MEMO_MAX_LENGTH} from '@/lib/constants';
 
 // ── Types ──
 
@@ -192,7 +193,7 @@ export const PATCH = withTracing('PATCH /api/feed/[id]', async (request, ctx) =>
     }
     if (isBookmarked !== undefined) updateValues.isBookmarked = isBookmarked;
     if (memo !== undefined) {
-      updateValues.memo = memo ? memo.slice(0, 500) : null;
+      updateValues.memo = memo ? memo.slice(0, ITEM_MEMO_MAX_LENGTH) : null;
       // 메모 추가 시 자동 북마크 (단, 명시적 isBookmarked 지정 시 덮어쓰지 않음)
       if (memo && isBookmarked === undefined) updateValues.isBookmarked = true;
     }
