@@ -15,7 +15,6 @@ export async function DashboardVideo() {
         title: videoItems.title,
         channelName: videoItems.channelName,
         thumbnailUrl: videoItems.thumbnailUrl,
-        publishedAt: videoItems.publishedAt,
       })
       .from(videoItems)
       .where(
@@ -24,7 +23,7 @@ export async function DashboardVideo() {
           eq(videoItems.status, 'summarized')
         )
       )
-      .orderBy(desc(videoItems.collectedAt))
+      .orderBy(desc(videoItems.summarizedAt))
       .limit(LIMIT);
 
     if (items.length === 0) {
