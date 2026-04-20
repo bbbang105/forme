@@ -38,7 +38,7 @@ export function SectionHeader({
           </span>{' '}
           {eyebrow}
         </span>
-        <h2 className="text-xl font-semibold tracking-tight leading-snug text-foreground truncate">
+        <h2 className="font-display text-2xl leading-snug text-foreground truncate">
           {title}
         </h2>
       </div>

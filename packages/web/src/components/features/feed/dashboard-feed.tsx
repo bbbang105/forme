@@ -140,7 +140,7 @@ function MiniCard({ item }: { item: MiniCardItem }) {
             </>
           )}
         </div>
-        <h4 className="text-[15px] font-medium leading-snug tracking-tight text-foreground line-clamp-2 group-hover:text-primary transition-colors">
+        <h4 className="font-display text-base leading-snug text-foreground line-clamp-2 group-hover:text-primary transition-colors">
           {item.title}
         </h4>
       </div>

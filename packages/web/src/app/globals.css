@@ -53,8 +53,11 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
 
-  /* Editorial display serif — loaded via next/font in layout.tsx */
-  --font-serif: var(--font-instrument-serif), Georgia, "Times New Roman", serif;
+  /* Editorial display serif — loaded via next/font in layout.tsx.
+   * Chain: Instrument Serif (Latin italic) → Noto Serif KR (Korean upright) →
+   * system serif. Pairs with `font-synthesis: none` on .font-display so the
+   * Korean fallback renders upright (no synthetic italic clipping on iOS). */
+  --font-serif: var(--font-instrument-serif), var(--font-noto-serif-kr), Georgia, "Times New Roman", serif;
 
   --animate-accordion-down: accordion-down 0.2s ease-out;
   --animate-accordion-up: accordion-up 0.2s ease-out;
@@ -96,16 +99,17 @@
   text-wrap: balance;
 }
 
-/* Editorial display utility — Instrument Serif italic.
- * NOTE: Use on Latin characters only. Korean has no native italic, so
- * synthetic italic skew overflows glyph boxes and clips on mobile renderers
- * (reported on iOS Safari/Chrome). Reserve for: logo/wordmark, masthead
- * accents, English labels. Use Pretendard weights for Korean titles. */
+/* Editorial display utility — Instrument Serif italic for Latin,
+ * Noto Serif KR upright for Korean (via font-serif fallback chain).
+ * `font-synthesis: none` disables browser's synthetic italic/bold on fallback
+ * fonts — Korean glyphs stay upright instead of being skewed, which was
+ * clipping last characters on iOS Safari/Chrome. */
 @utility font-display {
   font-family: var(--font-serif);
   font-style: italic;
   font-weight: 400;
   letter-spacing: -0.015em;
+  font-synthesis: none;
 }
 
 @layer base {
