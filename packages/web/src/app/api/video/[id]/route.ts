@@ -1,16 +1,20 @@
 import {NextResponse} from 'next/server';
-import {and, eq} from 'drizzle-orm';
-import {db, videoBookmarkCollections, videoItems} from '@forme/shared';
+import {and, count, eq, isNotNull, ne} from 'drizzle-orm';
+import {db, videoItems} from '@forme/shared';
 import {createClient} from '@/lib/supabase/server';
 import {withTracing} from '@/lib/logger';
 import {UUID_REGEX} from '@/lib/validators';
 import {ITEM_MEMO_MAX_LENGTH} from '@/lib/constants';
 
+/** Max items a user can pin to the top of the Saved view. */
+const MAX_PINNED = 3;
+
 interface PatchBody {
   isRead?: boolean;
   isBookmarked?: boolean;
   memo?: string | null;
-  collectionId?: string | null;
+  /** When `true`, sets `pinned_at = now()`. When `false`, clears it. Enforces MAX_PINNED. */
+  pinned?: boolean;
 }
 
 export const PATCH = withTracing('PATCH /api/video/[id]', async (request, ctx) => {
@@ -31,9 +35,9 @@ export const PATCH = withTracing('PATCH /api/video/[id]', async (request, ctx) =
     return NextResponse.json({error: 'Invalid JSON'}, {status: 400});
   }
 
-  const {isRead, isBookmarked, memo, collectionId} = body;
+  const {isRead, isBookmarked, memo, pinned} = body;
 
-  if (isRead === undefined && isBookmarked === undefined && memo === undefined && collectionId === undefined) {
+  if (isRead === undefined && isBookmarked === undefined && memo === undefined && pinned === undefined) {
     return NextResponse.json({error: 'At least one field required'}, {status: 400});
   }
   if (isRead !== undefined && typeof isRead !== 'boolean') {
@@ -45,12 +49,13 @@ export const PATCH = withTracing('PATCH /api/video/[id]', async (request, ctx) =
   if (memo !== undefined && memo !== null && typeof memo !== 'string') {
     return NextResponse.json({error: 'memo must be string or null'}, {status: 400});
   }
-  if (collectionId !== undefined && collectionId !== null && (typeof collectionId !== 'string' || !UUID_REGEX.test(collectionId))) {
-    return NextResponse.json({error: 'collectionId must be UUID or null'}, {status: 400});
+  if (pinned !== undefined && typeof pinned !== 'boolean') {
+    return NextResponse.json({error: 'pinned must be boolean'}, {status: 400});
   }
 
   try {
-    const [existing] = await db.select({id: videoItems.id})
+    const [existing] = await db
+      .select({id: videoItems.id, currentPinnedAt: videoItems.pinnedAt})
       .from(videoItems)
       .where(and(eq(videoItems.id, id), eq(videoItems.userId, user.id)))
       .limit(1);
@@ -59,7 +64,13 @@ export const PATCH = withTracing('PATCH /api/video/[id]', async (request, ctx) =
       return NextResponse.json({error: 'Item not found'}, {status: 404});
     }
 
-    const updateValues: Partial<{isRead: boolean; isBookmarked: boolean; memo: string | null; collectionId: string | null; readAt: Date | null}> = {};
+    const updateValues: Partial<{
+      isRead: boolean;
+      isBookmarked: boolean;
+      memo: string | null;
+      pinnedAt: Date | null;
+      readAt: Date | null;
+    }> = {};
 
     if (isRead !== undefined) {
       updateValues.isRead = isRead;
@@ -70,21 +81,36 @@ export const PATCH = withTracing('PATCH /api/video/[id]', async (request, ctx) =
       updateValues.memo = memo ? memo.slice(0, ITEM_MEMO_MAX_LENGTH) : null;
       if (memo) updateValues.isBookmarked = true;
     }
-    if (collectionId !== undefined) {
-      if (collectionId !== null) {
-        const [col] = await db.select({id: videoBookmarkCollections.id})
-          .from(videoBookmarkCollections)
-          .where(and(eq(videoBookmarkCollections.id, collectionId), eq(videoBookmarkCollections.userId, user.id)))
-          .limit(1);
-        if (!col) {
-          return NextResponse.json({error: 'Collection not found'}, {status: 404});
+
+    if (pinned !== undefined) {
+      if (pinned) {
+        if (!existing.currentPinnedAt) {
+          const [{value}] = await db
+            .select({value: count()})
+            .from(videoItems)
+            .where(
+              and(
+                eq(videoItems.userId, user.id),
+                isNotNull(videoItems.pinnedAt),
+                ne(videoItems.id, id),
+              )
+            );
+          if (value >= MAX_PINNED) {
+            return NextResponse.json(
+              {error: `Maximum ${MAX_PINNED} pinned items allowed`},
+              {status: 409}
+            );
+          }
         }
+        updateValues.pinnedAt = new Date();
+        if (isBookmarked === undefined) updateValues.isBookmarked = true;
+      } else {
+        updateValues.pinnedAt = null;
       }
-      updateValues.collectionId = collectionId;
-      if (collectionId !== null) updateValues.isBookmarked = true;
     }
 
-    const [updated] = await db.update(videoItems)
+    const [updated] = await db
+      .update(videoItems)
       .set(updateValues)
       .where(and(eq(videoItems.id, id), eq(videoItems.userId, user.id)))
       .returning();
@@ -108,7 +134,8 @@ export const DELETE = withTracing('DELETE /api/video/[id]', async (_request, ctx
   }
 
   try {
-    const deleted = await db.delete(videoItems)
+    const deleted = await db
+      .delete(videoItems)
       .where(and(eq(videoItems.id, id), eq(videoItems.userId, user.id)))
       .returning({id: videoItems.id});
 

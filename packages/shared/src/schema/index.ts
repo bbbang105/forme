@@ -6,7 +6,5 @@ export * from './calendar-events';
 export * from './todos';
 export * from './push-subscriptions';
 export * from './memos';
-export * from './bookmark-collections';
 export * from './video-sources';
 export * from './video-items';
-export * from './video-bookmark-collections';

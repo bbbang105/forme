@@ -20,7 +20,8 @@ export const videoItems = pgTable('video_items', {
   isRead: boolean('is_read').notNull().default(false),
   isBookmarked: boolean('is_bookmarked').notNull().default(false),
   memo: text('memo'),
-  collectionId: uuid('collection_id'),
+  /** Non-null timestamp when the bookmark is pinned to the top of the Saved view. Max 3 per user enforced at API layer. */
+  pinnedAt: timestamp('pinned_at', { withTimezone: true }),
   duration: integer('duration'),
   readAt: timestamp('read_at', { withTimezone: true }),
   summarizedAt: timestamp('summarized_at', { withTimezone: true }),
@@ -29,4 +30,5 @@ export const videoItems = pgTable('video_items', {
   feedIdx: index('idx_video_items_feed').on(table.userId, table.status, table.publishedAt),
   readIdx: index('idx_video_items_read').on(table.userId, table.isRead, table.publishedAt),
   bookmarkIdx: index('idx_video_items_bookmark').on(table.userId, table.isBookmarked, table.publishedAt),
+  pinnedAtIdx: index('idx_video_items_pinned_at').on(table.pinnedAt),
 }));

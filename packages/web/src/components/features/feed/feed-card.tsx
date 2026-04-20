@@ -2,7 +2,7 @@
 
 import {memo, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import Image from 'next/image';
-import {Bookmark, BookmarkCheck, Check, FileText, FolderOpen, MessageSquare, Trash2} from 'lucide-react';
+import {Bookmark, BookmarkCheck, Check, FileText, MessageSquare, Pin, PinOff, Trash2} from 'lucide-react';
 import {cn} from '@/lib/utils';
 import {ITEM_MEMO_MAX_LENGTH} from '@/lib/constants';
 import {formatRelativeDate, getArticleGradient, getCategoryStyle} from '@/lib/feed-utils';
@@ -30,13 +30,8 @@ export interface FeedItemData {
   collectedAt: string;
   sourceName: string | null;
   memo: string | null;
-  collectionId: string | null;
-}
-
-export interface CollectionInfo {
-  id: string;
-  name: string;
-  color: string;
+  /** ISO string if the bookmark is pinned to the top of the Saved view, otherwise null. */
+  pinnedAt: string | null;
 }
 
 interface FeedCardProps {
@@ -45,13 +40,17 @@ interface FeedCardProps {
   onMarkRead: (id: string) => void;
   onDelete?: (id: string) => void;
   onMemoChange?: (id: string, memo: string | null) => void;
-  onCollectionPick?: (id: string) => void;
-  collectionMap?: Map<string, CollectionInfo>;
+  /** Toggle pin state. When omitted, the pin button isn't rendered. */
+  onTogglePin?: (id: string, pinned: boolean) => void;
+  /** When true, a *new* pin is blocked (already 3 pinned). Has no effect on items that are already pinned. */
+  pinLocked?: boolean;
   showMemo?: boolean;
   selectMode?: boolean;
   selected?: boolean;
   onToggleSelect?: (id: string) => void;
   compact?: boolean;
+  /** Render the saved-view variant: ember border when pinned, full memo body, no description. */
+  savedVariant?: boolean;
 }
 
 // ─── Thumbnail ──────────────────────────────────────────────────────────
@@ -238,14 +237,12 @@ function MetaRow({
   catStyle,
   sourceName,
   dateLabel,
-  collection,
   tags,
   isNewItem,
 }: {
   catStyle: ReturnType<typeof getCategoryStyle>;
   sourceName: string | null;
   dateLabel: string | null;
-  collection?: CollectionInfo | false;
   tags?: string[] | null;
   isNewItem?: boolean;
 }) {
@@ -266,16 +263,6 @@ function MetaRow({
       >
         {catStyle.label}
       </span>
-      {collection && (
-        <span className="inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 border border-border text-muted-foreground normal-case tracking-normal shrink-0">
-          <span
-            className="w-1.5 h-1.5 rounded-full shrink-0"
-            style={{backgroundColor: collection.color}}
-            aria-hidden="true"
-          />
-          {collection.name}
-        </span>
-      )}
       {tags?.map((tag) => (
         <span key={tag} className="text-primary shrink-0">
           #{tag}
@@ -299,34 +286,44 @@ function ActionButtons({
   item,
   onBookmark,
   onDelete,
-  onCollectionPick,
+  onTogglePin,
+  pinLocked = false,
   size = 'md',
 }: {
   item: FeedItemData;
   onBookmark: (e: React.MouseEvent) => void;
   onDelete: (e: React.MouseEvent) => void;
-  onCollectionPick?: (e: React.MouseEvent) => void;
+  onTogglePin?: (e: React.MouseEvent) => void;
+  pinLocked?: boolean;
   size?: 'sm' | 'md';
 }) {
   const iconSize = size === 'sm' ? 'h-3.5 w-3.5' : 'h-4 w-4';
   const padding = size === 'sm' ? 'p-1' : 'p-1.5';
+  const isPinned = Boolean(item.pinnedAt);
+  const pinDisabled = !isPinned && pinLocked;
 
   return (
     <div className="flex items-center gap-0.5 shrink-0">
-      {onCollectionPick && (
+      {onTogglePin && (
         <button
           type="button"
-          onClick={onCollectionPick}
+          onClick={onTogglePin}
+          disabled={pinDisabled}
           className={cn(
             'rounded-sm transition-colors cursor-pointer',
             padding,
-            item.collectionId
+            isPinned
               ? 'text-primary'
-              : 'text-muted-foreground/40 hover:text-primary',
+              : 'text-muted-foreground/40 hover:text-primary disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-muted-foreground/40',
           )}
-          aria-label="컬렉션 지정"
+          aria-label={isPinned ? '고정 해제' : pinDisabled ? '고정 3개 가득참' : '상단에 고정'}
+          title={pinDisabled ? 'Pin limit: 3' : undefined}
         >
-          <FolderOpen className={iconSize} aria-hidden="true" />
+          {isPinned ? (
+            <PinOff className={iconSize} aria-hidden="true" />
+          ) : (
+            <Pin className={iconSize} aria-hidden="true" />
+          )}
         </button>
       )}
       <button
@@ -370,18 +367,19 @@ export const FeedCard = memo(function FeedCard({
   onMarkRead,
   onDelete,
   onMemoChange,
-  onCollectionPick,
-  collectionMap,
+  onTogglePin,
+  pinLocked,
   showMemo,
   selectMode,
   selected,
   onToggleSelect,
   compact,
+  savedVariant,
 }: FeedCardProps) {
-  const collection = item.collectionId ? collectionMap?.get(item.collectionId) : undefined;
   const catStyle = getCategoryStyle(item.category);
   const dateLabel = formatRelativeDate(item.publishedAt ?? item.collectedAt);
   const isNewItem = isNew(item.collectedAt);
+  const isPinned = Boolean(item.pinnedAt);
 
   const {containerRef, handlers} = useSwipeAction({
     onSwipeRight: () => {
@@ -412,10 +410,10 @@ export const FeedCard = memo(function FeedCard({
     onDelete?.(item.id);
   };
 
-  const handleCollectionPick = (e: React.MouseEvent) => {
+  const handleTogglePin = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    onCollectionPick?.(item.id);
+    onTogglePin?.(item.id, !isPinned);
   };
 
   // Compact: horizontal row (not currently used in app but kept for flexibility)
@@ -457,7 +455,6 @@ export const FeedCard = memo(function FeedCard({
                 catStyle={catStyle}
                 sourceName={item.sourceName}
                 dateLabel={dateLabel}
-                collection={collection}
                 isNewItem={isNewItem}
               />
             </div>
@@ -475,7 +472,9 @@ export const FeedCard = memo(function FeedCard({
     );
   }
 
-  // Default: magazine grid card (thumbnail on top, body below)
+  // Default: magazine grid card (thumbnail on top, body below).
+  // savedVariant (Saved tab) adds ember border + `pinned` label when pinned,
+  // and promotes memo to the body (no description shown).
   return (
     <div className="relative overflow-hidden">
       <SwipeBackground direction="right" />
@@ -490,11 +489,22 @@ export const FeedCard = memo(function FeedCard({
             'group relative flex flex-col bg-background',
             'transition-colors',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
+            savedVariant && 'rounded-md p-4',
+            savedVariant && isPinned && 'border-2 border-primary',
+            savedVariant && !isPinned && 'border border-border',
             selectMode && 'cursor-pointer',
             selected && 'bg-primary/5',
           )}
         >
-          {/* Select checkbox */}
+          {savedVariant && isPinned && (
+            <span
+              aria-hidden="true"
+              className="absolute -top-2 left-3 px-1.5 py-0.5 bg-primary text-primary-foreground font-mono text-[9px] uppercase tracking-[0.14em] font-semibold rounded-sm"
+            >
+              pinned
+            </span>
+          )}
+
           {selectMode && (
             <div className="absolute top-2 left-2 z-10 flex items-center justify-center min-h-[44px] min-w-[44px]">
               <Checkbox
@@ -505,18 +515,15 @@ export const FeedCard = memo(function FeedCard({
             </div>
           )}
 
-          {/* Thumbnail */}
           <div className="relative aspect-[16/10] w-full overflow-hidden rounded-sm bg-muted">
             <Thumbnail src={item.thumbnailUrl} title={item.title} className="w-full h-full" />
           </div>
 
-          {/* Body */}
           <div className="flex flex-col flex-1 gap-2.5 pt-3">
             <MetaRow
               catStyle={catStyle}
               sourceName={item.sourceName}
               dateLabel={dateLabel}
-              collection={collection}
               tags={item.tags}
               isNewItem={isNewItem}
             />
@@ -525,22 +532,11 @@ export const FeedCard = memo(function FeedCard({
               {item.title}
             </h3>
 
-            {item.description && (
+            {!savedVariant && item.description && (
               <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
                 {item.description}
               </p>
             )}
-
-            <div className="flex items-center justify-end mt-auto pt-1">
-              {!selectMode && (
-                <ActionButtons
-                  item={item}
-                  onBookmark={handleBookmark}
-                  onDelete={handleDelete}
-                  onCollectionPick={onCollectionPick ? handleCollectionPick : undefined}
-                />
-              )}
-            </div>
 
             {/* Inline memo (bookmark / read tabs) */}
             {showMemo && !selectMode && onMemoChange && (
@@ -551,6 +547,18 @@ export const FeedCard = memo(function FeedCard({
                 onMemoChange={onMemoChange}
               />
             )}
+
+            <div className="flex items-center justify-end mt-auto pt-1">
+              {!selectMode && (
+                <ActionButtons
+                  item={item}
+                  onBookmark={handleBookmark}
+                  onDelete={handleDelete}
+                  onTogglePin={onTogglePin ? handleTogglePin : undefined}
+                  pinLocked={pinLocked}
+                />
+              )}
+            </div>
           </div>
         </a>
       </div>
@@ -566,8 +574,8 @@ export const FeedListRow = memo(function FeedListRow({
   onMarkRead,
   onDelete,
   onMemoChange,
-  onCollectionPick,
-  collectionMap,
+  onTogglePin,
+  pinLocked,
   showMemo,
   selectMode,
   selected,
@@ -575,8 +583,8 @@ export const FeedListRow = memo(function FeedListRow({
 }: FeedCardProps) {
   const catStyle = getCategoryStyle(item.category);
   const dateLabel = formatRelativeDate(item.publishedAt ?? item.collectedAt);
-  const collection = item.collectionId ? collectionMap?.get(item.collectionId) : undefined;
   const isNewItem = isNew(item.collectedAt);
+  const isPinned = Boolean(item.pinnedAt);
 
   const handleClick = (e: React.MouseEvent) => {
     if (selectMode) {
@@ -600,10 +608,10 @@ export const FeedListRow = memo(function FeedListRow({
     onDelete?.(item.id);
   };
 
-  const handleCollectionPick = (e: React.MouseEvent) => {
+  const handleTogglePin = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    onCollectionPick?.(item.id);
+    onTogglePin?.(item.id, !isPinned);
   };
 
   return (
@@ -642,7 +650,6 @@ export const FeedListRow = memo(function FeedListRow({
           catStyle={catStyle}
           sourceName={item.sourceName}
           dateLabel={dateLabel}
-          collection={collection}
           tags={item.tags}
           isNewItem={isNewItem}
         />
@@ -675,7 +682,8 @@ export const FeedListRow = memo(function FeedListRow({
             item={item}
             onBookmark={handleBookmark}
             onDelete={handleDelete}
-            onCollectionPick={onCollectionPick ? handleCollectionPick : undefined}
+            onTogglePin={onTogglePin ? handleTogglePin : undefined}
+            pinLocked={pinLocked}
           />
         </div>
       )}

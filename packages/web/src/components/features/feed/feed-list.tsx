@@ -1,9 +1,8 @@
 'use client';
 
-import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {useCallback, useEffect, useRef, useState, useMemo} from 'react';
 import {useRouter, useSearchParams} from 'next/navigation';
-import {CheckSquare, Loader2, MailX, Newspaper, Plus, Settings2, Trash2, X} from 'lucide-react';
-import {cn} from '@/lib/utils';
+import {CheckSquare, Loader2, MailX, Newspaper, Plus, Trash2, X} from 'lucide-react';
 import {Skeleton} from '@/components/ui/skeleton';
 import {Button} from '@/components/ui/button';
 import {
@@ -15,11 +14,10 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import {type CollectionInfo, FeedCard, type FeedItemData, FeedListRow} from './feed-card';
+import {SectionHeader} from '@/components/ui/section-header';
+import {FeedCard, type FeedItemData, FeedListRow} from './feed-card';
 import {type StatusFilter} from './feed-filters';
 import {FeedFilterBar, type SortMode} from './feed-filter-bar';
-import {CollectionPicker} from './collection-picker';
-import type {BookmarkCollection} from './collection-manager';
 import dynamic from 'next/dynamic';
 
 const SourceManager = dynamic(
@@ -32,17 +30,13 @@ const SourceManager = dynamic(
   }
 );
 
-const CollectionManager = dynamic(
-  () => import('./collection-manager').then((m) => m.CollectionManager),
-  { ssr: false }
-);
-
 const AddUrlDialog = dynamic(
   () => import('./add-url-dialog').then((m) => m.AddUrlDialog),
   { ssr: false }
 );
 
 const PAGE_SIZE = 12;
+const MAX_PINNED = 3;
 
 /** Shared helper — builds the query string for /api/feed and fetchItems */
 function buildFeedParams(opts: {
@@ -52,7 +46,6 @@ function buildFeedParams(opts: {
   tagsParam: string;
   sort: SortMode;
   sourceId: string;
-  collectionId?: string;
   cursor?: string | null;
 }): URLSearchParams {
   const params = new URLSearchParams();
@@ -62,7 +55,6 @@ function buildFeedParams(opts: {
   if (opts.tagsParam) params.set('tags', opts.tagsParam);
   if (opts.sort !== 'latest') params.set('sort', opts.sort);
   if (opts.sourceId) params.set('sourceId', opts.sourceId);
-  if (opts.collectionId) params.set('collectionId', opts.collectionId);
   if (opts.cursor) params.set('cursor', opts.cursor);
   return params;
 }
@@ -85,6 +77,7 @@ export function FeedList() {
 
   // Data state
   const [items, setItems] = useState<FeedItemData[]>([]);
+  const [pinnedItems, setPinnedItems] = useState<FeedItemData[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -93,21 +86,7 @@ export function FeedList() {
   const [hasSources, setHasSources] = useState(true);
   const [favoriteSources, setFavoriteSources] = useState<{ id: string; name: string }[]>([]);
   const [manualSourceId, setManualSourceId] = useState<string | null>(null);
-
-  // Collection state
-  const [collections, setCollections] = useState<BookmarkCollection[]>([]);
-  const [selectedCollectionId, setSelectedCollectionId] = useState<string>('');
-  const [collectionPickerTarget, setCollectionPickerTarget] = useState<string | null>(null);
-  const [collectionManagerOpen, setCollectionManagerOpen] = useState(false);
   const [addUrlOpen, setAddUrlOpen] = useState(false);
-
-  const collectionMap = useMemo(() => {
-    const map = new Map<string, CollectionInfo>();
-    for (const c of collections) {
-      map.set(c.id, { id: c.id, name: c.name, color: c.color });
-    }
-    return map;
-  }, [collections]);
 
   // Selection & delete state
   const [selectMode, setSelectMode] = useState(false);
@@ -118,25 +97,24 @@ export function FeedList() {
   const [deleting, setDeleting] = useState(false);
   const [bulkUnreading, setBulkUnreading] = useState(false);
 
+  const isSavedTab = status === 'bookmarked';
+  const showMemo = status === 'bookmarked' || status === 'read';
+  const pinLocked = pinnedItems.length >= MAX_PINNED;
+
   // Refs for infinite scroll
   const sentinelRef = useRef<HTMLDivElement>(null);
   const cursorRef = useRef(cursor);
   const hasMoreRef = useRef(hasMore);
   const loadingMoreRef = useRef(false);
 
-  useEffect(() => {
-    cursorRef.current = cursor;
-  }, [cursor]);
-
-  useEffect(() => {
-    hasMoreRef.current = hasMore;
-  }, [hasMore]);
+  useEffect(() => { cursorRef.current = cursor; }, [cursor]);
+  useEffect(() => { hasMoreRef.current = hasMore; }, [hasMore]);
 
   // Exit select mode on filter change
   useEffect(() => {
     setSelectMode(false);
     setSelectedIds(new Set());
-  }, [category, status, search, tagsParam, sort, sourceId, selectedCollectionId]);
+  }, [category, status, search, tagsParam, sort, sourceId]);
 
   // URL sync helper
   const updateFilters = useCallback(
@@ -147,7 +125,6 @@ export function FeedList() {
       tags?: string[];
       sort?: SortMode;
       sourceId?: string;
-      collectionId?: string;
     }) => {
       const newCategory = updates.category ?? category;
       const newStatus = updates.status ?? status;
@@ -155,7 +132,6 @@ export function FeedList() {
       const newTags = updates.tags ?? selectedTags;
       const newSort = updates.sort ?? sort;
       const newSourceId = updates.sourceId ?? sourceId;
-      const newCollectionId = updates.collectionId ?? selectedCollectionId;
 
       const params = buildFeedParams({
         category: newCategory,
@@ -164,15 +140,13 @@ export function FeedList() {
         tagsParam: newTags.join(','),
         sort: newSort,
         sourceId: newSourceId,
-        collectionId: newCollectionId,
       });
-      // status 'unread' is the default, don't include in URL
       if (newStatus === 'unread') params.delete('status');
 
       const qs = params.toString();
       router.push(`/feed${qs ? `?${qs}` : ''}`, { scroll: false });
     },
-    [router, category, status, search, selectedTags, sort, sourceId, selectedCollectionId]
+    [router, category, status, search, selectedTags, sort, sourceId]
   );
 
   // Fetch items
@@ -180,7 +154,7 @@ export function FeedList() {
     async (cursorArg: string | null, append: boolean) => {
       if (!append) setLoading(true);
 
-      const params = buildFeedParams({ category, status, search, tagsParam, sort, sourceId, collectionId: selectedCollectionId, cursor: cursorArg });
+      const params = buildFeedParams({ category, status, search, tagsParam, sort, sourceId, cursor: cursorArg });
       params.set('limit', String(PAGE_SIZE));
 
       try {
@@ -190,9 +164,11 @@ export function FeedList() {
         const data = await res.json();
 
         if (append) {
-          setItems((prev) => [...prev, ...data.items]);
+          setItems((prev) => [...prev, ...(data.items ?? [])]);
         } else {
-          setItems(data.items);
+          setItems(data.items ?? []);
+          // pinnedItems only populated on first page of the Saved tab; reset otherwise.
+          setPinnedItems(data.pinnedItems ?? []);
         }
         setCursor(data.nextCursor);
         setHasMore(data.hasMore);
@@ -200,7 +176,7 @@ export function FeedList() {
         if (!append) setLoading(false);
       }
     },
-    [category, status, search, tagsParam, sort, sourceId, selectedCollectionId]
+    [category, status, search, tagsParam, sort, sourceId]
   );
 
   // Fetch sources for categories + favorites
@@ -218,27 +194,12 @@ export function FeedList() {
     setManualSourceId(manual?.id ?? null);
   }, []);
 
-  // Fetch collections
-  const fetchCollections = useCallback(async () => {
-    try {
-      const { getCollectionsWithCount } = await import('@/lib/actions/collections');
-      const data = await getCollectionsWithCount();
-      setCollections(data);
-    } catch {
-      // ignore
-    }
-  }, []);
-
-  // Load categories + collections on mount
-  useEffect(() => {
-    fetchCategories();
-    fetchCollections();
-  }, [fetchCategories, fetchCollections]);
+  useEffect(() => { fetchCategories(); }, [fetchCategories]);
 
   // Fetch items on filter changes
   useEffect(() => {
     fetchItems(null, false);
-  }, [category, status, search, tagsParam, sort, sourceId, selectedCollectionId, fetchItems]);
+  }, [category, status, search, tagsParam, sort, sourceId, fetchItems]);
 
   // Infinite scroll
   useEffect(() => {
@@ -247,11 +208,7 @@ export function FeedList() {
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (
-          entries[0]?.isIntersecting &&
-          hasMoreRef.current &&
-          !loadingMoreRef.current
-        ) {
+        if (entries[0]?.isIntersecting && hasMoreRef.current && !loadingMoreRef.current) {
           loadingMoreRef.current = true;
           setLoadingMore(true);
           fetchItems(cursorRef.current, true).finally(() => {
@@ -267,40 +224,38 @@ export function FeedList() {
     return () => observer.disconnect();
   }, [fetchItems, loading]);
 
-  // Optimistic updates
-  const handleToggleBookmark = useCallback(
-    async (id: string, isBookmarked: boolean) => {
-      setItems((prev) =>
-        prev.map((item) =>
-          item.id === id ? { ...item, isBookmarked } : item
-        )
-      );
+  // ── Optimistic handlers ──
 
-      const res = await fetch(`/api/feed/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isBookmarked }),
-      });
+  const handleToggleBookmark = useCallback(async (id: string, isBookmarked: boolean) => {
+    // Unbookmarking a pinned item auto-unpins it (server mirrors this invariant).
+    setPinnedItems((prev) =>
+      isBookmarked ? prev : prev.filter((item) => item.id !== id)
+    );
+    setItems((prev) =>
+      prev.map((item) =>
+        item.id === id
+          ? {...item, isBookmarked, ...(isBookmarked ? {} : {pinnedAt: null})}
+          : item
+      )
+    );
 
-      if (!res.ok) {
-        setItems((prev) =>
-          prev.map((item) =>
-            item.id === id ? { ...item, isBookmarked: !isBookmarked } : item
-          )
-        );
-      }
-    },
-    []
-  );
+    const res = await fetch(`/api/feed/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isBookmarked }),
+    });
+
+    if (!res.ok) {
+      fetchItems(null, false);
+    }
+  }, [fetchItems]);
 
   const handleMarkRead = useCallback(async (id: string) => {
     if (status === 'unread') {
       setItems((prev) => prev.filter((item) => item.id !== id));
     } else {
       setItems((prev) =>
-        prev.map((item) =>
-          item.id === id ? { ...item, isRead: true } : item
-        )
+        prev.map((item) => item.id === id ? { ...item, isRead: true } : item)
       );
     }
 
@@ -310,25 +265,24 @@ export function FeedList() {
       body: JSON.stringify({ isRead: true }),
     });
 
-    if (!res.ok) {
-      fetchItems(null, false);
-    }
+    if (!res.ok) fetchItems(null, false);
   }, [status, fetchItems]);
 
-  // ── Memo handler ──
-
   const handleMemoChange = useCallback(async (id: string, memo: string | null) => {
-    const item = itemsRef.current.find((i) => i.id === id);
-    const prevMemo = item?.memo ?? null;
-    const wasBookmarked = item?.isBookmarked ?? false;
+    const previousItem =
+      itemsRef.current.find((i) => i.id === id) ??
+      pinnedItemsRef.current.find((i) => i.id === id);
+    const prevMemo = previousItem?.memo ?? null;
+    const wasBookmarked = previousItem?.isBookmarked ?? false;
 
-    setItems((prev) =>
-      prev.map((i) =>
+    const apply = (list: FeedItemData[]) =>
+      list.map((i) =>
         i.id === id
           ? { ...i, memo, isBookmarked: memo ? true : i.isBookmarked }
           : i
-      )
-    );
+      );
+    setItems(apply);
+    setPinnedItems(apply);
 
     try {
       const res = await fetch(`/api/feed/${id}`, {
@@ -338,75 +292,72 @@ export function FeedList() {
       });
       if (!res.ok) throw new Error();
     } catch {
-      setItems((prev) =>
-        prev.map((i) =>
-          i.id === id ? { ...i, memo: prevMemo, isBookmarked: wasBookmarked } : i
-        )
-      );
+      const revert = (list: FeedItemData[]) =>
+        list.map((i) => i.id === id ? { ...i, memo: prevMemo, isBookmarked: wasBookmarked } : i);
+      setItems(revert);
+      setPinnedItems(revert);
+    }
+  }, []);
+
+  const handleTogglePin = useCallback(async (id: string, nextPinned: boolean) => {
+    // Block pinning when already at cap (cover the race between UI and server).
+    if (nextPinned && pinnedItemsRef.current.length >= MAX_PINNED &&
+        !pinnedItemsRef.current.some((p) => p.id === id)) {
       return;
     }
 
-    // 메모 추가 + 기존에 북마크 아니었으면 → 컬렉션 피커 자동 오픈
-    if (memo && !wasBookmarked) {
-      setCollectionPickerTarget(id);
+    const nowIso = new Date().toISOString();
+
+    if (nextPinned) {
+      // Optimistic: find item in regular list, move to pinned
+      const source = itemsRef.current.find((i) => i.id === id);
+      if (source) {
+        setItems((prev) => prev.filter((i) => i.id !== id));
+        setPinnedItems((prev) => [{ ...source, pinnedAt: nowIso, isBookmarked: true }, ...prev]);
+      } else {
+        // Already in pinned list (idempotent) — just bump pinnedAt
+        setPinnedItems((prev) =>
+          prev.map((i) => i.id === id ? { ...i, pinnedAt: nowIso } : i)
+        );
+      }
+    } else {
+      // Optimistic: move from pinned back to regular list at top
+      const source = pinnedItemsRef.current.find((i) => i.id === id);
+      if (source) {
+        setPinnedItems((prev) => prev.filter((i) => i.id !== id));
+        setItems((prev) => [{ ...source, pinnedAt: null }, ...prev]);
+      }
     }
-  }, []);
 
-  const isBookmarkTab = status === 'bookmarked';
-  const showMemo = status === 'bookmarked' || status === 'read';
-
-  // ── Collection handlers ──
-
-  const handleCollectionPick = useCallback((itemId: string) => {
-    setCollectionPickerTarget(itemId);
-  }, []);
-
-  const handleCollectionSelect = useCallback(async (collectionId: string | null) => {
-    if (!collectionPickerTarget) return;
-    const itemId = collectionPickerTarget;
-
-    // Optimistic update
-    setItems((prev) =>
-      prev.map((item) =>
-        item.id === itemId
-          ? { ...item, collectionId, ...(collectionId !== null ? { isBookmarked: true } : {}) }
-          : item
-      )
-    );
-
-    const res = await fetch(`/api/feed/${itemId}`, {
+    const res = await fetch(`/api/feed/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ collectionId }),
+      body: JSON.stringify({ pinned: nextPinned }),
     });
 
     if (!res.ok) {
+      // Re-sync from server on failure (e.g., server rejected due to limit race).
       fetchItems(null, false);
     }
-    // Refresh collection counts
-    fetchCollections();
-  }, [collectionPickerTarget, fetchItems, fetchCollections]);
+  }, [fetchItems]);
 
   // ── Delete handlers ──
 
   const handleDeleteRequest = useCallback((id: string) => {
-    const item = items.find((i) => i.id === id);
+    const item = items.find((i) => i.id === id) ?? pinnedItems.find((i) => i.id === id);
     setDeleteTarget(item ? { id: item.id, title: item.title } : null);
-  }, [items]);
+  }, [items, pinnedItems]);
 
   const handleDeleteConfirm = useCallback(async () => {
     if (!deleteTarget) return;
     setDeleting(true);
 
     setItems((prev) => prev.filter((item) => item.id !== deleteTarget.id));
+    setPinnedItems((prev) => prev.filter((item) => item.id !== deleteTarget.id));
 
-    const res = await fetch(`/api/feed/${deleteTarget.id}`, {
-      method: 'DELETE',
-    });
+    const res = await fetch(`/api/feed/${deleteTarget.id}`, { method: 'DELETE' });
 
-    if (!res.ok) {
-      fetchItems(null, false);
-    }
+    if (!res.ok) fetchItems(null, false);
     setDeleteTarget(null);
     setDeleting(false);
   }, [deleteTarget, fetchItems]);
@@ -417,8 +368,8 @@ export function FeedList() {
 
     const ids = [...selectedIds];
     setItems((prev) => prev.filter((item) => !selectedIds.has(item.id)));
+    setPinnedItems((prev) => prev.filter((item) => !selectedIds.has(item.id)));
 
-    // chunk into batches of 100
     let failed = false;
     for (let i = 0; i < ids.length; i += 100) {
       const chunk = ids.slice(i, i + 100);
@@ -430,9 +381,7 @@ export function FeedList() {
       if (!res.ok) failed = true;
     }
 
-    if (failed) {
-      fetchItems(null, false);
-    }
+    if (failed) fetchItems(null, false);
     setSelectedIds(new Set());
     setSelectMode(false);
     setBulkDeleteOpen(false);
@@ -457,9 +406,7 @@ export function FeedList() {
       if (!res.ok) failed = true;
     }
 
-    if (failed) {
-      fetchItems(null, false);
-    }
+    if (failed) fetchItems(null, false);
     setSelectedIds(new Set());
     setSelectMode(false);
     setBulkUnreadOpen(false);
@@ -493,12 +440,13 @@ export function FeedList() {
   // ── Keyboard navigation (DOM-based focus to avoid re-renders) ──
 
   const focusIndexRef = useRef(-1);
-  // Keep latest items/handlers in refs so the keydown listener never goes stale
   const itemsRef = useRef(items);
+  const pinnedItemsRef = useRef(pinnedItems);
   const handleMarkReadRef = useRef(handleMarkRead);
   const handleToggleBookmarkRef = useRef(handleToggleBookmark);
 
   useEffect(() => { itemsRef.current = items; }, [items]);
+  useEffect(() => { pinnedItemsRef.current = pinnedItems; }, [pinnedItems]);
   useEffect(() => { handleMarkReadRef.current = handleMarkRead; }, [handleMarkRead]);
   useEffect(() => { handleToggleBookmarkRef.current = handleToggleBookmark; }, [handleToggleBookmark]);
 
@@ -511,7 +459,7 @@ export function FeedList() {
       prev.classList.remove('ring-2', 'ring-primary/50', 'rounded-xl');
     }
     focusIndexRef.current = -1;
-  }, [category, status, search, tagsParam, sort, sourceId, selectedCollectionId]);
+  }, [category, status, search, tagsParam, sort, sourceId]);
 
   useEffect(() => {
     if (selectMode || loading) return;
@@ -519,13 +467,11 @@ export function FeedList() {
     function applyFocusRing(index: number) {
       const feed = document.querySelector('[data-feed-feed]');
       if (!feed) return;
-      // Remove old
       const prev = feed.querySelector('[data-feed-focused]');
       if (prev) {
         prev.removeAttribute('data-feed-focused');
         prev.classList.remove('ring-2', 'ring-primary/50', 'rounded-xl');
       }
-      // Apply new
       const el = feed.querySelector(`[data-feed-index="${index}"]`);
       if (el) {
         el.setAttribute('data-feed-focused', '');
@@ -568,7 +514,6 @@ export function FeedList() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  // Only re-register when selectMode or loading changes — items changes are handled via refs
   }, [selectMode, loading]);
 
   const handleCrawlComplete = useCallback(() => {
@@ -580,7 +525,7 @@ export function FeedList() {
     fetchCategories();
   }, [fetchCategories]);
 
-  // Empty state: no sources
+  // ── Empty state: no sources ──
   if (!loading && !hasSources) {
     return (
       <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-7xl mx-auto">
@@ -603,6 +548,8 @@ export function FeedList() {
       </div>
     );
   }
+
+  const isEmpty = items.length === 0 && pinnedItems.length === 0;
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-7xl mx-auto">
@@ -666,14 +613,7 @@ export function FeedList() {
         selectedCategory={category}
         onCategoryChange={(c) => updateFilters({ category: c })}
         status={status}
-        onStatusChange={(s) => {
-          if (s !== 'bookmarked') {
-            setSelectedCollectionId('');
-            updateFilters({ status: s, collectionId: '' });
-          } else {
-            updateFilters({ status: s });
-          }
-        }}
+        onStatusChange={(s) => updateFilters({ status: s })}
         selectedTags={selectedTags}
         onTagsChange={(tags) => updateFilters({ tags })}
         sort={sort}
@@ -717,86 +657,11 @@ export function FeedList() {
         }
       />
 
-      {/* Collection chips (bookmark tab only) — editorial text buttons with em-dash marker */}
-      {isBookmarkTab && (
-        <div className="flex items-center gap-5 mb-4 overflow-x-auto scrollbar-hide pb-0.5">
-          {collections.length > 0 && (
-            <>
-              <button
-                type="button"
-                onClick={() => setSelectedCollectionId('')}
-                className={cn(
-                  'shrink-0 font-mono text-[11px] uppercase tracking-[0.1em] transition-colors cursor-pointer',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm',
-                  selectedCollectionId === ''
-                    ? 'text-primary'
-                    : 'text-muted-foreground hover:text-foreground',
-                )}
-              >
-                {selectedCollectionId === '' && (
-                  <span aria-hidden="true" className="mr-1.5">
-                    —
-                  </span>
-                )}
-                All
-              </button>
-              {collections.map((col) => {
-                const active = col.id === selectedCollectionId;
-                return (
-                  <button
-                    type="button"
-                    key={col.id}
-                    onClick={() =>
-                      setSelectedCollectionId(col.id === selectedCollectionId ? '' : col.id)
-                    }
-                    className={cn(
-                      'shrink-0 inline-flex items-baseline gap-1.5 text-xs transition-colors cursor-pointer',
-                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm',
-                      active
-                        ? 'text-primary font-medium'
-                        : 'text-muted-foreground hover:text-foreground',
-                    )}
-                  >
-                    {active && (
-                      <span
-                        aria-hidden="true"
-                        className="font-mono text-[11px] tracking-[0.1em]"
-                      >
-                        —
-                      </span>
-                    )}
-                    <span>{col.name}</span>
-                    {col.count !== undefined && col.count > 0 && (
-                      <span className="font-mono text-[10px] opacity-60">{col.count}</span>
-                    )}
-                  </button>
-                );
-              })}
-            </>
-          )}
-          <button
-            type="button"
-            onClick={() => setCollectionManagerOpen(true)}
-            className={cn(
-              'shrink-0 inline-flex items-center gap-1.5 transition-colors cursor-pointer',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm',
-              collections.length === 0
-                ? 'font-mono text-[11px] uppercase tracking-[0.1em] text-muted-foreground hover:text-foreground'
-                : 'p-1 text-muted-foreground/50 hover:text-foreground ml-auto',
-            )}
-            aria-label="컬렉션 관리"
-          >
-            <Settings2 className="h-3.5 w-3.5" aria-hidden="true" />
-            {collections.length === 0 && <span>New collection</span>}
-          </button>
-        </div>
-      )}
-
       {/* Feed */}
       <div className="min-h-[30vh]" data-feed-feed>
       {loading ? (
         <FeedSkeleton />
-      ) : items.length === 0 ? (
+      ) : isEmpty ? (
         <div className="flex flex-col items-center justify-center min-h-[40vh] text-center max-w-sm mx-auto">
           <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-3">
             <span className="text-primary" aria-hidden="true">—</span> Nothing here
@@ -815,24 +680,84 @@ export function FeedList() {
                       : '수집된 글이 없습니다.'}
           </p>
         </div>
-      ) : (
+      ) : isSavedTab ? (
+        // ── Saved view: pinned grid + masonry for the rest ──
         <>
-          {/* Card grid (mobile/tablet) — editorial flat, hairline via parent divider on mobile single col */}
+          {pinnedItems.length > 0 && (
+            <section className="mb-12">
+              <SectionHeader
+                eyebrow={`Pinned · ${pinnedItems.length}/${MAX_PINNED}`}
+                title="자주 돌아보는 것"
+              />
+              <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {pinnedItems.map((item) => (
+                  <FeedCard
+                    key={item.id}
+                    item={item}
+                    onToggleBookmark={handleToggleBookmark}
+                    onMarkRead={handleMarkRead}
+                    onDelete={handleDeleteRequest}
+                    onMemoChange={handleMemoChange}
+                    onTogglePin={handleTogglePin}
+                    pinLocked={false}
+                    showMemo
+                    selectMode={selectMode}
+                    selected={selectedIds.has(item.id)}
+                    onToggleSelect={toggleSelect}
+                    savedVariant
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {items.length > 0 && (
+            <section>
+              {pinnedItems.length > 0 && (
+                <SectionHeader eyebrow="All saved" title="전체" />
+              )}
+              <div className={`${pinnedItems.length > 0 ? 'mt-6' : ''} columns-1 sm:columns-2 lg:columns-3 gap-6`}>
+                {items.map((item, i) => (
+                  <div key={item.id} data-feed-index={i} className="break-inside-avoid mb-6">
+                    <FeedCard
+                      item={item}
+                      onToggleBookmark={handleToggleBookmark}
+                      onMarkRead={handleMarkRead}
+                      onDelete={handleDeleteRequest}
+                      onMemoChange={handleMemoChange}
+                      onTogglePin={handleTogglePin}
+                      pinLocked={pinLocked}
+                      showMemo
+                      selectMode={selectMode}
+                      selected={selectedIds.has(item.id)}
+                      onToggleSelect={toggleSelect}
+                      savedVariant
+                    />
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          <div ref={sentinelRef} className="h-px" />
+          {loadingMore && (
+            <div className="py-6">
+              <LoadMoreSkeleton />
+            </div>
+          )}
+        </>
+      ) : (
+        // ── Default view (Unread / Read): grid (mobile) + list (desktop) ──
+        <>
           <div className="lg:hidden grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-10">
             {items.map((item, i) => (
-              <div
-                key={item.id}
-                data-feed-index={i}
-                className=""
-              >
+              <div key={item.id} data-feed-index={i}>
                 <FeedCard
                   item={item}
                   onToggleBookmark={handleToggleBookmark}
                   onMarkRead={handleMarkRead}
                   onDelete={handleDeleteRequest}
                   onMemoChange={handleMemoChange}
-                  onCollectionPick={(isBookmarkTab || status === 'read') ? handleCollectionPick : undefined}
-                  collectionMap={(isBookmarkTab || status === 'read') ? collectionMap : undefined}
                   showMemo={showMemo}
                   selectMode={selectMode}
                   selected={selectedIds.has(item.id)}
@@ -843,22 +768,15 @@ export function FeedList() {
             ))}
           </div>
 
-          {/* List view (desktop) */}
           <div className="hidden lg:block divide-y divide-border/60">
             {items.map((item, i) => (
-              <div
-                key={item.id}
-                data-feed-index={i}
-                className=""
-              >
+              <div key={item.id} data-feed-index={i}>
                 <FeedListRow
                   item={item}
                   onToggleBookmark={handleToggleBookmark}
                   onMarkRead={handleMarkRead}
                   onDelete={handleDeleteRequest}
                   onMemoChange={handleMemoChange}
-                  onCollectionPick={(isBookmarkTab || status === 'read') ? handleCollectionPick : undefined}
-                  collectionMap={(isBookmarkTab || status === 'read') ? collectionMap : undefined}
                   showMemo={showMemo}
                   selectMode={selectMode}
                   selected={selectedIds.has(item.id)}
@@ -868,10 +786,7 @@ export function FeedList() {
             ))}
           </div>
 
-          {/* Infinite scroll sentinel */}
           <div ref={sentinelRef} className="h-px" />
-
-          {/* Loading more indicator */}
           {loadingMore && (
             <div className="py-6">
               <LoadMoreSkeleton />
@@ -946,41 +861,12 @@ export function FeedList() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Collection picker bottom sheet */}
-      <CollectionPicker
-        open={!!collectionPickerTarget}
-        onOpenChange={(open) => { if (!open) setCollectionPickerTarget(null); }}
-        collections={collections}
-        currentCollectionId={
-          collectionPickerTarget
-            ? items.find((i) => i.id === collectionPickerTarget)?.collectionId ?? null
-            : null
-        }
-        onSelect={handleCollectionSelect}
-      />
-
       {/* Add URL dialog */}
       <AddUrlDialog
         open={addUrlOpen}
         onOpenChange={setAddUrlOpen}
         onComplete={() => { fetchItems(null, false); fetchCategories(); }}
       />
-
-      {/* Collection manager dialog */}
-      {collectionManagerOpen && (
-        <CollectionManager
-          open={collectionManagerOpen}
-          onOpenChange={setCollectionManagerOpen}
-          collections={collections}
-          onCollectionsChange={(updated) => {
-            setCollections(updated);
-            // If current filter is a deleted collection, reset
-            if (selectedCollectionId && !updated.find((c) => c.id === selectedCollectionId)) {
-              setSelectedCollectionId('');
-            }
-          }}
-        />
-      )}
     </div>
   );
 }
@@ -988,29 +874,24 @@ export function FeedList() {
 function FeedSkeleton() {
   return (
     <>
-      {/* Card skeleton (mobile/tablet) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:hidden gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:hidden gap-x-6 gap-y-10">
         {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="rounded-xl border border-border/60 overflow-hidden">
-            <Skeleton className="aspect-video w-full" />
-            <div className="p-3 space-y-2">
-              <Skeleton className="h-4 w-16 rounded-full" />
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-3/4" />
-              <Skeleton className="h-3 w-1/2" />
-            </div>
+          <div key={i} className="space-y-3">
+            <Skeleton className="aspect-[16/10] w-full rounded-sm" />
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="h-5 w-full" />
+            <Skeleton className="h-5 w-3/4" />
           </div>
         ))}
       </div>
-      {/* List skeleton (desktop) */}
-      <div className="hidden lg:block space-y-4">
+      <div className="hidden lg:block divide-y divide-border/60">
         {Array.from({ length: 8 }).map((_, i) => (
-          <div key={i} className="flex items-start gap-4 py-4">
-            <Skeleton className="w-[100px] h-[64px] rounded-md shrink-0" />
+          <div key={i} className="flex items-start gap-5 py-5">
+            <Skeleton className="w-[140px] h-[90px] rounded-sm shrink-0" />
             <div className="flex-1 space-y-2">
-              <Skeleton className="h-4 w-3/4" />
-              <Skeleton className="h-3 w-full" />
-              <Skeleton className="h-3 w-1/3" />
+              <Skeleton className="h-3 w-32" />
+              <Skeleton className="h-5 w-3/4" />
+              <Skeleton className="h-4 w-full" />
             </div>
           </div>
         ))}
@@ -1022,24 +903,22 @@ function FeedSkeleton() {
 function LoadMoreSkeleton() {
   return (
     <>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:hidden gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:hidden gap-x-6 gap-y-10">
         {Array.from({ length: 2 }).map((_, i) => (
-          <div key={i} className="rounded-xl border border-border/60 overflow-hidden">
-            <Skeleton className="aspect-video w-full" />
-            <div className="p-3 space-y-2">
-              <Skeleton className="h-4 w-16 rounded-full" />
-              <Skeleton className="h-4 w-full" />
-            </div>
+          <div key={i} className="space-y-3">
+            <Skeleton className="aspect-[16/10] w-full rounded-sm" />
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="h-5 w-full" />
           </div>
         ))}
       </div>
-      <div className="hidden lg:block space-y-4">
+      <div className="hidden lg:block divide-y divide-border/60">
         {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="flex items-start gap-4 py-4">
-            <Skeleton className="w-[100px] h-[64px] rounded-md shrink-0" />
+          <div key={i} className="flex items-start gap-5 py-5">
+            <Skeleton className="w-[140px] h-[90px] rounded-sm shrink-0" />
             <div className="flex-1 space-y-2">
-              <Skeleton className="h-4 w-3/4" />
-              <Skeleton className="h-3 w-full" />
+              <Skeleton className="h-3 w-32" />
+              <Skeleton className="h-5 w-3/4" />
             </div>
           </div>
         ))}
