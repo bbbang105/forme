@@ -1,10 +1,10 @@
-import Link from 'next/link';
-import {ArrowRight, ExternalLink} from 'lucide-react';
+import {ExternalLink} from 'lucide-react';
 import {cn} from '@/lib/utils';
-import {formatRelativeDate, getArticleGradient, getCategoryStyle,} from '@/lib/feed-utils';
+import {formatRelativeDate, getArticleGradient, getCategoryStyle} from '@/lib/feed-utils';
 import {getAuthUser} from '@/lib/auth';
 import {feedItems, feedSources, db} from '@forme/shared';
 import {and, desc, eq, isNull, sql} from 'drizzle-orm';
+import {SectionHeader} from '@/components/ui/section-header';
 import {MiniCardLink} from './mini-card-link';
 import {MiniCardThumbnail} from './mini-card-thumbnail';
 
@@ -78,24 +78,22 @@ export async function DashboardFeed() {
   }));
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-foreground">최신 피드</h3>
-        <Link
-          href="/feed"
-          className="flex items-center gap-1 text-xs text-primary hover:underline"
-        >
-          더보기
-          <ArrowRight className="h-3 w-3" />
-        </Link>
-      </div>
+    <section className="space-y-4">
+      <SectionHeader
+        eyebrow="Feed"
+        title="최신 읽을거리"
+        actionHref="/feed"
+        actionLabel="View all"
+      />
 
-      <div className="space-y-2">
+      <ul className="space-y-2">
         {items.map((item) => (
-          <MiniCard key={item.id} item={item} />
+          <li key={item.id}>
+            <MiniCard item={item} />
+          </li>
         ))}
-      </div>
-    </div>
+      </ul>
+    </section>
   );
 }
 
@@ -110,46 +108,44 @@ function MiniCard({ item }: { item: MiniCardItem }) {
       itemId={item.id}
       href={item.url}
       className={cn(
-        'group flex items-center gap-3 p-3 rounded-lg border border-border/60',
-        'hover:border-primary/30 hover:shadow-sm transition-all',
+        'group flex items-start gap-3 py-3 border-b border-border/60 last:border-b-0',
+        'transition-colors',
       )}
     >
       {/* Thumbnail — client island handles img error fallback */}
-      <div className="w-16 h-12 rounded-md overflow-hidden bg-muted shrink-0">
-        <MiniCardThumbnail
-          src={item.thumbnailUrl}
-          gradient={gradient}
-        />
+      <div className="w-20 h-20 rounded-sm overflow-hidden bg-muted shrink-0">
+        <MiniCardThumbnail src={item.thumbnailUrl} gradient={gradient} />
       </div>
 
       {/* Content */}
-      <div className="flex-1 min-w-0">
-        <h4 className="text-sm font-medium text-foreground line-clamp-1 group-hover:text-primary transition-colors">
-          {item.title}
-        </h4>
-        <div className="flex items-center gap-1.5 mt-0.5">
+      <div className="flex-1 min-w-0 space-y-1.5">
+        <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
           <span
             className={cn(
-              'inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-medium ring-1 ring-inset',
+              'inline-flex rounded-sm px-1.5 py-0.5 ring-1 ring-inset normal-case tracking-normal',
               catStyle.bg,
               catStyle.text,
-              catStyle.ring
+              catStyle.ring,
             )}
           >
             {catStyle.label}
           </span>
           {item.sourceName && (
-            <span className="text-xs text-muted-foreground truncate">
-              {item.sourceName}
-            </span>
+            <span className="truncate">{item.sourceName}</span>
           )}
           {relativeDate && (
-            <span className="text-xs text-muted-foreground">{relativeDate}</span>
+            <>
+              <span className="text-primary shrink-0" aria-hidden="true">·</span>
+              <span className="shrink-0">{relativeDate}</span>
+            </>
           )}
         </div>
+        <h4 className="font-display text-base leading-snug text-foreground line-clamp-2 group-hover:text-primary transition-colors">
+          {item.title}
+        </h4>
       </div>
 
-      <ExternalLink className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-primary transition-colors shrink-0" />
+      <ExternalLink className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-primary transition-colors shrink-0 mt-1" aria-hidden="true" />
     </MiniCardLink>
   );
 }

@@ -1,33 +1,27 @@
-import Link from 'next/link';
 import {getAuthUser} from '@/lib/auth';
 import {calendarEvents, db, todos} from '@forme/shared';
 import {and, asc, eq, gte, lte} from 'drizzle-orm';
-import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
-import {ArrowRight, CalendarDays, CheckCircle2, Circle} from 'lucide-react';
+import {CheckCircle2, Circle} from 'lucide-react';
+import {SectionHeader} from '@/components/ui/section-header';
 
 export async function DashboardCalendar() {
   const user = await getAuthUser();
 
   // KST today using Intl for reliability
-  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date());
+  const today = new Intl.DateTimeFormat('en-CA', {timeZone: 'Asia/Seoul'}).format(new Date());
 
   // Get upcoming events (next 7 days)
   const todayDate = new Date(today + 'T00:00:00+09:00');
   const weekLater = new Date(todayDate);
   weekLater.setDate(weekLater.getDate() + 7);
-  const weekLaterStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(weekLater);
+  const weekLaterStr = new Intl.DateTimeFormat('en-CA', {timeZone: 'Asia/Seoul'}).format(weekLater);
 
   // Parallelize independent queries
   const [todayTodos, upcomingEvents] = await Promise.all([
     db
       .select()
       .from(todos)
-      .where(
-        and(
-          eq(todos.userId, user.id),
-          eq(todos.date, today),
-        )
-      )
+      .where(and(eq(todos.userId, user.id), eq(todos.date, today)))
       .orderBy(asc(todos.sortOrder), asc(todos.createdAt))
       .limit(5),
     db
@@ -50,69 +44,79 @@ export async function DashboardCalendar() {
   if (totalCount === 0 && upcomingEvents.length === 0) return null;
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4">
-        <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
-          <CalendarDays className="h-4 w-4 text-primary" />
-          오늘의 할 일
-          {totalCount > 0 && (
-            <span className="text-xs text-muted-foreground font-normal ml-1">
-              {completedCount}/{totalCount}
-            </span>
-          )}
-        </CardTitle>
-        <Link
-          href="/calendar"
-          className="text-xs text-primary hover:underline flex items-center gap-0.5"
-        >
-          전체 보기
-          <ArrowRight className="h-3 w-3" />
-        </Link>
-      </CardHeader>
-      <CardContent className="p-4 pt-0 space-y-3">
+    <section className="space-y-4">
+      <SectionHeader
+        eyebrow={totalCount > 0 ? `Today · ${completedCount}/${totalCount}` : 'Today'}
+        title="오늘의 할 일"
+        actionHref="/calendar"
+        actionLabel="View all"
+      />
+
+      <div className="space-y-4">
         {/* Today's todos */}
         {todayTodos.length > 0 && (
-          <div className="space-y-1">
+          <ul className="space-y-2">
             {todayTodos.map((todo) => (
-              <div key={todo.id} className="flex items-center gap-2 text-sm">
+              <li key={todo.id} className="flex items-center gap-2.5 text-sm">
                 {todo.isCompleted ? (
-                  <CheckCircle2 className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                  <CheckCircle2 className="h-4 w-4 text-primary shrink-0" aria-hidden="true" />
                 ) : (
-                  <Circle className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                  <Circle className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden="true" />
                 )}
-                <span className={todo.isCompleted ? 'line-through text-muted-foreground' : ''}>
+                <span
+                  className={
+                    todo.isCompleted ? 'line-through text-muted-foreground' : 'text-foreground'
+                  }
+                >
                   {todo.content}
                 </span>
-              </div>
+              </li>
             ))}
-          </div>
+          </ul>
         )}
 
         {/* Upcoming events */}
         {upcomingEvents.length > 0 && (
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">다가오는 일정</p>
-            {upcomingEvents.map((event) => (
-              <div key={event.id} className={`flex items-center gap-2 text-sm ${event.isCompleted ? 'opacity-50' : ''}`}>
-                <span
-                  className="w-0.5 h-4 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: event.color }}
-                />
-                <span className={`truncate ${event.isCompleted ? 'line-through text-muted-foreground' : ''}`}>
-                  {event.startTime && <span className="text-xs text-muted-foreground mr-1">{event.startTime}</span>}
-                  {event.title}
-                </span>
-                <span className="text-xs text-muted-foreground flex-shrink-0 ml-auto">
-                  {event.startDate === today
-                    ? '오늘'
-                    : `${new Date(event.startDate + 'T00:00:00').getMonth() + 1}.${new Date(event.startDate + 'T00:00:00').getDate()}`
-                  }
-                </span>
+          <div className="space-y-2">
+            {todayTodos.length > 0 && (
+              <div className="pt-2 border-t border-border/60">
+                <p className="font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground mb-2">
+                  Upcoming
+                </p>
               </div>
-            ))}
+            )}
+            <ul className="space-y-2">
+              {upcomingEvents.map((event) => (
+                <li
+                  key={event.id}
+                  className={`flex items-center gap-2.5 text-sm ${event.isCompleted ? 'opacity-50' : ''}`}
+                >
+                  <span
+                    className="w-0.5 h-4 shrink-0"
+                    style={{backgroundColor: event.color}}
+                    aria-hidden="true"
+                  />
+                  <span
+                    className={`truncate min-w-0 flex-1 ${event.isCompleted ? 'line-through text-muted-foreground' : 'text-foreground'}`}
+                  >
+                    {event.startTime && (
+                      <span className="font-mono text-xs text-muted-foreground mr-2">
+                        {event.startTime}
+                      </span>
+                    )}
+                    {event.title}
+                  </span>
+                  <span className="font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground shrink-0">
+                    {event.startDate === today
+                      ? 'today'
+                      : `${new Date(event.startDate + 'T00:00:00').getMonth() + 1}.${new Date(event.startDate + 'T00:00:00').getDate()}`}
+                  </span>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }
