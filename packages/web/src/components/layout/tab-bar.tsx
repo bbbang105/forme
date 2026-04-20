@@ -6,10 +6,10 @@ import {Calendar, Newspaper, PlayCircle, StickyNote} from 'lucide-react';
 import {cn} from '@/lib/utils';
 
 const tabs = [
-  { href: '/feed', label: '피드', icon: Newspaper },
-  { href: '/video', label: '유튜브', icon: PlayCircle },
-  { href: '/calendar', label: '캘린더', icon: Calendar },
-  { href: '/memo', label: '메모', icon: StickyNote },
+  { href: '/feed', label: 'Feed', icon: Newspaper },
+  { href: '/video', label: 'YouTube', icon: PlayCircle },
+  { href: '/calendar', label: 'Calendar', icon: Calendar },
+  { href: '/memo', label: 'Notes', icon: StickyNote },
 ];
 
 export function TabBar() {
