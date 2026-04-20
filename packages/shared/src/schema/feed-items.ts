@@ -1,6 +1,5 @@
 import {boolean, index, pgTable, text, timestamp, uniqueIndex, uuid, varchar} from 'drizzle-orm/pg-core';
 import {feedSources} from './feed-sources';
-import {bookmarkCollections} from './bookmark-collections';
 
 export const feedItems = pgTable('feed_items', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -17,7 +16,8 @@ export const feedItems = pgTable('feed_items', {
   collectedAt: timestamp('collected_at', { withTimezone: true }).notNull().defaultNow(),
   readAt: timestamp('read_at', { withTimezone: true }),
   memo: text('memo'),
-  collectionId: uuid('collection_id').references(() => bookmarkCollections.id, { onDelete: 'set null' }),
+  /** Non-null timestamp when the bookmark is pinned to the top of the Saved view. Max 3 per user enforced at API layer. */
+  pinnedAt: timestamp('pinned_at', { withTimezone: true }),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
 }, (table) => ({
   sourceUrlIdx: uniqueIndex('idx_items_source_url').on(table.sourceId, table.url),
@@ -26,6 +26,6 @@ export const feedItems = pgTable('feed_items', {
   sourceIdx: index('idx_items_source').on(table.sourceId),
   readAtIdx: index('idx_items_read_at').on(table.readAt),
   filtersIdx: index('idx_items_filters').on(table.sourceId, table.isRead, table.isBookmarked, table.category),
-  collectionIdx: index('idx_items_collection').on(table.collectionId),
+  pinnedAtIdx: index('idx_items_pinned_at').on(table.pinnedAt),
   deletedAtIdx: index('idx_items_deleted_at').on(table.deletedAt),
 }));

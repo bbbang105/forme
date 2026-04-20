@@ -2,7 +2,7 @@ import {NextResponse} from 'next/server';
 import {createClient} from '@/lib/supabase/server';
 import {UUID_REGEX} from '@/lib/validators';
 import {feedItems, feedSources, db, profiles} from '@forme/shared';
-import {and, desc, eq, inArray, isNull, sql, type SQL} from 'drizzle-orm';
+import {and, desc, eq, inArray, isNotNull, isNull, sql, type SQL} from 'drizzle-orm';
 import {escapeIlike} from '@/lib/feed-utils';
 import {withTracing} from '@/lib/logger';
 
@@ -39,7 +39,7 @@ interface RawItem {
   collectedAt: Date;
   sourceName: string | null;
   memo: string | null;
-  collectionId: string | null;
+  pinnedAt: Date | null;
 }
 
 // ── Serializer ──
@@ -60,7 +60,7 @@ function serializeItem(item: RawItem) {
     collectedAt: item.collectedAt.toISOString(),
     sourceName: item.sourceName ?? null,
     memo: item.memo ?? null,
-    collectionId: item.collectionId ?? null,
+    pinnedAt: item.pinnedAt?.toISOString() ?? null,
   };
 }
 
@@ -71,14 +71,20 @@ function serializeItem(item: RawItem) {
  *
  * Query params:
  *   category  - filter by category slug (omit or 'all' to skip)
- *   status    - 'unread' (is_read=false) | 'bookmarked' (is_bookmarked=true)
- *   search    - ILIKE search on title and description (max 100 chars)
+ *   status    - 'unread' | 'read' | 'bookmarked'
+ *   search    - ILIKE search on title / description / source name (max 100 chars)
  *   tags      - comma-separated tag names, AND filter (items must contain ALL)
  *   sort      - 'latest' (default) | 'recommended' (by user interest overlap)
  *   cursor    - composite keyset cursor
  *   limit     - page size, default 12, max 50
  *
- * Response: { items, nextCursor, hasMore }
+ * Response: { items, nextCursor, hasMore, pinnedItems? }
+ *
+ * `pinnedItems` is populated only on the first page (cursor=null) of the
+ * `bookmarked` status — up to 3 pinned bookmarks rendered separately at the
+ * top of the Saved view. Subsequent pages / other statuses don't include it,
+ * and pinned items are excluded from the main `items` array on the bookmarked
+ * status to avoid duplicate rendering.
  */
 export const GET = withTracing('GET /api/feed', async (request) => {
   // ── Auth ──
@@ -103,7 +109,6 @@ export const GET = withTracing('GET /api/feed', async (request) => {
   const tagsParam = searchParams.get('tags')?.trim() || '';
   const sort = searchParams.get('sort')?.trim() || 'latest';
   const sourceId = searchParams.get('sourceId')?.trim() || '';
-  const collectionId = searchParams.get('collectionId')?.trim() || '';
 
   const rawLimit = parseInt(searchParams.get('limit') || String(DEFAULT_LIMIT), 10);
   const limit = isNaN(rawLimit)
@@ -132,16 +137,11 @@ export const GET = withTracing('GET /api/feed', async (request) => {
     );
   }
 
-  if (collectionId && !UUID_REGEX.test(collectionId)) {
-    return NextResponse.json(
-      { error: 'collectionId must be a valid UUID' },
-      { status: 400 }
-    );
-  }
-
   const filterTags = tagsParam
     ? tagsParam.split(',').map((t) => t.trim()).filter(Boolean)
     : [];
+
+  const isBookmarked = status === 'bookmarked';
 
   // ── Build filter conditions ──
   const filterConditions = [eq(feedSources.userId, user.id), isNull(feedItems.deletedAt)];
@@ -160,16 +160,15 @@ export const GET = withTracing('GET /api/feed', async (request) => {
     filterConditions.push(eq(feedItems.sourceId, sourceId));
   }
 
-  if (collectionId) {
-    filterConditions.push(eq(feedItems.collectionId, collectionId));
-  }
-
   if (status === 'unread') {
     filterConditions.push(eq(feedItems.isRead, false));
   } else if (status === 'read') {
     filterConditions.push(eq(feedItems.isRead, true));
-  } else if (status === 'bookmarked') {
+  } else if (isBookmarked) {
     filterConditions.push(eq(feedItems.isBookmarked, true));
+    // Pinned items are returned separately in `pinnedItems`; exclude them here
+    // to prevent duplicate rendering on the Saved view.
+    filterConditions.push(isNull(feedItems.pinnedAt));
   }
 
   if (search) {
@@ -306,6 +305,42 @@ export const GET = withTracing('GET /api/feed', async (request) => {
         ? filterConditions[0]
         : and(...filterConditions);
 
+    // Pinned items — only fetched on the first page of the Saved tab.
+    let pinnedSerialized: ReturnType<typeof serializeItem>[] = [];
+    if (isBookmarked && !cursor) {
+      const pinnedRows = await db
+        .select({
+          id: feedItems.id,
+          sourceId: feedItems.sourceId,
+          title: feedItems.title,
+          url: feedItems.url,
+          description: feedItems.description,
+          thumbnailUrl: feedItems.thumbnailUrl,
+          publishedAt: feedItems.publishedAt,
+          category: feedItems.category,
+          tags: feedItems.tags,
+          isRead: feedItems.isRead,
+          isBookmarked: feedItems.isBookmarked,
+          collectedAt: feedItems.collectedAt,
+          sourceName: feedSources.name,
+          memo: feedItems.memo,
+          pinnedAt: feedItems.pinnedAt,
+        })
+        .from(feedItems)
+        .innerJoin(feedSources, eq(feedItems.sourceId, feedSources.id))
+        .where(
+          and(
+            eq(feedSources.userId, user.id),
+            isNull(feedItems.deletedAt),
+            eq(feedItems.isBookmarked, true),
+            isNotNull(feedItems.pinnedAt),
+          )
+        )
+        .orderBy(desc(feedItems.pinnedAt), desc(feedItems.id))
+        .limit(3);
+      pinnedSerialized = pinnedRows.map(serializeItem);
+    }
+
     if (isRecommended) {
       const rows = await db
         .select({
@@ -323,7 +358,7 @@ export const GET = withTracing('GET /api/feed', async (request) => {
           collectedAt: feedItems.collectedAt,
           sourceName: feedSources.name,
           memo: feedItems.memo,
-          collectionId: feedItems.collectionId,
+          pinnedAt: feedItems.pinnedAt,
           score: scoreExpr!.as('score'),
           sortDate: sortDateExpr.as('sort_date'),
         })
@@ -349,6 +384,7 @@ export const GET = withTracing('GET /api/feed', async (request) => {
       return NextResponse.json(
         {
           items: items.map(serializeItem),
+          pinnedItems: pinnedSerialized,
           nextCursor,
           hasMore,
         },
@@ -373,7 +409,7 @@ export const GET = withTracing('GET /api/feed', async (request) => {
         collectedAt: feedItems.collectedAt,
         sourceName: feedSources.name,
         memo: feedItems.memo,
-        collectionId: feedItems.collectionId,
+        pinnedAt: feedItems.pinnedAt,
         sortDate: sortDateExpr.as('sort_date'),
       })
       .from(feedItems)
@@ -397,12 +433,11 @@ export const GET = withTracing('GET /api/feed', async (request) => {
     return NextResponse.json(
       {
         items: items.map(serializeItem),
+        pinnedItems: pinnedSerialized,
         nextCursor,
         hasMore,
       },
-      {
-        headers: { 'Cache-Control': 'no-store' },
-      }
+      { headers: { 'Cache-Control': 'no-store' } }
     );
   } catch (err) {
     console.error('[GET /api/feed]', err);

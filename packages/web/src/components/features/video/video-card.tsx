@@ -2,7 +2,7 @@
 
 import {memo, useCallback, useEffect, useRef, useState} from 'react';
 import Image from 'next/image';
-import {Bookmark, BookmarkCheck, FileText, FolderOpen, MessageSquare, Trash2} from 'lucide-react';
+import {Bookmark, BookmarkCheck, FileText, MessageSquare, Pin, PinOff, Trash2} from 'lucide-react';
 import {cn} from '@/lib/utils';
 import {ITEM_MEMO_MAX_LENGTH} from '@/lib/constants';
 import {formatRelativeDate, getArticleGradient} from '@/lib/feed-utils';
@@ -24,13 +24,8 @@ export interface VideoItemData {
   isBookmarked: boolean;
   duration: number | null;
   memo: string | null;
-  collectionId: string | null;
-}
-
-export interface CollectionInfo {
-  id: string;
-  name: string;
-  color: string;
+  /** ISO string if pinned to top of Saved view, otherwise null. */
+  pinnedAt: string | null;
 }
 
 interface VideoCardProps {
@@ -41,8 +36,12 @@ interface VideoCardProps {
   onDelete?: (id: string) => void;
   onToggleBookmark?: (id: string) => void;
   onMemoChange?: (id: string, memo: string | null) => void;
-  onCollectionPick?: (id: string) => void;
-  collectionMap?: Map<string, CollectionInfo>;
+  /** Toggle pin. When omitted the pin button isn't rendered. */
+  onTogglePin?: (id: string, pinned: boolean) => void;
+  /** True when a new pin is blocked (3 already pinned). No effect on already-pinned items. */
+  pinLocked?: boolean;
+  /** Render the saved-view variant: ember border + `pinned` label when pinned. */
+  savedVariant?: boolean;
   showMemo?: boolean;
   sourceTags?: string[];
 }
@@ -245,15 +244,17 @@ export const VideoCard = memo(function VideoCard({
   onDelete,
   onToggleBookmark,
   onMemoChange,
-  onCollectionPick,
-  collectionMap,
+  onTogglePin,
+  pinLocked,
+  savedVariant,
   showMemo,
   sourceTags = [],
 }: VideoCardProps) {
-  const collection = item.collectionId && collectionMap?.get(item.collectionId);
   const isSummarized = item.status === 'summarized';
   const isSummarizing = item.status === 'summarizing';
   const dateLabel = formatRelativeDate(item.publishedAt);
+  const isPinned = Boolean(item.pinnedAt);
+  const pinDisabled = !isPinned && Boolean(pinLocked);
 
   const cardContent = (
     <>
@@ -291,13 +292,6 @@ export const VideoCard = memo(function VideoCard({
         )}
 
         <div className="mt-1.5 flex items-center gap-1">
-          {/* Collection chip */}
-          {collection && (
-            <span className="inline-flex items-center gap-1 shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-muted/60 text-muted-foreground ring-1 ring-inset ring-border/40">
-              <span className="w-2 h-2 rounded-full shrink-0" style={{backgroundColor: collection.color}} />
-              {collection.name}
-            </span>
-          )}
           {/* Source tag (1개만) */}
           {sourceTags.slice(0, 1).map((tag) => (
             <span
@@ -336,12 +330,21 @@ export const VideoCard = memo(function VideoCard({
   return (
     <div
       className={cn(
-        'group flex w-full gap-3 rounded-lg border border-border/60 bg-card p-3 transition-all duration-200',
+        'group flex w-full gap-3 rounded-lg border bg-card p-3 transition-all duration-200 relative',
+        savedVariant && isPinned ? 'border-2 border-primary' : 'border-border/60',
         'hover:border-primary/30 hover:shadow-sm hover:bg-accent/30',
         selected && 'ring-2 ring-primary border-primary/40',
         isSummarizing && 'opacity-60',
       )}
     >
+      {savedVariant && isPinned && (
+        <span
+          aria-hidden="true"
+          className="absolute -top-2 left-3 px-1.5 py-0.5 bg-primary text-primary-foreground font-mono text-[9px] uppercase tracking-[0.14em] font-semibold rounded-sm"
+        >
+          pinned
+        </span>
+      )}
       <div className="flex flex-col min-w-0 flex-1 gap-1">
         <button
           type="button"
@@ -367,17 +370,28 @@ export const VideoCard = memo(function VideoCard({
 
       {/* Right actions — 선택 모드에서는 숨김 */}
       {!onSelect && <div className="flex flex-col items-center justify-start shrink-0">
-        {onCollectionPick && (
+        {onTogglePin && (
           <button
             type="button"
-            onClick={() => onCollectionPick(item.id)}
+            onClick={() => {
+              if (pinDisabled) return;
+              onTogglePin(item.id, !isPinned);
+            }}
+            disabled={pinDisabled}
             className={cn(
               'p-1 min-w-[28px] min-h-[28px] flex items-center justify-center rounded-md transition-colors cursor-pointer',
-              item.collectionId ? 'text-primary' : 'text-muted-foreground/40 hover:text-primary',
+              isPinned
+                ? 'text-primary'
+                : 'text-muted-foreground/40 hover:text-primary disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-muted-foreground/40',
             )}
-            aria-label="컬렉션 지정"
+            aria-label={isPinned ? '고정 해제' : pinDisabled ? '고정 3개 가득참' : '상단에 고정'}
+            title={pinDisabled ? 'Pin limit: 3' : undefined}
           >
-            <FolderOpen className="h-3.5 w-3.5" aria-hidden="true" />
+            {isPinned ? (
+              <PinOff className="h-3.5 w-3.5" aria-hidden="true" />
+            ) : (
+              <Pin className="h-3.5 w-3.5" aria-hidden="true" />
+            )}
           </button>
         )}
         {onToggleBookmark && (

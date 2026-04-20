@@ -240,7 +240,7 @@ export const POST = withTracing('POST /api/feed/add-url', async (request) => {
           isBookmarked: false,
           readAt: null,
           memo: null,
-          collectionId: null,
+          pinnedAt: null,
           collectedAt: new Date(),
           deletedAt: null,
         })
@@ -278,7 +278,7 @@ export const POST = withTracing('POST /api/feed/add-url', async (request) => {
         isBookmarked: inserted.isBookmarked,
         collectedAt: inserted.collectedAt.toISOString(),
         memo: inserted.memo ?? null,
-        collectionId: inserted.collectionId ?? null,
+        pinnedAt: inserted.pinnedAt?.toISOString() ?? null,
       },
       {status: 201},
     );

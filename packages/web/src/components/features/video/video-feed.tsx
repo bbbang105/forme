@@ -2,7 +2,7 @@
 
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useRouter, useSearchParams} from 'next/navigation';
-import {BookmarkIcon, Download, Loader2, Mail, MailOpen, MailX, Plus, Search, Settings2, Star, Trash2, Wand2, X} from 'lucide-react';
+import {BookmarkIcon, Download, Loader2, Mail, MailOpen, MailX, Plus, Search, Star, Trash2, Wand2, X} from 'lucide-react';
 import {cn} from '@/lib/utils';
 import {Button} from '@/components/ui/button';
 import {
@@ -15,13 +15,11 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {SectionHeader} from '@/components/ui/section-header';
 import {type VideoSource, VideoSourceBar} from './video-source-bar';
 import {CollectProgress} from './collect-progress';
 import {VideoCard, type VideoItemData} from './video-card';
 import {VIDEO_SUMMARIZE_BATCH_MAX} from '@/lib/constants';
-import {getVideoCollectionsWithCount} from '@/lib/actions/video-collections';
-import {VideoCollectionPicker} from './video-collection-picker';
-import {type VideoCollection, VideoCollectionManager} from './video-collection-manager';
 import {AddUrlDialog} from './add-url-dialog';
 
 const EMPTY_TAGS: string[] = [];
@@ -92,11 +90,9 @@ export function VideoFeed() {
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [showBulkDelete, setShowBulkDelete] = useState(false);
 
-  // Collection state
-  const [collections, setCollections] = useState<VideoCollection[]>([]);
-  const [pickerItemId, setPickerItemId] = useState<string | null>(null);
-  const [showCollectionManager, setShowCollectionManager] = useState(false);
-  const activeCollectionId = searchParams.get('collectionId') || '';
+  // Pinned items — populated on first page of Saved tab
+  const [pinnedItems, setPinnedItems] = useState<VideoItemData[]>([]);
+  const MAX_PINNED = 3;
   const [showAddUrl, setShowAddUrl] = useState(false);
 
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -130,7 +126,7 @@ export function VideoFeed() {
   }, []);
 
   // Build query key for refetch tracking
-  const queryKey = `${tab}|${status}|${activeSourceId}|${activeTag}|${activeCollectionId}|${searchQuery}`;
+  const queryKey = `${tab}|${status}|${activeSourceId}|${activeTag}|${searchQuery}`;
 
   // Fetch sources
   const fetchSources = useCallback(async () => {
@@ -154,7 +150,6 @@ export function VideoFeed() {
         if (isFeedTab) params.set('status', status);
         if (activeSourceId) params.set('sourceId', activeSourceId);
         if (activeTag) params.set('tag', activeTag);
-        if (activeCollectionId) params.set('collectionId', activeCollectionId);
         if (searchQuery) params.set('search', searchQuery);
         if (!reset && nextCursor) params.set('cursor', nextCursor);
 
@@ -163,6 +158,8 @@ export function VideoFeed() {
 
         const data = await res.json();
         setItems((prev) => (reset ? data.items : [...prev, ...data.items]));
+        // pinnedItems only returned on first page of Saved tab
+        if (reset) setPinnedItems(data.pinnedItems ?? []);
         setCursor(data.nextCursor);
         setHasMore(data.hasMore);
       } finally {
@@ -170,22 +167,13 @@ export function VideoFeed() {
         setLoadingMore(false);
       }
     },
-    [tab, status, activeSourceId, activeTag, activeCollectionId, searchQuery, isFeedTab],
+    [tab, status, activeSourceId, activeTag, searchQuery, isFeedTab],
   );
-
-  // Fetch collections
-  const fetchCollections = useCallback(async () => {
-    try {
-      const data = await getVideoCollectionsWithCount();
-      setCollections(data);
-    } catch { /* ignore */ }
-  }, []);
 
   // Initial load
   useEffect(() => {
     fetchSources();
-    fetchCollections();
-  }, [fetchSources, fetchCollections]);
+  }, [fetchSources]);
 
   // Reload on filter change
   useEffect(() => {
@@ -252,21 +240,15 @@ export function VideoFeed() {
         status: null,
         sourceId: null,
         tag: null,
-        collectionId: null,
         search: null,
       });
     },
     [updateFilter],
   );
 
-  // Status switch handler — reset collection when leaving bookmark
   const handleStatusSwitch = useCallback(
     (newStatus: Status) => {
-      if (newStatus !== 'bookmarked') {
-        updateFilter({ status: newStatus, collectionId: null });
-      } else {
-        updateFilter({ status: newStatus });
-      }
+      updateFilter({ status: newStatus });
     },
     [updateFilter],
   );
@@ -311,9 +293,11 @@ export function VideoFeed() {
     }
   };
 
-  // Stable ref for items (avoid stale closure in handlers passed to memo'd cards)
+  // Stable refs for items/pinnedItems (avoid stale closure in handlers passed to memo'd cards)
   const itemsRef = useRef(items);
+  const pinnedItemsRef = useRef(pinnedItems);
   useEffect(() => { itemsRef.current = items; }, [items]);
+  useEffect(() => { pinnedItemsRef.current = pinnedItems; }, [pinnedItems]);
 
   const handleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => {
@@ -359,7 +343,6 @@ export function VideoFeed() {
     if (!item) return;
 
     if (!item.isBookmarked) {
-      setPickerItemId(id);
       setItems((prev) =>
         prev.map((i) => (i.id === id ? {...i, isBookmarked: true} : i)),
       );
@@ -378,34 +361,39 @@ export function VideoFeed() {
       return;
     }
 
-    const prevCollectionId = item.collectionId;
+    // Unbookmarking also unpins (server mirrors this invariant)
+    const prevPinnedAt = item.pinnedAt;
+    setPinnedItems((prev) => prev.filter((i) => i.id !== id));
     setItems((prev) =>
-      prev.map((i) => (i.id === id ? {...i, isBookmarked: false, collectionId: null} : i)),
+      prev.map((i) => (i.id === id ? {...i, isBookmarked: false, pinnedAt: null} : i)),
     );
     try {
       const res = await fetch(`/api/video/${id}`, {
         method: 'PATCH',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({isBookmarked: false, collectionId: null}),
+        body: JSON.stringify({isBookmarked: false}),
       });
       if (!res.ok) throw new Error();
     } catch {
       setItems((prev) =>
-        prev.map((i) => (i.id === id ? {...i, isBookmarked: true, collectionId: prevCollectionId} : i)),
+        prev.map((i) => (i.id === id ? {...i, isBookmarked: true, pinnedAt: prevPinnedAt} : i)),
       );
     }
   }, []);
 
   const handleMemoChange = useCallback(async (id: string, memo: string | null) => {
-    const item = itemsRef.current.find((i) => i.id === id);
+    const item =
+      itemsRef.current.find((i) => i.id === id) ??
+      pinnedItemsRef.current.find((i) => i.id === id);
     const prevMemo = item?.memo ?? null;
     const wasBookmarked = item?.isBookmarked ?? false;
 
-    setItems((prev) =>
-      prev.map((i) =>
+    const apply = (list: VideoItemData[]) =>
+      list.map((i) =>
         i.id === id ? {...i, memo, isBookmarked: memo ? true : i.isBookmarked} : i,
-      ),
-    );
+      );
+    setItems(apply);
+    setPinnedItems(apply);
 
     try {
       const res = await fetch(`/api/video/${id}`, {
@@ -415,18 +403,48 @@ export function VideoFeed() {
       });
       if (!res.ok) throw new Error();
     } catch {
-      setItems((prev) =>
-        prev.map((i) =>
-          i.id === id ? {...i, memo: prevMemo, isBookmarked: wasBookmarked} : i,
-        ),
-      );
-      return;
-    }
-
-    if (memo && !wasBookmarked) {
-      setPickerItemId(id);
+      const revert = (list: VideoItemData[]) =>
+        list.map((i) => (i.id === id ? {...i, memo: prevMemo, isBookmarked: wasBookmarked} : i));
+      setItems(revert);
+      setPinnedItems(revert);
     }
   }, []);
+
+  const handleTogglePin = useCallback(async (id: string, nextPinned: boolean) => {
+    if (nextPinned && pinnedItemsRef.current.length >= MAX_PINNED &&
+        !pinnedItemsRef.current.some((p) => p.id === id)) {
+      return;
+    }
+    const nowIso = new Date().toISOString();
+
+    if (nextPinned) {
+      const source = itemsRef.current.find((i) => i.id === id);
+      if (source) {
+        setItems((prev) => prev.filter((i) => i.id !== id));
+        setPinnedItems((prev) => [{ ...source, pinnedAt: nowIso, isBookmarked: true }, ...prev]);
+      } else {
+        setPinnedItems((prev) =>
+          prev.map((i) => i.id === id ? { ...i, pinnedAt: nowIso } : i)
+        );
+      }
+    } else {
+      const source = pinnedItemsRef.current.find((i) => i.id === id);
+      if (source) {
+        setPinnedItems((prev) => prev.filter((i) => i.id !== id));
+        setItems((prev) => [{ ...source, pinnedAt: null }, ...prev]);
+      }
+    }
+
+    const res = await fetch(`/api/video/${id}`, {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({pinned: nextPinned}),
+    });
+
+    if (!res.ok) {
+      fetchItems({ reset: true });
+    }
+  }, [fetchItems]);
 
   const handleSummarize = async () => {
     if (selectedIds.size === 0) return;
@@ -561,40 +579,17 @@ export function VideoFeed() {
     }
   };
 
-  const pickerItemIdRef = useRef(pickerItemId);
-  useEffect(() => { pickerItemIdRef.current = pickerItemId; }, [pickerItemId]);
-
-  const handleCollectionSelect = useCallback(async (collectionId: string | null) => {
-    if (!pickerItemIdRef.current) return;
-    const id = pickerItemIdRef.current;
-    setPickerItemId(null);
-
-    setItems((prev) =>
-      prev.map((i) =>
-        i.id === id ? {...i, collectionId, isBookmarked: collectionId ? true : i.isBookmarked} : i,
-      ),
-    );
-
-    await fetch(`/api/video/${id}`, {
-      method: 'PATCH',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({collectionId}),
-    });
-    fetchCollections();
-  }, [fetchCollections]);
-
-  const handleCollectionPick = useCallback((id: string) => {
-    setPickerItemId(id);
-  }, []);
-
   const handleDeleteRequest = useCallback((id: string) => {
-    setDeleteTarget(itemsRef.current.find((i) => i.id === id) ?? null);
+    setDeleteTarget(
+      itemsRef.current.find((i) => i.id === id) ??
+      pinnedItemsRef.current.find((i) => i.id === id) ??
+      null
+    );
   }, []);
-
-  const collectionMap = useMemo(() => new Map(collections.map((c) => [c.id, {id: c.id, name: c.name, color: c.color}])), [collections]);
 
   // Source tag map for card display
   const sourceTagMap = useMemo(() => new Map(sources.map((s) => [s.id, s.tags ?? []])), [sources]);
+  const pinLocked = pinnedItems.length >= MAX_PINNED;
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-4 max-w-7xl mx-auto space-y-4 pb-24">
@@ -1005,59 +1000,12 @@ export function VideoFeed() {
         </div>
       )}
 
-      {/* ── 북마크 상태: 컬렉션 칩 필터 ── */}
-      {isBookmarkStatus && (
-        <div className="flex items-center gap-2 overflow-x-auto scrollbar-none pb-0.5">
-          <button
-            type="button"
-            onClick={() => updateFilter({collectionId: null})}
-            className={cn(
-              'shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
-              !activeCollectionId
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted text-muted-foreground hover:text-foreground',
-            )}
-          >
-            전체
-          </button>
-          {collections.map((col) => (
-            <button
-              key={col.id}
-              type="button"
-              onClick={() => updateFilter({collectionId: activeCollectionId === col.id ? null : col.id})}
-              className={cn(
-                'shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
-                activeCollectionId === col.id
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted/60 text-muted-foreground hover:bg-muted',
-              )}
-            >
-              <span className="w-2 h-2 rounded-full shrink-0" style={{backgroundColor: col.color}} />
-              {col.name}
-              {col.count !== undefined && col.count > 0 && (
-                <span className="text-[10px] opacity-70">{col.count}</span>
-              )}
-            </button>
-          ))}
-          <button
-            type="button"
-            onClick={() => setShowCollectionManager(true)}
-            className="shrink-0 flex items-center gap-1.5 rounded-full text-xs font-medium transition-colors p-1.5 text-muted-foreground/60 hover:text-foreground hover:bg-muted"
-            aria-label="컬렉션 관리"
-          >
-            <Settings2 className="h-3.5 w-3.5" aria-hidden="true" />
-          </button>
-        </div>
-      )}
-
       {/* ── Feed ── */}
       {loading ? (
         <div className="flex justify-center py-8">
           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" aria-hidden="true" />
         </div>
-      ) : items.length === 0 ? (
+      ) : items.length === 0 && pinnedItems.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-16 text-muted-foreground">
           <p className="text-sm">
             {isFeedTab && status === 'unread' && '안읽은 요약이 없어요'}
@@ -1072,6 +1020,64 @@ export function VideoFeed() {
             {isCreateTab && '채널을 추가하고 영상을 수집해보세요'}
           </p>
         </div>
+      ) : isBookmarkStatus ? (
+        <>
+          {pinnedItems.length > 0 && (
+            <section className="mb-10">
+              <SectionHeader
+                eyebrow={`Pinned · ${pinnedItems.length}/${MAX_PINNED}`}
+                title="자주 돌아보는 것"
+              />
+              <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {pinnedItems.map((item) => (
+                  <VideoCard
+                    key={item.id}
+                    item={item}
+                    selected={selectedIds.has(item.id)}
+                    onSelect={selectMode ? handleSelect : undefined}
+                    onClick={selectMode ? undefined : handleCardClick}
+                    onDelete={handleDeleteRequest}
+                    onToggleBookmark={handleToggleBookmark}
+                    onMemoChange={handleMemoChange}
+                    onTogglePin={handleTogglePin}
+                    pinLocked={false}
+                    savedVariant
+                    showMemo
+                    sourceTags={item.sourceId ? sourceTagMap.get(item.sourceId) ?? EMPTY_TAGS : EMPTY_TAGS}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {items.length > 0 && (
+            <section>
+              {pinnedItems.length > 0 && (
+                <SectionHeader eyebrow="All saved" title="전체" />
+              )}
+              <div className={`${pinnedItems.length > 0 ? 'mt-5' : ''} columns-1 sm:columns-2 lg:columns-3 gap-4`}>
+                {items.map((item) => (
+                  <div key={item.id} className="break-inside-avoid mb-4">
+                    <VideoCard
+                      item={item}
+                      selected={selectedIds.has(item.id)}
+                      onSelect={selectMode ? handleSelect : undefined}
+                      onClick={selectMode ? undefined : handleCardClick}
+                      onDelete={handleDeleteRequest}
+                      onToggleBookmark={handleToggleBookmark}
+                      onMemoChange={handleMemoChange}
+                      onTogglePin={handleTogglePin}
+                      pinLocked={pinLocked}
+                      savedVariant
+                      showMemo
+                      sourceTags={item.sourceId ? sourceTagMap.get(item.sourceId) ?? EMPTY_TAGS : EMPTY_TAGS}
+                    />
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+        </>
       ) : (
         <div className="space-y-2">
           {items.map((item) => (
@@ -1084,8 +1090,6 @@ export function VideoFeed() {
               onDelete={handleDeleteRequest}
               onToggleBookmark={isFeedTab ? handleToggleBookmark : undefined}
               onMemoChange={isFeedTab ? handleMemoChange : undefined}
-              onCollectionPick={isBookmarkStatus ? handleCollectionPick : undefined}
-              collectionMap={isBookmarkStatus ? collectionMap : undefined}
               showMemo={isFeedTab}
               sourceTags={item.sourceId ? sourceTagMap.get(item.sourceId) ?? EMPTY_TAGS : EMPTY_TAGS}
             />
@@ -1167,15 +1171,6 @@ export function VideoFeed() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Collection picker */}
-      <VideoCollectionPicker
-        open={!!pickerItemId}
-        onOpenChange={(open) => { if (!open) setPickerItemId(null); }}
-        collections={collections}
-        currentCollectionId={pickerItemId ? (items.find((i) => i.id === pickerItemId)?.collectionId ?? null) : null}
-        onSelect={handleCollectionSelect}
-      />
-
       {/* Add URL dialog */}
       <AddUrlDialog
         open={showAddUrl}
@@ -1184,17 +1179,6 @@ export function VideoFeed() {
           fetchedKeyRef.current = null;
           fetchItems({reset: true});
         }}
-      />
-
-      {/* Collection manager */}
-      <VideoCollectionManager
-        open={showCollectionManager}
-        onOpenChange={(open) => {
-          setShowCollectionManager(open);
-          if (!open) fetchCollections();
-        }}
-        collections={collections}
-        onCollectionsChange={setCollections}
       />
     </div>
   );

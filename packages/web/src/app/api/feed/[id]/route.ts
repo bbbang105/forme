@@ -1,10 +1,13 @@
 import {NextResponse} from 'next/server';
 import {createClient} from '@/lib/supabase/server';
-import {bookmarkCollections, feedItems, feedSources, db} from '@forme/shared';
-import {and, eq, isNull} from 'drizzle-orm';
+import {feedItems, feedSources, db} from '@forme/shared';
+import {and, count, eq, isNotNull, isNull, ne} from 'drizzle-orm';
 import {withTracing} from '@/lib/logger';
 import {UUID_REGEX} from '@/lib/validators';
 import {ITEM_MEMO_MAX_LENGTH} from '@/lib/constants';
+
+/** Max items a user can pin to the top of the Saved view. */
+const MAX_PINNED = 3;
 
 // ── Types ──
 
@@ -12,14 +15,14 @@ interface PatchBody {
   isRead?: boolean;
   isBookmarked?: boolean;
   memo?: string | null;
-  collectionId?: string | null;
+  /** When `true`, sets `pinned_at = now()`. When `false`, clears it. Enforces MAX_PINNED. */
+  pinned?: boolean;
 }
 
 /**
  * DELETE /api/feed/[id]
  *
- * Deletes a single feed item.
- * Ownership is verified by joining through feed_sources.user_id.
+ * Soft-deletes a single feed item (sets deletedAt). Ownership through feed_sources.user_id.
  */
 export const DELETE = withTracing('DELETE /api/feed/[id]', async (_request, ctx) => {
   const { id } = await (ctx as { params: Promise<{ id: string }> }).params;
@@ -45,15 +48,12 @@ export const DELETE = withTracing('DELETE /api/feed/[id]', async (_request, ctx)
     const [existing] = await db
       .select({ id: feedItems.id })
       .from(feedItems)
-      .innerJoin(
-        feedSources,
-        eq(feedItems.sourceId, feedSources.id)
-      )
+      .innerJoin(feedSources, eq(feedItems.sourceId, feedSources.id))
       .where(
         and(
           eq(feedItems.id, id),
           eq(feedSources.userId, user.id),
-          isNull(feedItems.deletedAt)
+          isNull(feedItems.deletedAt),
         )
       )
       .limit(1);
@@ -67,26 +67,21 @@ export const DELETE = withTracing('DELETE /api/feed/[id]', async (_request, ctx)
     return new NextResponse(null, { status: 204 });
   } catch (err) {
     console.error(`[DELETE /api/feed/${id}]`, err);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 });
 
 /**
  * PATCH /api/feed/[id]
  *
- * Updates read/bookmark status on a single feed item.
- * Ownership is verified by joining through feed_sources.user_id.
+ * Updates read / bookmark / memo / pinned on a single feed item.
+ * Ownership verified by joining through feed_sources.user_id.
  *
- * Body: { isRead?: boolean, isBookmarked?: boolean }
- *
- * Response: updated item
+ * Body: { isRead?, isBookmarked?, memo?, pinned? }
  */
 export const PATCH = withTracing('PATCH /api/feed/[id]', async (request, ctx) => {
   const { id } = await (ctx as { params: Promise<{ id: string }> }).params;
-  // ── Auth ──
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -97,7 +92,6 @@ export const PATCH = withTracing('PATCH /api/feed/[id]', async (request, ctx) =>
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // ── Validate route param ──
   if (!id || !UUID_REGEX.test(id)) {
     return NextResponse.json(
       { error: 'Invalid item id: must be a UUID' },
@@ -105,7 +99,6 @@ export const PATCH = withTracing('PATCH /api/feed/[id]', async (request, ctx) =>
     );
   }
 
-  // ── Parse body ──
   let body: PatchBody;
   try {
     body = await request.json();
@@ -113,63 +106,42 @@ export const PATCH = withTracing('PATCH /api/feed/[id]', async (request, ctx) =>
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const { isRead, isBookmarked, memo, collectionId } = body;
+  const { isRead, isBookmarked, memo, pinned } = body;
 
-  // At least one field must be provided
-  if (isRead === undefined && isBookmarked === undefined && memo === undefined && collectionId === undefined) {
+  if (isRead === undefined && isBookmarked === undefined && memo === undefined && pinned === undefined) {
     return NextResponse.json(
       { error: 'At least one field must be provided' },
       { status: 400 }
     );
   }
 
-  // Type-check provided fields
   if (isRead !== undefined && typeof isRead !== 'boolean') {
-    return NextResponse.json(
-      { error: 'isRead must be a boolean' },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: 'isRead must be a boolean' }, { status: 400 });
   }
-
   if (isBookmarked !== undefined && typeof isBookmarked !== 'boolean') {
-    return NextResponse.json(
-      { error: 'isBookmarked must be a boolean' },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: 'isBookmarked must be a boolean' }, { status: 400 });
   }
-
   if (memo !== undefined && memo !== null && typeof memo !== 'string') {
-    return NextResponse.json(
-      { error: 'memo must be a string or null' },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: 'memo must be a string or null' }, { status: 400 });
   }
-
-  if (collectionId !== undefined && collectionId !== null && (typeof collectionId !== 'string' || !UUID_REGEX.test(collectionId))) {
-    return NextResponse.json(
-      { error: 'collectionId must be a valid UUID or null' },
-      { status: 400 }
-    );
+  if (pinned !== undefined && typeof pinned !== 'boolean') {
+    return NextResponse.json({ error: 'pinned must be a boolean' }, { status: 400 });
   }
 
   try {
-    // ── Verify ownership ──
-    // feed_items has no user_id directly; ownership flows through feed_sources
+    // ── Verify ownership (feed_items flows through feed_sources) ──
     const [existing] = await db
       .select({
         id: feedItems.id,
-        sourceUserId: feedSources.userId,
+        currentPinnedAt: feedItems.pinnedAt,
       })
       .from(feedItems)
-      .innerJoin(
-        feedSources,
-        eq(feedItems.sourceId, feedSources.id)
-      )
+      .innerJoin(feedSources, eq(feedItems.sourceId, feedSources.id))
       .where(
         and(
           eq(feedItems.id, id),
           eq(feedSources.userId, user.id),
-          isNull(feedItems.deletedAt)
+          isNull(feedItems.deletedAt),
         )
       )
       .limit(1);
@@ -178,13 +150,13 @@ export const PATCH = withTracing('PATCH /api/feed/[id]', async (request, ctx) =>
       return NextResponse.json({ error: 'Item not found' }, { status: 404 });
     }
 
-    // ── Build update payload (only provided fields) ──
+    // ── Build update payload ──
     const updateValues: Partial<{
       isRead: boolean;
       isBookmarked: boolean;
       readAt: Date | null;
       memo: string | null;
-      collectionId: string | null;
+      pinnedAt: Date | null;
     }> = {};
 
     if (isRead !== undefined) {
@@ -197,23 +169,39 @@ export const PATCH = withTracing('PATCH /api/feed/[id]', async (request, ctx) =>
       // 메모 추가 시 자동 북마크 (단, 명시적 isBookmarked 지정 시 덮어쓰지 않음)
       if (memo && isBookmarked === undefined) updateValues.isBookmarked = true;
     }
-    if (collectionId !== undefined) {
-      // 컬렉션 소유권 검증
-      if (collectionId !== null) {
-        const [col] = await db.select({ id: bookmarkCollections.id })
-          .from(bookmarkCollections)
-          .where(and(eq(bookmarkCollections.id, collectionId), eq(bookmarkCollections.userId, user.id)))
-          .limit(1);
-        if (!col) {
-          return NextResponse.json({ error: 'Collection not found' }, { status: 404 });
+
+    if (pinned !== undefined) {
+      if (pinned) {
+        // Pinning a not-yet-pinned item → count other currently-pinned items.
+        // If already pinned, allow (idempotent, just bumps pinned_at).
+        if (!existing.currentPinnedAt) {
+          const [{ value }] = await db
+            .select({ value: count() })
+            .from(feedItems)
+            .innerJoin(feedSources, eq(feedItems.sourceId, feedSources.id))
+            .where(
+              and(
+                eq(feedSources.userId, user.id),
+                isNotNull(feedItems.pinnedAt),
+                isNull(feedItems.deletedAt),
+                ne(feedItems.id, id),
+              )
+            );
+          if (value >= MAX_PINNED) {
+            return NextResponse.json(
+              { error: `Maximum ${MAX_PINNED} pinned items allowed` },
+              { status: 409 }
+            );
+          }
         }
+        updateValues.pinnedAt = new Date();
+        // Pinning implicitly keeps the item bookmarked.
+        if (isBookmarked === undefined) updateValues.isBookmarked = true;
+      } else {
+        updateValues.pinnedAt = null;
       }
-      updateValues.collectionId = collectionId;
-      // 컬렉션 지정 시 자동 북마크
-      if (collectionId !== null) updateValues.isBookmarked = true;
     }
 
-    // ── Update ──
     const [updated] = await db
       .update(feedItems)
       .set(updateValues)
@@ -221,10 +209,7 @@ export const PATCH = withTracing('PATCH /api/feed/[id]', async (request, ctx) =>
       .returning();
 
     if (!updated) {
-      return NextResponse.json(
-        { error: 'Update failed' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Update failed' }, { status: 500 });
     }
 
     return NextResponse.json({
@@ -241,13 +226,10 @@ export const PATCH = withTracing('PATCH /api/feed/[id]', async (request, ctx) =>
       isBookmarked: updated.isBookmarked,
       collectedAt: updated.collectedAt.toISOString(),
       memo: updated.memo ?? null,
-      collectionId: updated.collectionId ?? null,
+      pinnedAt: updated.pinnedAt?.toISOString() ?? null,
     });
   } catch (err) {
     console.error(`[PATCH /api/feed/${id}]`, err);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 });

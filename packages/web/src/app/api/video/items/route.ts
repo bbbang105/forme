@@ -1,5 +1,5 @@
 import {NextResponse} from 'next/server';
-import {and, desc, eq, inArray, lt, or, sql} from 'drizzle-orm';
+import {and, desc, eq, inArray, isNotNull, isNull, lt, or, sql} from 'drizzle-orm';
 import {db, videoItems, videoSources} from '@forme/shared';
 import {createClient} from '@/lib/supabase/server';
 import {withTracing} from '@/lib/logger';
@@ -30,9 +30,9 @@ export const GET = withTracing('GET /api/video/items', async (request: Request) 
 
   const sourceId = url.searchParams.get('sourceId');
   const tag = url.searchParams.get('tag');
-  const collectionId = url.searchParams.get('collectionId');
   const cursor = url.searchParams.get('cursor');
   const limit = VIDEO_FEED_PAGE_SIZE;
+  const isBookmarked = tab === 'feed' && status === 'bookmarked';
 
   // summarizing 타임아웃 리커버리 (create 탭에서만 실행)
   if (tab === 'create') {
@@ -59,6 +59,8 @@ export const GET = withTracing('GET /api/video/items', async (request: Request) 
       conditions.push(eq(videoItems.isRead, true));
     } else if (status === 'bookmarked') {
       conditions.push(eq(videoItems.isBookmarked, true));
+      // Pinned items are returned separately in `pinnedItems` (first page only).
+      conditions.push(isNull(videoItems.pinnedAt));
     }
   } else if (tab === 'create') {
     conditions.push(
@@ -81,11 +83,6 @@ export const GET = withTracing('GET /api/video/items', async (request: Request) 
   // Source filter
   if (sourceId && UUID_REGEX.test(sourceId)) {
     conditions.push(eq(videoItems.sourceId, sourceId));
-  }
-
-  // Collection filter (feed tab only — collected items don't have collectionId)
-  if (tab === 'feed' && collectionId && UUID_REGEX.test(collectionId)) {
-    conditions.push(eq(videoItems.collectionId, collectionId));
   }
 
   // Tag filter — find sourceIds with matching tag, then filter items
@@ -129,6 +126,24 @@ export const GET = withTracing('GET /api/video/items', async (request: Request) 
 
   const sortColumn = isReadTab ? videoItems.readAt : videoItems.publishedAt;
 
+  // Pinned items — only on first page of Saved (bookmarked) view.
+  let pinnedItems: typeof videoItems.$inferSelect[] = [];
+  if (isBookmarked && !cursor) {
+    pinnedItems = await db
+      .select()
+      .from(videoItems)
+      .where(
+        and(
+          eq(videoItems.userId, user.id),
+          eq(videoItems.status, 'summarized'),
+          eq(videoItems.isBookmarked, true),
+          isNotNull(videoItems.pinnedAt),
+        )
+      )
+      .orderBy(desc(videoItems.pinnedAt), desc(videoItems.id))
+      .limit(3);
+  }
+
   const rows = await db.select().from(videoItems)
     .where(and(...conditions))
     .orderBy(desc(sortColumn), desc(videoItems.id))
@@ -142,7 +157,7 @@ export const GET = withTracing('GET /api/video/items', async (request: Request) 
     ? `${cursorDate.toISOString()}|${lastItem.id}`
     : null;
 
-  return NextResponse.json({ items, nextCursor, hasMore }, {
+  return NextResponse.json({ items, pinnedItems, nextCursor, hasMore }, {
     headers: { 'Cache-Control': 'no-store' },
   });
 });

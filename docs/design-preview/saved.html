@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Saved — forme</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Noto+Serif+KR:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+  <style>
+    :root {
+      --cream-50: #FDFAF3;
+      --cream-100: #F7F2E8;
+      --cream-200: #EFE7D6;
+      --hairline: #E5DCCB;
+      --hairline-strong: #D6CAB0;
+      --ink-900: #1F1A15;
+      --ink-700: #3F362C;
+      --ink-500: #6B635A;
+      --ink-400: #8E867C;
+      --ember-700: #A94A20;
+      --ember-600: #C4582C;
+      --ember-500: #D96B3B;
+      --ember-100: #F4E4D4;
+      --ember-50: #FBF1E7;
+
+      --font-serif: 'Instrument Serif', 'Noto Serif KR', Georgia, serif;
+      --font-ui: 'Pretendard Variable', Pretendard, sans-serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--cream-100);
+      color: var(--ink-900);
+      font-family: var(--font-ui);
+      font-size: 15px;
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+      padding-bottom: 80px;
+    }
+    a { color: inherit; text-decoration: none; }
+    img { display: block; max-width: 100%; }
+
+    /* ── Nav ────── */
+    .nav {
+      position: sticky; top: 0; z-index: 30;
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 14px 28px;
+      background: rgba(247,242,232,.9);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--hairline);
+      font-family: var(--font-mono); font-size: 11px;
+      letter-spacing: 0.08em; color: var(--ink-500);
+      text-transform: uppercase;
+    }
+    .nav .brand {
+      font-family: var(--font-serif); font-style: italic; font-size: 18px;
+      letter-spacing: 0; color: var(--ink-900); text-transform: none;
+      font-synthesis: none;
+    }
+    .nav .brand span { color: var(--ember-500); }
+
+    /* ── Intro ────── */
+    .intro { max-width: 1400px; margin: 0 auto; padding: 64px 28px 40px; }
+    .intro .eyebrow {
+      font-family: var(--font-mono); font-size: 11px;
+      letter-spacing: 0.12em; color: var(--ink-500);
+      text-transform: uppercase; display: inline-block; margin-bottom: 16px;
+    }
+    .intro .eyebrow::before { content: "— "; color: var(--ember-500); }
+    .intro h1 {
+      font-family: var(--font-serif); font-style: italic;
+      font-size: clamp(32px, 5vw, 52px); font-weight: 400;
+      line-height: 1.1; letter-spacing: -0.01em;
+      max-width: 780px;
+      font-synthesis: none;
+    }
+    .intro p {
+      margin-top: 20px; max-width: 620px;
+      color: var(--ink-700);
+    }
+
+    /* ── Feed filter bar (mock) ────── */
+    .feed-page { max-width: 1400px; margin: 0 auto; padding: 0 28px 40px; }
+    .masthead {
+      display: flex; align-items: baseline; justify-content: space-between;
+      padding-bottom: 10px; border-bottom: 1px solid var(--hairline);
+      margin-bottom: 24px;
+    }
+    .masthead .date {
+      font-family: var(--font-mono); font-size: 11px;
+      letter-spacing: 0.12em; color: var(--ink-500);
+      text-transform: uppercase;
+    }
+    .masthead .date span { color: var(--ember-500); }
+    .masthead .forme {
+      font-family: var(--font-serif); font-style: italic;
+      color: var(--ink-400); font-size: 14px;
+      font-synthesis: none;
+    }
+    .masthead .forme span { color: var(--ember-500); }
+
+    .filters {
+      display: flex; flex-direction: column; gap: 16px;
+      margin-bottom: 24px;
+    }
+    .category-row {
+      display: flex; align-items: center; gap: 24px;
+      border-bottom: 1px solid var(--hairline);
+    }
+    .category-row button {
+      background: none; border: none; cursor: pointer;
+      padding: 12px 0; margin-bottom: -1px;
+      font-family: var(--font-mono); font-size: 11px;
+      letter-spacing: 0.12em; color: var(--ink-500);
+      text-transform: uppercase; border-bottom: 2px solid transparent;
+      white-space: nowrap;
+    }
+    .category-row button.active {
+      color: var(--ink-900); font-weight: 600;
+      border-bottom-color: var(--ember-500);
+    }
+
+    .status-row {
+      display: flex; align-items: center; gap: 20px;
+    }
+    .status-row button {
+      background: none; border: none; cursor: pointer; padding: 0;
+      font-family: var(--font-mono); font-size: 11px;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--ink-500);
+    }
+    .status-row button.active { color: var(--ember-500); }
+    .status-row button.active::before {
+      content: "— "; margin-right: 4px;
+    }
+
+    /* ── Pinned Section ────── */
+    .section-head {
+      display: flex; align-items: baseline; justify-content: space-between;
+      padding-bottom: 10px; border-bottom: 1px solid var(--hairline);
+      margin-bottom: 20px; margin-top: 8px;
+    }
+    .section-head .left {
+      display: flex; align-items: baseline; gap: 12px;
+    }
+    .section-head .eye {
+      font-family: var(--font-mono); font-size: 10px;
+      letter-spacing: 0.14em; color: var(--ink-500);
+      text-transform: uppercase;
+    }
+    .section-head .eye span { color: var(--ember-500); }
+    .section-head h2 {
+      font-family: var(--font-serif); font-style: italic;
+      font-size: 22px; font-weight: 400;
+      line-height: 1.1;
+      font-synthesis: none;
+    }
+    .section-head .count {
+      font-family: var(--font-mono); font-size: 10px;
+      color: var(--ink-500); letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .pinned-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      margin-bottom: 48px;
+    }
+    @media (max-width: 1100px) { .pinned-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 640px) { .pinned-grid { grid-template-columns: 1fr; } }
+
+    /* ── Card atom ────── */
+    .card {
+      background: var(--cream-50);
+      padding: 18px;
+      border-radius: 4px;
+      display: flex; flex-direction: column; gap: 14px;
+    }
+    .card.pinned {
+      border: 1.5px solid var(--ember-500);
+      background: var(--cream-50);
+      position: relative;
+    }
+    .card.pinned::before {
+      content: "pinned";
+      position: absolute; top: -8px; left: 14px;
+      background: var(--ember-500); color: var(--cream-50);
+      font-family: var(--font-mono); font-size: 9px;
+      letter-spacing: 0.14em; text-transform: uppercase;
+      padding: 2px 6px; border-radius: 2px; font-weight: 600;
+    }
+    .card.regular {
+      border: 1px solid var(--hairline);
+    }
+
+    .card .thumb {
+      aspect-ratio: 16/10;
+      background: var(--cream-200);
+      border-radius: 3px;
+      overflow: hidden;
+      filter: sepia(.08) saturate(.95);
+    }
+    .card .meta {
+      display: flex; align-items: center; gap: 8px;
+      font-family: var(--font-mono); font-size: 10px;
+      letter-spacing: 0.08em; color: var(--ink-500);
+      text-transform: uppercase; flex-wrap: wrap;
+    }
+    .card .meta .dot { color: var(--ember-500); }
+    .card .meta .tag {
+      padding: 2px 6px; border-radius: 2px;
+      border: 1px solid var(--hairline-strong);
+      background: var(--cream-200);
+      text-transform: uppercase; letter-spacing: 0.06em;
+      color: var(--ink-700);
+    }
+    .card .meta .tag.rose { background: #fee2e2; border-color: #fca5a5; color: #881337; }
+    .card .meta .tag.stone { background: #f5f5f4; border-color: #d6d3d1; color: #3f3f36; }
+    .card .meta .tag.emerald { background: #d1fae5; border-color: #86efac; color: #065f46; }
+    .card .meta .tag.amber { background: #fef3c7; border-color: #fcd34d; color: #78350f; }
+
+    .card h3 {
+      font-family: var(--font-serif); font-style: italic;
+      font-size: 20px; font-weight: 400; line-height: 1.25;
+      letter-spacing: -0.005em;
+      font-synthesis: none;
+    }
+
+    .card .memo {
+      padding-left: 12px;
+      border-left: 2px solid var(--ember-500);
+      font-size: 14px; color: var(--ink-700);
+      line-height: 1.65;
+      white-space: pre-wrap;
+    }
+    .card.pinned .memo { border-left-color: var(--ember-500); }
+    .card.regular .memo { border-left-color: var(--ember-500); }
+
+    .card .actions {
+      display: flex; align-items: center; justify-content: flex-end;
+      gap: 12px;
+      font-family: var(--font-mono); font-size: 10px;
+      letter-spacing: 0.1em; color: var(--ink-500);
+      text-transform: uppercase;
+      padding-top: 4px; margin-top: auto;
+    }
+    .card .actions button {
+      background: none; border: none; cursor: pointer;
+      padding: 0; font: inherit; color: inherit; letter-spacing: inherit;
+      text-transform: inherit; display: inline-flex; align-items: center; gap: 4px;
+    }
+    .card .actions button:hover { color: var(--ember-500); }
+    .card .actions button.on { color: var(--ember-500); }
+    .card .actions .ico {
+      width: 14px; height: 14px;
+      display: inline-block;
+    }
+
+    /* ── Masonry (all saved) ────── */
+    .masonry {
+      column-count: 3;
+      column-gap: 24px;
+    }
+    @media (max-width: 1100px) { .masonry { column-count: 2; } }
+    @media (max-width: 640px) { .masonry { column-count: 1; } }
+
+    .masonry .card {
+      break-inside: avoid;
+      margin-bottom: 24px;
+      display: inline-flex; width: 100%;
+    }
+
+    /* ── Notes ─── */
+    .notes {
+      margin-top: 40px; padding: 14px 18px;
+      border-left: 2px solid var(--ember-500);
+      font-family: var(--font-mono); font-size: 11px;
+      color: var(--ink-500); letter-spacing: 0.04em; line-height: 1.8;
+    }
+    .notes .k { color: var(--ink-900); text-transform: uppercase; letter-spacing: 0.1em; }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <div class="brand">forme<span>.</span> · saved</div>
+    <div>pin up to 3 · masonry · dynamic height</div>
+  </nav>
+
+  <section class="intro">
+    <span class="eyebrow">saved · proposal</span>
+    <h1>A wall of your own <em>notes.</em></h1>
+    <p>
+      북마크 컬렉션은 걷어냅니다. 대신 Saved 탭은 <strong>메모가 주인공</strong>인 마소너리 뷰로 바뀝니다.
+      메모가 길면 카드도 길게, 없으면 짧게. 특히 자주 돌아볼 3개는 상단에 <strong>ember 테두리</strong>로 고정해둘 수 있습니다.
+    </p>
+  </section>
+
+  <!-- ════════════ Feed page ════════════ -->
+  <section class="feed-page">
+    <!-- masthead -->
+    <div class="masthead">
+      <div class="date"><span>—</span> 04.20 · MONDAY</div>
+      <div class="forme">forme<span>.</span></div>
+    </div>
+
+    <!-- filter bar -->
+    <div class="filters">
+      <div class="category-row">
+        <button class="active">All</button>
+        <button>AI</button>
+        <button>DEV</button>
+        <button>UXUI</button>
+        <button>ECONOMY</button>
+      </div>
+      <div class="status-row">
+        <button>Unread</button>
+        <button>Read</button>
+        <button class="active">Saved</button>
+      </div>
+    </div>
+
+    <!-- ─────── PINNED ─────── -->
+    <div class="section-head">
+      <div class="left">
+        <span class="eye"><span>—</span> Pinned</span>
+        <h2>자주 돌아보는 것</h2>
+      </div>
+      <span class="count">3 / 3</span>
+    </div>
+
+    <div class="pinned-grid">
+      <!-- pin 1 -->
+      <article class="card pinned">
+        <div class="thumb"><img src="https://picsum.photos/seed/pin1/480/300" alt="" /></div>
+        <div class="meta">
+          <span class="tag stone">DEV</span>
+          <span>요즘 IT</span>
+          <span class="dot">·</span>
+          <span>04.20</span>
+        </div>
+        <h3>자바스크립트 AbortController로 비동기 작업 취소하기</h3>
+        <div class="memo">다음 스프린트에 검색 debounce + 라우트 변경 fetch cancel에 적용. 팀 리뷰때 공유 필요 — 특히 infinite scroll 쪽 race condition 해결.</div>
+        <div class="actions">
+          <button class="on"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>unpin</button>
+          <button class="on"><svg class="ico" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
+          <button><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>
+        </div>
+      </article>
+
+      <!-- pin 2 -->
+      <article class="card pinned">
+        <div class="thumb"><img src="https://picsum.photos/seed/pin2/480/300" alt="" /></div>
+        <div class="meta">
+          <span class="tag emerald">UXUI</span>
+          <span>Smashing</span>
+          <span class="dot">·</span>
+          <span>04.16</span>
+        </div>
+        <h3>Designing Quiet Interfaces for Long Reading</h3>
+        <div class="memo">단일 포인트 컬러 원칙 — forme 디자인 시스템에도 동일 적용.</div>
+        <div class="actions">
+          <button class="on">unpin</button>
+          <button class="on"><svg class="ico" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
+          <button><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+        </div>
+      </article>
+
+      <!-- pin 3 -->
+      <article class="card pinned">
+        <div class="thumb"><img src="https://picsum.photos/seed/pin3/480/300" alt="" /></div>
+        <div class="meta">
+          <span class="tag stone">DEV</span>
+          <span>토스 Tech</span>
+          <span class="dot">·</span>
+          <span>04.17</span>
+        </div>
+        <h3>좋은 프로덕트 매니저가 되는 법, 그 첫 번째 원칙</h3>
+        <div class="memo">우선순위 5개 질문 프레임 — 팀 O1 때 매주 돌려볼만 함. 1) 왜 지금인가 2) 누가 실제로 원하는가 3) 우리가 할 수 있는가 4) 작게 만들 수 있나 5) 측정 가능한가. 기획 템플릿에 넣어두기.</div>
+        <div class="actions">
+          <button class="on">unpin</button>
+          <button class="on"><svg class="ico" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
+          <button><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+        </div>
+      </article>
+    </div>
+
+    <!-- ─────── ALL SAVED (masonry) ─────── -->
+    <div class="section-head">
+      <div class="left">
+        <span class="eye"><span>—</span> All saved</span>
+        <h2>전체</h2>
+      </div>
+      <span class="count">12 items</span>
+    </div>
+
+    <div class="masonry">
+      <!-- long memo -->
+      <article class="card regular">
+        <div class="thumb"><img src="https://picsum.photos/seed/s1/480/300" alt="" /></div>
+        <div class="meta">
+          <span class="tag rose">AI</span>
+          <span>뉴스페퍼민트</span>
+          <span class="dot">·</span>
+          <span>04.15</span>
+        </div>
+        <h3>ChatGPT o1이 더 똑똑해진 이유, 추론 모델의 작동 방식</h3>
+        <div class="memo">결국 chain-of-thought가 "think before you answer"로 내재화된 것. 우리 챗봇도 명시적 reasoning step 프롬프트 없이도 자체 판단하게 재설계 필요. 특히 도구 선택 상황에서 효과가 클 듯. 그리고 context window가 늘어도 reasoning quality는 더 중요하다는 점 — 프롬프트 엔지니어링보다 모델 선택이 본질임.</div>
+        <div class="actions">
+          <button>pin</button>
+          <button class="on"><svg class="ico" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
+          <button><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+        </div>
+      </article>
+
+      <!-- short memo -->
+      <article class="card regular">
+        <div class="thumb"><img src="https://picsum.photos/seed/s2/480/300" alt="" /></div>
+        <div class="meta">
+          <span class="tag stone">DEV</span>
+          <span>Eng Blog</span>
+          <span class="dot">·</span>
+          <span>04.12</span>
+        </div>
+        <h3>Why We Migrated from Postgres to MySQL (and Back)</h3>
+        <div class="memo">우리는 Postgres 유지. 이 글은 팀 상황 다름.</div>
+        <div class="actions">
+          <button>pin</button>
+          <button class="on"><svg class="ico" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
+          <button><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/></svg></button>
+        </div>
+      </article>
+
+      <!-- no memo -->
+      <article class="card regular">
+        <div class="thumb"><img src="https://picsum.photos/seed/s3/480/300" alt="" /></div>
+        <div class="meta">
+          <span class="tag emerald">UXUI</span>
+          <span>Nielsen Norman</span>
+          <span class="dot">·</span>
+          <span>04.11</span>
+        </div>
+        <h3>The Quiet Death of the Homepage</h3>
+        <div class="actions">
+          <button>pin</button>
+          <button class="on"><svg class="ico" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
+          <button><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/></svg></button>
+        </div>
+      </article>
+
+      <!-- very long memo, multi-paragraph -->
+      <article class="card regular">
+        <div class="thumb"><img src="https://picsum.photos/seed/s4/480/300" alt="" /></div>
+        <div class="meta">
+          <span class="tag stone">DEV</span>
+          <span>요즘 IT</span>
+          <span class="dot">·</span>
+          <span>04.18</span>
+        </div>
+        <h3>하네스 경쟁의 시작, 왜 opencode와 OMO 일까?</h3>
+        <div class="memo">두 진영의 베팅이 극명히 다름:
+
+1) opencode: MCP 기반 플러그인 생태계로 moat 구축 시도. open-source가 메인 무기. 장기적으론 모델 중립이 장점.
+
+2) OMO: 자체 모델 튜닝 + 벤치 1등 전략. 단기 성능이 앞서지만 모델 비용과 evaluation 수렴 어려움.
+
+우리 앱이 MCP 지원 검토해야 하는 이유: 장기적으로 유저가 에이전트/모델을 스스로 고르는 시장이 될 것.</div>
+        <div class="actions">
+          <button>pin</button>
+          <button class="on"><svg class="ico" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
+          <button><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/></svg></button>
+        </div>
+      </article>
+
+      <!-- medium memo -->
+      <article class="card regular">
+        <div class="thumb"><img src="https://picsum.photos/seed/s5/480/300" alt="" /></div>
+        <div class="meta">
+          <span class="tag amber">ECONOMY</span>
+          <span>플래텀</span>
+          <span class="dot">·</span>
+          <span>04.14</span>
+        </div>
+        <h3>한국형 스타트업의 성장 공식, 3가지 축</h3>
+        <div class="memo">PMF 이전 단계에서 이 3축 측정해야 함 — (1) 리텐션 (2) 채널 효율 (3) 월간 수익성. 그 이전엔 전부 vanity metric.</div>
+        <div class="actions">
+          <button>pin</button>
+          <button class="on"><svg class="ico" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
+          <button><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/></svg></button>
+        </div>
+      </article>
+
+      <!-- no memo short -->
+      <article class="card regular">
+        <div class="thumb"><img src="https://picsum.photos/seed/s6/480/300" alt="" /></div>
+        <div class="meta">
+          <span class="tag stone">DEV</span>
+          <span>요즘 IT</span>
+          <span class="dot">·</span>
+          <span>04.14</span>
+        </div>
+        <h3>React 19 안정판에서 바뀐 7가지</h3>
+        <div class="actions">
+          <button>pin</button>
+          <button class="on"><svg class="ico" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
+          <button><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/></svg></button>
+        </div>
+      </article>
+
+      <!-- long quote memo -->
+      <article class="card regular">
+        <div class="thumb"><img src="https://picsum.photos/seed/s7/480/300" alt="" /></div>
+        <div class="meta">
+          <span class="tag emerald">UXUI</span>
+          <span>Frank Chimero</span>
+          <span class="dot">·</span>
+          <span>04.09</span>
+        </div>
+        <h3>The Web's Grain</h3>
+        <div class="memo">"좋은 디자인은 기술의 결을 따르되, 거기에 저항하는 지점을 찾는 것이다. 두 다리 사이에 긴장이 있어야 살아있다."
+
+— 한 인용문이 리디자인 전체를 붙잡아 두는 기준이 됨. 우리의 "결"은 결국: 모바일 PWA / 한 사람의 공책 / 조용한 독서.</div>
+        <div class="actions">
+          <button>pin</button>
+          <button class="on"><svg class="ico" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
+          <button><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/></svg></button>
+        </div>
+      </article>
+
+      <!-- short memo -->
+      <article class="card regular">
+        <div class="thumb"><img src="https://picsum.photos/seed/s8/480/300" alt="" /></div>
+        <div class="meta">
+          <span class="tag amber">ECONOMY</span>
+          <span>테오의 프로덕트</span>
+          <span class="dot">·</span>
+          <span>04.10</span>
+        </div>
+        <h3>Product Analytics 101: 코호트 기반 리텐션 분해</h3>
+        <div class="memo">W1~W8 리텐션 그려보면 product-market fit 신호 명확.</div>
+        <div class="actions">
+          <button>pin</button>
+          <button class="on"><svg class="ico" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
+          <button><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/></svg></button>
+        </div>
+      </article>
+
+      <!-- no memo -->
+      <article class="card regular">
+        <div class="thumb"><img src="https://picsum.photos/seed/s9/480/300" alt="" /></div>
+        <div class="meta">
+          <span class="tag stone">DEV</span>
+          <span>모바일 퍼블리싱</span>
+          <span class="dot">·</span>
+          <span>04.09</span>
+        </div>
+        <h3>아이폰 17 Pro Max 7일 후기, 배터리와 무게</h3>
+        <div class="actions">
+          <button>pin</button>
+          <button class="on"><svg class="ico" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
+          <button><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/></svg></button>
+        </div>
+      </article>
+
+      <!-- short memo -->
+      <article class="card regular">
+        <div class="thumb"><img src="https://picsum.photos/seed/s10/480/300" alt="" /></div>
+        <div class="meta">
+          <span class="tag emerald">UXUI</span>
+          <span>매거진 B</span>
+          <span class="dot">·</span>
+          <span>04.08</span>
+        </div>
+        <h3>Bear — the quiet note-taker</h3>
+        <div class="memo">레퍼런스. 세리프 믹스 + markdown 위주 + 태그 중심 아카이빙.</div>
+        <div class="actions">
+          <button>pin</button>
+          <button class="on"><svg class="ico" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
+          <button><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/></svg></button>
+        </div>
+      </article>
+
+      <!-- no memo -->
+      <article class="card regular">
+        <div class="thumb"><img src="https://picsum.photos/seed/s11/480/300" alt="" /></div>
+        <div class="meta">
+          <span class="tag rose">AI</span>
+          <span>Hacker News</span>
+          <span class="dot">·</span>
+          <span>04.07</span>
+        </div>
+        <h3>Show HN: Local-first LLM coding agent with MCP</h3>
+        <div class="actions">
+          <button>pin</button>
+          <button class="on"><svg class="ico" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
+          <button><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/></svg></button>
+        </div>
+      </article>
+
+      <!-- medium memo -->
+      <article class="card regular">
+        <div class="thumb"><img src="https://picsum.photos/seed/s12/480/300" alt="" /></div>
+        <div class="meta">
+          <span class="tag amber">ECONOMY</span>
+          <span>스타트업 투자 노트</span>
+          <span class="dot">·</span>
+          <span>04.05</span>
+        </div>
+        <h3>2026 상반기 VC 투자 트렌드, AI 인프라 vs 애플리케이션</h3>
+        <div class="memo">B2B 고객당 비용 vs 인프라 라운드 규모 — 우리 포지셔닝에 직접 영향. 시드/시리즈 A 데크에서 "which layer"를 명확히 해야 함.</div>
+        <div class="actions">
+          <button>pin</button>
+          <button class="on"><svg class="ico" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
+          <button><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/></svg></button>
+        </div>
+      </article>
+    </div>
+
+    <div class="notes">
+      <span class="k">Layout</span>  CSS columns 기반 마소너리 — 3 cols(desktop) / 2 cols(tablet) / 1 col(mobile). 카드는 내용 길이만큼 세로로 늘어나고, 컬럼 내부에서 자연스럽게 쌓임<br>
+      <span class="k">Pinned</span>  상단 3-col 고정 그리드 (마소너리 아님). ember 1.5px border + 좌상단 'pinned' 태그. 최대 3개, unpin시 맨 아래로 복귀(최근 저장순 기준 재정렬)<br>
+      <span class="k">Memo</span>  border-left ember 2px + 원문 그대로 표시(truncate X). 개행 유지로 인용/리스트 자연스럽게 표현<br>
+      <span class="k">Drop</span>  bookmark-collections 테이블 + video_bookmark_collections 테이블 + collection_id FK + 관련 API/Server Actions/UI 컴포넌트 싹 제거
+    </div>
+  </section>
+</body>
+</html>
