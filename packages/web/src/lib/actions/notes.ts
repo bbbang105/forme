@@ -209,7 +209,7 @@ export async function updateNote(
     );
 
     // Content-only update — only the note list needs refreshing, not the dashboard widget
-    revalidatePath('/note');
+    revalidatePath('/notes');
     return row;
   }, { id });
 }
@@ -244,7 +244,7 @@ export async function deleteNote(id: string) {
     );
 
     // Deletion changes the dashboard recent-notes widget count
-    revalidatePath('/note');
+    revalidatePath('/notes');
     revalidatePath('/dashboard');
   }, { id });
 }
@@ -273,7 +273,7 @@ export async function toggleMemoPin(id: string) {
     if (!row) throw new Error('노트를 찾을 수 없습니다');
 
     // Pin toggling only reorders the note list — dashboard widget is unaffected
-    revalidatePath('/note');
+    revalidatePath('/notes');
     return row;
   }, { id });
 }

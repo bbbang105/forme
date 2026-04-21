@@ -9,7 +9,7 @@ const tabs = [
   { href: '/feed', label: 'Feed', icon: Newspaper },
   { href: '/youtube', label: 'YouTube', icon: PlayCircle },
   { href: '/calendar', label: 'Calendar', icon: Calendar },
-  { href: '/note', label: 'Notes', icon: StickyNote },
+  { href: '/notes', label: 'Notes', icon: StickyNote },
 ];
 
 export function TabBar() {

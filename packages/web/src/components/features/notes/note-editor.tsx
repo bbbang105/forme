@@ -127,13 +127,13 @@ export function NoteEditor({ note }: NoteEditorProps) {
     }
 
     router.refresh();
-    router.push('/note');
+    router.push('/notes');
   }, [editor, note.id, title, save, router, detach]);
 
   const handleDelete = useCallback(async () => {
     await deleteNote(note.id);
     router.refresh();
-    router.push('/note');
+    router.push('/notes');
   }, [note.id, router]);
 
   const handleTogglePin = useCallback(async () => {

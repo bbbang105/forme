@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
-const ALLOWED_PATHS = ['/dashboard', '/feed', '/youtube', '/calendar', '/note'];
+const ALLOWED_PATHS = ['/dashboard', '/feed', '/youtube', '/calendar', '/notes'];
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
