@@ -23,14 +23,14 @@ const MIME_TO_EXT: Record<string, string> = {
 };
 
 /**
- * POST /api/note/image
+ * POST /api/notes/image
  *
  * Accepts multipart/form-data with:
  *   image: image file (jpeg, png, gif, webp)
  *
  * Returns: { url: string }
  */
-export const POST = withTracing('POST /api/note/image', async (request) => {
+export const POST = withTracing('POST /api/notes/image', async (request) => {
   // Auth
   const supabase = await createClient();
   const {
@@ -86,7 +86,7 @@ export const POST = withTracing('POST /api/note/image', async (request) => {
 
     return NextResponse.json({ url });
   } catch (err) {
-    console.error('[POST /api/note/image]', err);
+    console.error('[POST /api/notes/image]', err);
     return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
   }
 });

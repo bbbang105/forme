@@ -43,7 +43,7 @@ function useImageUpload(editor: Editor | null) {
     try {
       const formData = new FormData();
       formData.append('image', file);
-      const res = await fetch('/api/note/image', {
+      const res = await fetch('/api/notes/image', {
         method: 'POST',
         body: formData,
       });

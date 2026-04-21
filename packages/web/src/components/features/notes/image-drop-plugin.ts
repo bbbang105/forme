@@ -4,12 +4,12 @@ import {Decoration, DecorationSet} from '@tiptap/pm/view';
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 const MAX_SIZE = 5 * 1024 * 1024; // 5MB
 
-/** Upload an image file to /api/note/image. Returns URL or null. */
+/** Upload an image file to /api/notes/image. Returns URL or null. */
 async function uploadImage(file: File): Promise<string | null> {
   const formData = new FormData();
   formData.append('image', file);
   try {
-    const res = await fetch('/api/note/image', {method: 'POST', body: formData});
+    const res = await fetch('/api/notes/image', {method: 'POST', body: formData});
     if (!res.ok) return null;
     const {url} = (await res.json()) as {url: string};
     try {
