@@ -20,6 +20,7 @@ import {type YoutubeSource, YoutubeSourceBar} from './youtube-source-bar';
 import {CollectProgress} from './collect-progress';
 import {YoutubeCard, type YoutubeItemData} from './youtube-card';
 import {YOUTUBE_SUMMARIZE_BATCH_MAX} from '@/lib/constants';
+import {YOUTUBE_VIDEO_ID_REGEX} from '@/lib/validators';
 import {AddUrlDialog} from './add-url-dialog';
 
 const EMPTY_TAGS: string[] = [];
@@ -331,8 +332,10 @@ export function YoutubeFeed() {
 
       if (item.status === 'summarized') {
         router.push(`/youtube/${id}`);
-      } else {
+      } else if (YOUTUBE_VIDEO_ID_REGEX.test(item.videoId)) {
         window.open(`https://www.youtube.com/watch?v=${item.videoId}`, '_blank', 'noopener');
+      } else {
+        console.warn('[youtube-feed] Invalid videoId, skipping open:', item.videoId);
       }
     },
     [router],
@@ -417,6 +420,12 @@ export function YoutubeFeed() {
     }
     const nowIso = new Date().toISOString();
 
+    // Precise rollback: snapshot previous state before optimistic mutation.
+    // Matches the pattern used by handleToggleBookmark / handleMemoChange so
+    // failure cannot leave items + pinnedItems in a partially-reconciled state.
+    const prevItems = itemsRef.current;
+    const prevPinnedItems = pinnedItemsRef.current;
+
     if (nextPinned) {
       const source = itemsRef.current.find((i) => i.id === id);
       if (source) {
@@ -435,16 +444,19 @@ export function YoutubeFeed() {
       }
     }
 
-    const res = await fetch(`/api/youtube/${id}`, {
-      method: 'PATCH',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({pinned: nextPinned}),
-    });
-
-    if (!res.ok) {
-      fetchItems({ reset: true });
+    try {
+      const res = await fetch(`/api/youtube/${id}`, {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({pinned: nextPinned}),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      // Restore both lists atomically to the pre-mutation snapshot.
+      setItems(prevItems);
+      setPinnedItems(prevPinnedItems);
     }
-  }, [fetchItems]);
+  }, []);
 
   const handleSummarize = async () => {
     if (selectedIds.size === 0) return;

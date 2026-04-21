@@ -367,8 +367,8 @@ export async function toggleRecurringInstance(eventId: string, dateStr: string) 
 
 export async function excludeRecurringDate(eventId: string, dateStr: string) {
   return traceAction('excludeRecurringDate', async () => {
-    if (!UUID_REGEX.test(eventId)) throw new Error('잘못된 ID입니다');
     const user = await getAuthUser();
+    if (!UUID_REGEX.test(eventId)) throw new Error('잘못된 ID입니다');
     if (!DATE_REGEX.test(dateStr)) throw new Error('날짜 형식이 올바르지 않습니다');
 
     const [event] = await traceQuery('calendar.events.get_for_exclude', () =>
