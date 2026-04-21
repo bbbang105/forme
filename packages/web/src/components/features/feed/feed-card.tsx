@@ -2,12 +2,11 @@
 
 import {memo, useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import Image from 'next/image';
-import {Bookmark, BookmarkCheck, Check, FileText, MessageSquare, Pin, PinOff, Trash2} from 'lucide-react';
+import {Bookmark, BookmarkCheck, FileText, MessageSquare, Pin, PinOff, Trash2} from 'lucide-react';
 import {cn} from '@/lib/utils';
 import {ITEM_NOTE_MAX_LENGTH} from '@/lib/constants';
 import {formatRelativeDate, getArticleGradient, getCategoryStyle} from '@/lib/feed-utils';
 import {Checkbox} from '@/components/ui/checkbox';
-import {useSwipeAction} from '@/hooks/use-swipe-action';
 import type {SavedItemBase} from '@/lib/types/saved-item';
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
@@ -202,28 +201,6 @@ function InlineNote({
   );
 }
 
-// ─── Swipe Backgrounds ──────────────────────────────────────────────────
-function SwipeBackground({direction}: {direction: 'left' | 'right'}) {
-  if (direction === 'right') {
-    return (
-      <div className="absolute inset-0 bg-primary/10 flex items-center pl-5 pointer-events-none">
-        <div className="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.1em] text-primary">
-          <Check className="h-4 w-4" aria-hidden="true" />
-          <span>Mark read</span>
-        </div>
-      </div>
-    );
-  }
-  return (
-    <div className="absolute inset-0 bg-destructive/10 flex items-center justify-end pr-5 pointer-events-none">
-      <div className="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.1em] text-destructive">
-        <span>Delete</span>
-        <Trash2 className="h-4 w-4" aria-hidden="true" />
-      </div>
-    </div>
-  );
-}
-
 // ─── Meta Row ────────────────────────────────────────────────────────────
 function MetaRow({
   catStyle,
@@ -373,13 +350,6 @@ export const FeedCard = memo(function FeedCard({
   const isNewItem = isNew(item.collectedAt);
   const isPinned = Boolean(item.pinnedAt);
 
-  const {containerRef, handlers} = useSwipeAction({
-    onSwipeRight: () => {
-      if (!item.isRead) onMarkRead(item.id);
-    },
-    onSwipeLeft: () => onDelete?.(item.id),
-  });
-
   const handleClick = (e: React.MouseEvent) => {
     if (selectMode) {
       e.preventDefault();
@@ -411,56 +381,50 @@ export const FeedCard = memo(function FeedCard({
   // Compact: horizontal row (not currently used in app but kept for flexibility)
   if (compact) {
     return (
-      <div className="relative overflow-hidden">
-        <SwipeBackground direction="right" />
-        <SwipeBackground direction="left" />
-        <div ref={containerRef} {...(selectMode ? {} : handlers)}>
-          <a
-            href={selectMode ? undefined : item.url}
-            target={selectMode ? undefined : '_blank'}
-            rel={selectMode ? undefined : 'noopener noreferrer'}
-            onClick={handleClick}
-            className={cn(
-              'group relative flex items-start gap-3 py-3 bg-background',
-              'transition-colors',
-              selectMode && 'cursor-pointer',
-              selected && 'bg-primary/5',
-            )}
-          >
-            {selectMode && (
-              <div className="flex items-center justify-center shrink-0 min-h-[44px] min-w-[44px]">
-                <Checkbox
-                  checked={selected}
-                  onCheckedChange={() => onToggleSelect?.(item.id)}
-                  className="h-5 w-5 border-2"
-                />
-              </div>
-            )}
-            <div className="w-[80px] h-[52px] shrink-0 rounded-sm overflow-hidden bg-muted">
-              <Thumbnail src={item.thumbnailUrl} title={item.title} className="w-full h-full" />
-            </div>
-            <div className="flex flex-col flex-1 min-w-0 gap-1.5">
-              <h3 className="font-display text-base leading-snug text-foreground line-clamp-2 group-hover:text-primary transition-colors">
-                {item.title}
-              </h3>
-              <MetaRow
-                catStyle={catStyle}
-                sourceName={item.sourceName}
-                dateLabel={dateLabel}
-                isNewItem={isNewItem}
-              />
-            </div>
-            {!selectMode && (
-              <ActionButtons
-                item={item}
-                onBookmark={handleBookmark}
-                onDelete={handleDelete}
-                size="sm"
-              />
-            )}
-          </a>
+      <a
+        href={selectMode ? undefined : item.url}
+        target={selectMode ? undefined : '_blank'}
+        rel={selectMode ? undefined : 'noopener noreferrer'}
+        onClick={handleClick}
+        className={cn(
+          'group relative flex items-start gap-3 py-3 bg-background',
+          'transition-colors',
+          selectMode && 'cursor-pointer',
+          selected && 'bg-primary/5',
+        )}
+      >
+        {selectMode && (
+          <div className="flex items-center justify-center shrink-0 min-h-[44px] min-w-[44px]">
+            <Checkbox
+              checked={selected}
+              onCheckedChange={() => onToggleSelect?.(item.id)}
+              className="h-5 w-5 border-2"
+            />
+          </div>
+        )}
+        <div className="w-[80px] h-[52px] shrink-0 rounded-sm overflow-hidden bg-muted">
+          <Thumbnail src={item.thumbnailUrl} title={item.title} className="w-full h-full" />
         </div>
-      </div>
+        <div className="flex flex-col flex-1 min-w-0 gap-1.5">
+          <h3 className="font-display text-base leading-snug text-foreground line-clamp-2 group-hover:text-primary transition-colors">
+            {item.title}
+          </h3>
+          <MetaRow
+            catStyle={catStyle}
+            sourceName={item.sourceName}
+            dateLabel={dateLabel}
+            isNewItem={isNewItem}
+          />
+        </div>
+        {!selectMode && (
+          <ActionButtons
+            item={item}
+            onBookmark={handleBookmark}
+            onDelete={handleDelete}
+            size="sm"
+          />
+        )}
+      </a>
     );
   }
 
@@ -468,93 +432,87 @@ export const FeedCard = memo(function FeedCard({
   // savedVariant (Saved tab) adds ember border + `pinned` label when pinned,
   // and promotes note to the body (no description shown).
   return (
-    <div className="relative overflow-hidden">
-      <SwipeBackground direction="right" />
-      <SwipeBackground direction="left" />
-      <div ref={containerRef} {...(selectMode ? {} : handlers)}>
-        <a
-          href={selectMode ? undefined : item.url}
-          target={selectMode ? undefined : '_blank'}
-          rel={selectMode ? undefined : 'noopener noreferrer'}
-          onClick={handleClick}
-          className={cn(
-            'group relative flex flex-col bg-background',
-            'transition-colors',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
-            savedVariant && 'rounded-md p-4',
-            savedVariant && isPinned && 'border-2 border-primary',
-            savedVariant && !isPinned && 'border border-border',
-            selectMode && 'cursor-pointer',
-            selected && 'bg-primary/5',
-          )}
+    <a
+      href={selectMode ? undefined : item.url}
+      target={selectMode ? undefined : '_blank'}
+      rel={selectMode ? undefined : 'noopener noreferrer'}
+      onClick={handleClick}
+      className={cn(
+        'group relative flex flex-col bg-background',
+        'transition-colors',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
+        savedVariant && 'rounded-md p-4',
+        savedVariant && isPinned && 'border-2 border-primary',
+        savedVariant && !isPinned && 'border border-border',
+        selectMode && 'cursor-pointer',
+        selected && 'bg-primary/5',
+      )}
+    >
+      {savedVariant && isPinned && (
+        <span
+          aria-hidden="true"
+          className="absolute -top-2 left-3 px-1.5 py-0.5 bg-primary text-primary-foreground font-mono text-[9px] uppercase tracking-[0.14em] font-semibold rounded-sm"
         >
-          {savedVariant && isPinned && (
-            <span
-              aria-hidden="true"
-              className="absolute -top-2 left-3 px-1.5 py-0.5 bg-primary text-primary-foreground font-mono text-[9px] uppercase tracking-[0.14em] font-semibold rounded-sm"
-            >
-              pinned
-            </span>
-          )}
+          pinned
+        </span>
+      )}
 
-          {selectMode && (
-            <div className="absolute top-2 left-2 z-10 flex items-center justify-center min-h-[44px] min-w-[44px]">
-              <Checkbox
-                checked={selected}
-                onCheckedChange={() => onToggleSelect?.(item.id)}
-                className="h-5 w-5 border-2 bg-background/80 backdrop-blur-sm"
-              />
-            </div>
-          )}
+      {selectMode && (
+        <div className="absolute top-2 left-2 z-10 flex items-center justify-center min-h-[44px] min-w-[44px]">
+          <Checkbox
+            checked={selected}
+            onCheckedChange={() => onToggleSelect?.(item.id)}
+            className="h-5 w-5 border-2 bg-background/80 backdrop-blur-sm"
+          />
+        </div>
+      )}
 
-          <div className="relative aspect-[16/10] w-full overflow-hidden rounded-sm bg-muted">
-            <Thumbnail src={item.thumbnailUrl} title={item.title} className="w-full h-full" />
-          </div>
-
-          <div className="flex flex-col flex-1 gap-2.5 pt-3">
-            <MetaRow
-              catStyle={catStyle}
-              sourceName={item.sourceName}
-              dateLabel={dateLabel}
-              tags={item.tags}
-              isNewItem={isNewItem}
-            />
-
-            <h3 className="font-display text-lg leading-snug text-foreground line-clamp-2 group-hover:text-primary transition-colors">
-              {item.title}
-            </h3>
-
-            {!savedVariant && item.description && (
-              <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
-                {item.description}
-              </p>
-            )}
-
-            {/* Inline note (bookmark / read tabs) */}
-            {showMemo && !selectMode && onMemoChange && (
-              <InlineNote
-                key={item.note ?? ''}
-                itemId={item.id}
-                initialMemo={item.note}
-                onMemoChange={onMemoChange}
-              />
-            )}
-
-            <div className="flex items-center justify-end mt-auto pt-1">
-              {!selectMode && (
-                <ActionButtons
-                  item={item}
-                  onBookmark={handleBookmark}
-                  onDelete={handleDelete}
-                  onTogglePin={onTogglePin ? handleTogglePin : undefined}
-                  pinLocked={pinLocked}
-                />
-              )}
-            </div>
-          </div>
-        </a>
+      <div className="relative aspect-[16/10] w-full overflow-hidden rounded-sm bg-muted">
+        <Thumbnail src={item.thumbnailUrl} title={item.title} className="w-full h-full" />
       </div>
-    </div>
+
+      <div className="flex flex-col flex-1 gap-2.5 pt-3">
+        <MetaRow
+          catStyle={catStyle}
+          sourceName={item.sourceName}
+          dateLabel={dateLabel}
+          tags={item.tags}
+          isNewItem={isNewItem}
+        />
+
+        <h3 className="font-display text-lg leading-snug text-foreground line-clamp-2 group-hover:text-primary transition-colors">
+          {item.title}
+        </h3>
+
+        {!savedVariant && item.description && (
+          <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
+            {item.description}
+          </p>
+        )}
+
+        {/* Inline note (bookmark / read tabs) */}
+        {showMemo && !selectMode && onMemoChange && (
+          <InlineNote
+            key={item.note ?? ''}
+            itemId={item.id}
+            initialMemo={item.note}
+            onMemoChange={onMemoChange}
+          />
+        )}
+
+        <div className="flex items-center justify-end mt-auto pt-1">
+          {!selectMode && (
+            <ActionButtons
+              item={item}
+              onBookmark={handleBookmark}
+              onDelete={handleDelete}
+              onTogglePin={onTogglePin ? handleTogglePin : undefined}
+              pinLocked={pinLocked}
+            />
+          )}
+        </div>
+      </div>
+    </a>
   );
 });
 

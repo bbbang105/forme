@@ -56,6 +56,12 @@ export const DEFAULT_CATEGORY_STYLES: Record<string, { label: string; bg: string
     text: 'text-amber-700 dark:text-amber-300',
     ring: 'ring-amber-200 dark:ring-amber-500/30',
   },
+  'start-up': {
+    label: 'START-UP',
+    bg: 'bg-sky-100 dark:bg-sky-500/20',
+    text: 'text-sky-700 dark:text-sky-300',
+    ring: 'ring-sky-200 dark:ring-sky-500/30',
+  },
 };
 
 /**

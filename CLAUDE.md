@@ -70,11 +70,11 @@ pnpm db:push          # 스키마 직접 push (dev용)
 - 피드 URL 수동 등록: POST /api/feed/add-url (preview 모드 + 저장 모드), "직접 추가" 시스템 소스 자동 생성 (manual://), OG 메타 파싱 (50KB streaming), AddUrlDialog 2단계 플로우 (가져오기→미리보기 편집→등록), INTEREST_OPTIONS 태그 클릭 토글 (최대 5개), 카테고리 선택 (AI/DEV/UXUI/ECONOMY), 즐겨찾기 바에 "직접 추가" 필터 칩
 - 피드/유튜브 inline 노트: `InlineNote` 컴포넌트 (읽음+북마크 탭, `ITEM_NOTE_MAX_LENGTH=1000`, key prop으로 외부 상태 동기화), PATCH API 서버측 노트→자동 북마크 (명시적 isBookmarked 지정 시 덮어쓰지 않음)
 - Saved 핀 고정: `feed_items.pinned_at` / `youtube_items.pinned_at` 타임스탬프, 유저당 최대 3개 (서버측 count 검증 후 409), Saved 탭 상단 3-col pinned grid + 하단 CSS columns 마소너리. PATCH `{pinned: boolean}` 지원, 북마크 해제 시 자동 unpin
-- 피드 UX: 스와이프 액션 (우→읽음, 좌→삭제), 키보드 네비 (j/k/o/b, ref 기반 리스너 — 아이템 변경 시 재등록 불필요)
+- 피드 UX: 키보드 네비 (j/k/o/b, ref 기반 리스너 — 아이템 변경 시 재등록 불필요)
 - 노트 캐싱: 에디터 뒤로가기 시 `router.refresh()` + NoteList initialNotes props 동기화
 - Discord 웹훅: `lib/discord.ts` — URL 패턴 검증 + 5초 타임아웃 + 에러 내부 흡수
 - DB 커넥션: `max: 1` (Supabase Transaction Pooler가 실제 풀 관리, 서버리스 최적)
-- 성능: `serverExternalPackages`로 서버 전용 패키지 번들 제외, AVIF 이미지 포맷, 병렬 쿼리 (`Promise.all`), SW LRU 캐시 (정적 100개), SW HTML/RSC network-first (4초 타임아웃 + 캐시 폴백), 리스트 아이템 `React.memo` (FeedCard, FeedListRow, NoteCard, YoutubeCard)
+- 성능: `serverExternalPackages`로 서버 전용 패키지 번들 제외, AVIF 이미지 포맷, 병렬 쿼리 (`Promise.all`), SW LRU 캐시 (정적 100개), SW HTML/RSC network-first (4초 타임아웃 + 캐시 폴백), 리스트 아이템 `React.memo` (FeedCard, FeedListRow, NoteCard, YoutubeCard, YoutubeListRow, YoutubeCompactRow)
 - 에러 바운더리: 모든 (main) 피처 페이지에 `error.tsx` 배치 (calendar, feed, notes, youtube), 에디토리얼 템플릿 (mono eyebrow "— Something's off" + font-display 타이틀 + "— Try again" 버튼), `error` prop 로깅 + 제네릭 메시지만 표출
 - 접근성: 탭바 `aria-current="page"`, 검색 input `aria-label`, 이벤트 폼 색상 버튼 `focus-visible:ring-2` + `aria-label`, 폼 라벨 `htmlFor`/`id` 연결 필수, 에러 메시지 `role="alert" aria-live="polite"`, 터치 타겟 최소 44x44px (WCAG 2.5.5), 모든 커스텀 버튼 `focus-visible:ring-2`, `@utility focus-ring` CSS 유틸리티, `prefers-reduced-motion` 미디어 쿼리, 장식 아이콘 `aria-hidden="true"` (라벨 있는 버튼 내부 아이콘)
 - 아이콘 통일: lucide-react 아이콘 사용 (Newspaper, CheckSquare, FileText 등)
@@ -90,11 +90,13 @@ pnpm db:push          # 스키마 직접 push (dev용)
 - SW 등록: 지수 백오프 재시도 (최대 3회, constants.ts 참조), 푸시 구독 자동 동기화 (syncPushSubscription, sessionStorage 중복 방지)
 - RSS 크롤 중복 방지: 크로스소스 제목 dedup (동일 제목 → DB 미저장, feedSources join으로 유저별 기존 제목 조회)
 - 유튜브 요약: youtube_sources (채널 소스) + youtube_items (수집/요약 영상, sourceId nullable — 수동 URL 추가 지원) 테이블, 수집과 요약 분리 (수집: RSS 무료, 요약: Gemini API), @handle URL → 페이지 파싱으로 channelId 추출 (한글 핸들 decodeURIComponent 대응, 100자 제한), youtube.com/channel/ URL도 지원, SSE 스트리밍 요약 (api/feed/crawl 패턴), 자막 추출: Innertube ANDROID client (POT 불필요, WEB client는 빈 응답), 실패 시 description 폴백 (summarySource 플래그), 자막 최대 80,000자, 마크다운 렌더러 next/dynamic 지연 로딩, 최대 5개 배치 요약 (YOUTUBE_SUMMARIZE_BATCH_MAX), YouTube Data API v3로 duration 조회 → Shorts/2분 미만 필터, GEMINI_MODEL 환경변수 (기본 gemini-2.5-flash), 영상 길이별 동적 프롬프트 (10분 미만/10~30분/30~60분/60분+ 분량 가이드), 자막 URL SSRF 방어 (isSafeUrl), videoId 정규식 검증, pinned_at 핀 고정 (최대 3개) + 마소너리 Saved 뷰, optimistic updates + 에러 롤백
-- 유튜브 URL 직접 추가: 피드 탭 태그 칩 우측 + 버튼 → AddUrlDialog (SSE 원스텝: 메타 → 자막 → 요약 → DB), 기존 영상 있으면 트랜잭션으로 삭제 후 재등록, cancel 시 orphan DB 정리
-- 유튜브 피드 2탭 구조: "피드" (세그먼트 탭, 요약 완료 영상) + "생성" (수집/요약 실행), 피드 탭 내 상태 칩 (안읽음/읽음/북마크 — 피드 동일 패턴), 피드 탭 검색 (escapeIlike + raw SQL ESCAPE), 탭 전환 시 하위 필터 전체 초기화, itemsRef 패턴 (useCallback + ref로 stale closure 방지), 읽음 탭 readAt DESC 정렬 (최근 읽은 순)
-- 유튜브 선택 모드: 피드 탭 상태 칩 우측 "선택" 버튼, 생성 탭 수집 라인 우측 "선택" 버튼, 일괄 삭제 (bulk-action API), 읽음 탭에서 일괄 안읽음 되돌리기 (mark_unread)
+- 유튜브 URL 직접 추가: 피드 탭 statusActions `+` 아이콘 → AddUrlDialog (SSE 원스텝: 메타 → 자막 → 요약 → DB), 기존 영상 있으면 트랜잭션으로 삭제 후 재등록, cancel 시 orphan DB 정리
+- 유튜브 에디토리얼 레이아웃 (Feed 탭): 모바일 = 1/2-col 잡지 그리드 (`YoutubeCard`, 썸네일 위 + meta row + font-display 제목 + oneLiner), 데스크탑 = 헤어라인 리스트 (`YoutubeListRow`, 140x90 썸 + font-display text-xl). Saved 탭 = 3-col pinned 그리드 + CSS 마소너리. 요약 `oneLiner` 는 description 슬롯, keywords 는 카드에서 제거
+- 유튜브 피드 2탭 구조: Feed (요약 완료 영상, `YoutubeCard`/`YoutubeListRow`) + Collect (수집+요약, `YoutubeCompactRow` 컴팩트 리스트), 상태 칩 (안읽음/읽음/북마크 — 피드 동일 패턴), 피드 탭 검색 (escapeIlike + raw SQL ESCAPE), 탭 전환 시 하위 필터 전체 초기화, itemsRef 패턴 (useCallback + ref로 stale closure 방지), 읽음 탭 readAt DESC 정렬
+- 유튜브 필터바 순서: 태그 세그먼트 (em-dash mono) → Feed: 상태 칩 + feedStatusActions (Select/+URL/Sources) + 검색 / Collect: 기간 칩 + Collect 버튼 + collectRowActions (Select/Sources) → 즐겨찾기 채널 칩. 정렬 바 없음 (publishedAt DESC / readAt DESC 기본 고정)
+- 유튜브 선택 모드: feedStatusActions 또는 collectRowActions 의 "Select/Cancel" mono 버튼, 일괄 삭제 (bulk-action API), 읽음 탭에서 일괄 안읽음 되돌리기 (mark_unread), Create 탭 선택 → 일괄 요약 (SSE, `YOUTUBE_SUMMARIZE_BATCH_MAX`)
 - 유튜브 즐겨찾기 소스: DnD 순서변경 (@dnd-kit/sortable, GripVertical 핸들, /api/youtube/sources/reorder 배치 업데이트)
-- 피드 필터 순서: 카테고리 세그먼트 → 상태 칩 (+ statusActions 슬롯) → 검색 → 즐겨찾기 소스 → 정렬, 헤더 제거 (선택/소스관리 버튼을 상태 칩 우측에 배치)
+- 피드 필터 순서: 카테고리 세그먼트 (underline) → 상태 칩 (+ statusActions 슬롯: Select / + URL / Sources) → 검색 → 즐겨찾기 소스 → 정렬 (Latest / Recommended), 헤더 제거
 - 테스트: Vitest + `vi.hoisted()` Proxy 기반 DB 목 패턴 (`packages/web/src/__tests__/`). **전략/규칙은 `docs/testing-strategy.md` 참조** — 신규 Server Action/API/훅/util 추가 시 필수 테스트 계층 + 커버리지 기준, CI 통합 (lint/typecheck/build/test 4 job 필수), 정적 분석 회귀 가드 (`route-consistency.test.ts`)
 
 ## 핵심 파일
@@ -179,7 +181,6 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/app/api/feed/[id]/route.ts` | 피드 아이템 PATCH (읽음/북마크/노트/pinned, 핀 최대 3개 서버 검증) + DELETE (단건 삭제, ownership join 검증) |
 | `packages/web/src/app/api/feed/bulk-delete/route.ts` | 피드 일괄 삭제 (POST, max 100개, UUID 전수 검증) |
 | `packages/web/src/app/api/feed/bulk-action/route.ts` | 피드 일괄 액션 (mark_unread/delete, max 100개, ownership join 검증) |
-| `packages/web/src/hooks/use-swipe-action.ts` | 터치 스와이프 제스처 훅 (axis-lock, damped swipe, ref 기반 콜백, 타이머 cleanup) |
 | `packages/web/src/hooks/use-bulk-selection.ts` | 공통 선택 모드 훅 (selectMode + Set<id>, toggle/deselect/toggleSelectAll(ids)/exitSelectMode, feed-list + youtube-feed 공유) |
 | `packages/web/src/lib/types/saved-item.ts` | `SavedItemBase` 공통 interface — FeedItemData / YoutubeItemData 가 extends (id/sourceId/title/description/thumbnailUrl/publishedAt/isRead/isBookmarked/note/pinnedAt 10필드) |
 | `packages/web/src/lib/format-time.ts` | 공유 시간 포맷 유틸 (formatTime, formatDuration) |
@@ -199,9 +200,11 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/app/api/youtube/bulk-action/route.ts` | 영상 일괄 액션 (mark_unread/delete, max 100개, userId 스코핑) |
 | `packages/web/src/app/api/youtube/sources/reorder/route.ts` | 즐겨찾기 소스 순서 배치 업데이트 (favoriteOrder) |
 | `packages/web/src/app/api/youtube/items/route.ts` | 영상 피드 목록 (tab=feed/create, status=unread/read/bookmarked, 읽음 탭 readAt DESC 정렬, 검색 escapeIlike, 커서 페이지네이션) |
-| `packages/web/src/components/features/youtube/youtube-feed.tsx` | 유튜브 피드 메인 (2탭 세그먼트 + 상태 칩 + 검색 + 무한스크롤 + 선택 모드 + URL 추가, itemsRef/updateFilterRef 패턴, useCallback 최적화) |
-| `packages/web/src/components/features/youtube/youtube-card.tsx` | 영상 카드 (React.memo, flex-col 액션 버튼, 인라인 노트, 핀 토글, 선택 모드 시 액션 숨김) |
-| `packages/web/src/components/features/youtube/youtube-source-bar.tsx` | 채널 소스 관리 다이얼로그 (추가/삭제/즐겨찾기/태그, 즐겨찾기 DnD 순서변경) |
+| `packages/web/src/components/features/youtube/youtube-feed.tsx` | 유튜브 피드 메인 (Feed/Collect 메인탭, 잡지 그리드 모바일 + 헤어라인 리스트 데스크탑, Saved pinned+마소너리, Collect 컴팩트 리스트, 무한스크롤, 선택 모드, URL 추가, itemsRef/updateFilterRef 패턴) |
+| `packages/web/src/components/features/youtube/youtube-card.tsx` | 영상 카드 3종 (`YoutubeCard` 잡지 그리드 — Feed 탭 모바일 + Saved, `YoutubeListRow` 헤어라인 리스트 — Feed 탭 데스크탑, `YoutubeCompactRow` 컴팩트 행 — Collect 탭). 공유 primitives (Thumbnail + duration badge, MetaRow em-dash mono, ActionButtons, InlineNote). savedVariant 핀 ember border + pinned 라벨 |
+| `packages/web/src/components/features/youtube/youtube-filter-bar.tsx` | 필터바 (태그 세그먼트 + Feed: 상태칩 + feedStatusActions + 검색 / Collect: 기간칩 + Collect 버튼 + collectRowActions / 즐겨찾기 채널 칩) |
+| `packages/web/src/components/features/youtube/youtube-feed-skeleton.tsx` | 탭 인식 스켈레톤 (Feed: 모바일 잡지 + 데스크탑 헤어라인 / Collect: 컴팩트 행) |
+| `packages/web/src/components/features/youtube/youtube-source-bar.tsx` | 채널 소스 관리 다이얼로그 (추가/삭제/즐겨찾기/태그, 즐겨찾기 DnD 순서변경, compact 트리거 모드로 Feed/Collect 양쪽 액션 슬롯에 배치) |
 | `packages/web/src/components/features/youtube/add-url-dialog.tsx` | URL 직접 추가 다이얼로그 (SSE 진행 표시, aria-live, role="progressbar") |
 | `packages/web/src/components/features/youtube/collect-progress.tsx` | 수집 진행 SSE 표시 (role="status" aria-live="polite") |
 | `packages/web/src/components/features/youtube/markdown-renderer.tsx` | 마크다운 렌더러 (dynamic import, prose 스타일링) |

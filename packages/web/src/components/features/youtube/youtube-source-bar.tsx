@@ -74,6 +74,12 @@ interface YoutubeSourceBarProps {
   onAdd: (channelUrl: string) => Promise<void>;
   onDelete: (id: string) => void;
   onUpdate: () => void;
+  /**
+   * When true, renders a compact icon-only trigger that fits alongside the
+   * editorial filter-bar action slots. Default renders the full outline
+   * "채널 관리" button.
+   */
+  compact?: boolean;
 }
 
 function SortableChannelCard(props: {
@@ -239,7 +245,7 @@ function ChannelCard({
   );
 }
 
-export function YoutubeSourceBar({ sources, onAdd, onDelete, onUpdate }: YoutubeSourceBarProps) {
+export function YoutubeSourceBar({ sources, onAdd, onDelete, onUpdate, compact = false }: YoutubeSourceBarProps) {
   const [open, setOpen] = useState(false);
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
@@ -333,15 +339,25 @@ export function YoutubeSourceBar({ sources, onAdd, onDelete, onUpdate }: Youtube
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-1.5">
-          <Settings2 className="h-4 w-4" aria-hidden="true" />
-          채널 관리
-          {sources.length > 0 && (
-            <span className="ml-0.5 inline-flex items-center justify-center rounded-full bg-primary/10 text-primary text-[10px] font-semibold h-4 min-w-4 px-1">
-              {sources.length}
-            </span>
-          )}
-        </Button>
+        {compact ? (
+          <button
+            type="button"
+            className="p-1.5 rounded-md border border-border text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            aria-label="채널 관리"
+          >
+            <Settings2 className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
+        ) : (
+          <Button variant="outline" size="sm" className="gap-1.5">
+            <Settings2 className="h-4 w-4" aria-hidden="true" />
+            채널 관리
+            {sources.length > 0 && (
+              <span className="ml-0.5 inline-flex items-center justify-center rounded-full bg-primary/10 text-primary text-[10px] font-semibold h-4 min-w-4 px-1">
+                {sources.length}
+              </span>
+            )}
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-md max-h-[85vh] flex flex-col overflow-hidden inset-y-0 my-auto">
         <DialogHeader className="shrink-0">

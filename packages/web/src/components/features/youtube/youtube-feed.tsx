@@ -2,7 +2,7 @@
 
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useRouter, useSearchParams} from 'next/navigation';
-import {Download, Loader2, MailX, Plus, Search, Star, Trash2, X} from 'lucide-react';
+import {Loader2, MailX, Plus, Trash2} from 'lucide-react';
 import {cn} from '@/lib/utils';
 import {Button} from '@/components/ui/button';
 import {
@@ -18,7 +18,19 @@ import {
 import {SectionHeader} from '@/components/ui/section-header';
 import {type YoutubeSource, YoutubeSourceBar} from './youtube-source-bar';
 import {CollectProgress} from './collect-progress';
-import {YoutubeCard, type YoutubeItemData} from './youtube-card';
+import {
+    YoutubeCard,
+    YoutubeCompactRow,
+    YoutubeListRow,
+    type YoutubeItemData,
+} from './youtube-card';
+import {
+    YoutubeFilterBar,
+    type YoutubePeriod,
+    type YoutubeStatus,
+    type YoutubeTab,
+} from './youtube-filter-bar';
+import {YoutubeFeedSkeleton} from './youtube-feed-skeleton';
 import {YOUTUBE_SUMMARIZE_BATCH_MAX} from '@/lib/constants';
 import {YOUTUBE_VIDEO_ID_REGEX} from '@/lib/validators';
 import {AddUrlDialog} from './add-url-dialog';
@@ -26,43 +38,19 @@ import {useInfiniteScroll} from '@/hooks/use-infinite-scroll';
 import {useFilterSync} from '@/hooks/use-filter-sync';
 import {useBulkSelection} from '@/hooks/use-bulk-selection';
 
-const EMPTY_TAGS: string[] = [];
+const MAX_PINNED = 3;
 
-type Tab = 'feed' | 'create';
-type Status = 'unread' | 'read' | 'bookmarked';
-type Period = '3d' | '7d' | '30d';
-
-const MAIN_TABS: { value: Tab; label: string }[] = [
-  { value: 'feed', label: 'Feed' },
-  { value: 'create', label: 'Collect' },
-];
-
-const STATUS_TABS: { value: Status; label: string }[] = [
-  { value: 'unread', label: 'Unread' },
-  { value: 'read', label: 'Read' },
-  { value: 'bookmarked', label: 'Saved' },
-];
-
-const PERIODS: { value: Period; label: string }[] = [
-  { value: '3d', label: '3D' },
-  { value: '7d', label: '7D' },
-  { value: '30d', label: '30D' },
-];
-
-const TAG_OPTIONS = [
-  { value: 'economy', label: 'ECONOMY' },
-  { value: 'dev', label: 'DEV' },
-  { value: 'ai', label: 'AI' },
-  { value: 'uxui', label: 'UX/UI' },
-  { value: 'start-up', label: 'START-UP' },
+const MAIN_TABS: {value: YoutubeTab; label: string}[] = [
+  {value: 'feed', label: 'Feed'},
+  {value: 'create', label: 'Collect'},
 ];
 
 export function YoutubeFeed() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const {updateFilter: updateFilterBase} = useFilterSync({basePath: '/youtube'});
-  const tab = (searchParams.get('tab') as Tab) || 'feed';
-  const status = (searchParams.get('status') as Status) || 'unread';
+  const tab = (searchParams.get('tab') as YoutubeTab) || 'feed';
+  const status = (searchParams.get('status') as YoutubeStatus) || 'unread';
   const activeSourceId = searchParams.get('sourceId') || '';
   const activeTag = searchParams.get('tag') || '';
   const searchQuery = searchParams.get('search') || '';
@@ -77,10 +65,10 @@ export function YoutubeFeed() {
   const [hasMore, setHasMore] = useState(false);
 
   // Collect SSE state
-  const [collectPeriod, setCollectPeriod] = useState<Period>('7d');
+  const [collectPeriod, setCollectPeriod] = useState<YoutubePeriod>('7d');
   const [collectActive, setCollectActive] = useState(false);
 
-  // Selection mode (create tab + feed tab) — shared bulk-selection hook
+  // Selection mode (shared)
   const {
     selectMode,
     selectedIds,
@@ -94,37 +82,40 @@ export function YoutubeFeed() {
   // Summarize progress
   const [summarizeProgress, setSummarizeProgress] = useState<{
     total: number;
-    results: { videoId: string; title: string; status: 'summarizing' | 'summarized' | 'failed'; error?: string }[];
+    results: {videoId: string; title: string; status: 'summarizing' | 'summarized' | 'failed'; error?: string}[];
   } | null>(null);
 
-  // Delete state
+  // Delete / bulk state
   const [deleteTarget, setDeleteTarget] = useState<YoutubeItemData | null>(null);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [showBulkDelete, setShowBulkDelete] = useState(false);
+  const [bulkUnreading, setBulkUnreading] = useState(false);
+  const [showBulkUnread, setShowBulkUnread] = useState(false);
 
-  // Pinned items — populated on first page of Saved tab
+  // Pinned items (Saved tab first page only)
   const [pinnedItems, setPinnedItems] = useState<YoutubeItemData[]>([]);
-  const MAX_PINNED = 3;
   const [showAddUrl, setShowAddUrl] = useState(false);
 
   const abortRef = useRef<AbortController | null>(null);
   const fetchedKeyRef = useRef<string | null>(null);
 
   const favoriteSources = useMemo(() => sources.filter((s) => s.isFavorite), [sources]);
-  const allTags = useMemo(() => [...new Set(sources.flatMap((s) => s.tags ?? []))], [sources]);
+  const availableTags = useMemo(() => [...new Set(sources.flatMap((s) => s.tags ?? []))], [sources]);
+  const sourceTagMap = useMemo(() => new Map(sources.map((s) => [s.id, s.tags ?? []])), [sources]);
 
   const isCreateTab = tab === 'create';
   const isFeedTab = tab === 'feed';
   const isBookmarkStatus = isFeedTab && status === 'bookmarked';
+  const pinLocked = pinnedItems.length >= MAX_PINNED;
+  const showMemo = isFeedTab && (status === 'read' || status === 'bookmarked');
 
-  // Abort SSE on unmount
   useEffect(() => {
     return () => {
       abortRef.current?.abort();
     };
   }, []);
 
-  // Search local state (debounced) — handlers defined after updateFilter
+  // Local search (debounced)
   const [localSearch, setLocalSearch] = useState(searchQuery);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -136,10 +127,8 @@ export function YoutubeFeed() {
     return () => clearTimeout(searchTimerRef.current);
   }, []);
 
-  // Build query key for refetch tracking
   const queryKey = `${tab}|${status}|${activeSourceId}|${activeTag}|${searchQuery}`;
 
-  // Fetch sources
   const fetchSources = useCallback(async () => {
     const res = await fetch('/api/youtube/sources');
     if (res.ok) {
@@ -148,16 +137,15 @@ export function YoutubeFeed() {
     }
   }, []);
 
-  // Fetch items
   const fetchItems = useCallback(
-    async (opts: { reset?: boolean; nextCursor?: string | null } = {}) => {
-      const { reset = false, nextCursor = null } = opts;
+    async (opts: {reset?: boolean; nextCursor?: string | null} = {}) => {
+      const {reset = false, nextCursor = null} = opts;
 
       if (reset) setLoading(true);
       else setLoadingMore(true);
 
       try {
-        const params = new URLSearchParams({ tab });
+        const params = new URLSearchParams({tab});
         if (isFeedTab) params.set('status', status);
         if (activeSourceId) params.set('sourceId', activeSourceId);
         if (activeTag) params.set('tag', activeTag);
@@ -169,7 +157,6 @@ export function YoutubeFeed() {
 
         const data = await res.json();
         setItems((prev) => (reset ? data.items : [...prev, ...data.items]));
-        // pinnedItems only returned on first page of Saved tab
         if (reset) setPinnedItems(data.pinnedItems ?? []);
         setCursor(data.nextCursor);
         setHasMore(data.hasMore);
@@ -181,33 +168,28 @@ export function YoutubeFeed() {
     [tab, status, activeSourceId, activeTag, searchQuery, isFeedTab],
   );
 
-  // Initial load
   useEffect(() => {
     fetchSources();
   }, [fetchSources]);
 
-  // Reload on filter change
   useEffect(() => {
     if (fetchedKeyRef.current === queryKey) return;
     fetchedKeyRef.current = queryKey;
     setItems([]);
     setCursor(null);
     exitSelectMode();
-    fetchItems({ reset: true });
+    fetchItems({reset: true});
   }, [queryKey, fetchItems, exitSelectMode]);
 
-  // Infinite scroll — shared hook reads latest fetchItems via ref internally.
   const {sentinelRef} = useInfiniteScroll({
     hasMore,
     loading: loadingMore || loading,
     onLoadMore: () => {
-      if (cursor) fetchItems({ reset: false, nextCursor: cursor });
+      if (cursor) fetchItems({reset: false, nextCursor: cursor});
     },
     rootMargin: '200px',
   });
 
-  // URL update helper — uses the shared filter sync hook, then invalidates
-  // the refetch tracker so the next `useEffect(queryKey)` run refetches.
   const updateFilter = useCallback(
     (updates: Record<string, string | null>) => {
       fetchedKeyRef.current = null;
@@ -216,25 +198,24 @@ export function YoutubeFeed() {
     [updateFilterBase],
   );
 
-  // Stable ref for updateFilter (avoid stale closure in debounce timer)
   const updateFilterRef = useRef(updateFilter);
-  useEffect(() => { updateFilterRef.current = updateFilter; }, [updateFilter]);
+  useEffect(() => {
+    updateFilterRef.current = updateFilter;
+  }, [updateFilter]);
 
-  // Search handlers
   const handleSearchChange = useCallback((v: string) => {
     setLocalSearch(v);
     clearTimeout(searchTimerRef.current);
-    searchTimerRef.current = setTimeout(() => updateFilterRef.current({ search: v || null }), 300);
+    searchTimerRef.current = setTimeout(() => updateFilterRef.current({search: v || null}), 300);
   }, []);
 
   const handleSearchClear = useCallback(() => {
     setLocalSearch('');
-    updateFilter({ search: null });
+    updateFilter({search: null});
   }, [updateFilter]);
 
-  // Tab switch handler — reset all sub-filters + cancel pending search debounce
   const handleTabSwitch = useCallback(
-    (newTab: Tab) => {
+    (newTab: YoutubeTab) => {
       clearTimeout(searchTimerRef.current);
       updateFilter({
         tab: newTab,
@@ -248,32 +229,33 @@ export function YoutubeFeed() {
   );
 
   const handleStatusSwitch = useCallback(
-    (newStatus: Status) => {
-      updateFilter({ status: newStatus });
+    (newStatus: YoutubeStatus) => {
+      updateFilter({status: newStatus});
     },
     [updateFilter],
   );
 
-  // Handlers
   const handleAddSource = async (channelUrl: string) => {
     const res = await fetch('/api/youtube/sources', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ channelUrl }),
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({channelUrl}),
     });
     if (!res.ok) {
       let message = '등록 실패';
       try {
         const data = await res.json();
         message = data.error || message;
-      } catch { /* */ }
+      } catch {
+        /* */
+      }
       throw new Error(message);
     }
     await fetchSources();
   };
 
   const handleDeleteSource = async (id: string) => {
-    const res = await fetch(`/api/youtube/sources/${id}`, { method: 'DELETE' });
+    const res = await fetch(`/api/youtube/sources/${id}`, {method: 'DELETE'});
     if (res.ok) {
       setSources((prev) => prev.filter((s) => s.id !== id));
     }
@@ -288,40 +270,45 @@ export function YoutubeFeed() {
     setCollectActive(false);
     fetchedKeyRef.current = null;
     if (isCreateTab) {
-      fetchItems({ reset: true });
+      fetchItems({reset: true});
     } else {
       handleTabSwitch('create');
     }
   };
 
-  // Stable refs for items/pinnedItems (avoid stale closure in handlers passed to note'd cards)
+  // Refs for items/pinnedItems (stale-closure safety)
   const itemsRef = useRef(items);
   const pinnedItemsRef = useRef(pinnedItems);
-  useEffect(() => { itemsRef.current = items; }, [items]);
-  useEffect(() => { pinnedItemsRef.current = pinnedItems; }, [pinnedItems]);
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
+  useEffect(() => {
+    pinnedItemsRef.current = pinnedItems;
+  }, [pinnedItems]);
 
-  const handleSelect = useCallback((id: string) => {
-    toggleSelectedId(id);
-  }, [toggleSelectedId]);
+  const handleSelect = useCallback(
+    (id: string) => {
+      toggleSelectedId(id);
+    },
+    [toggleSelectedId],
+  );
 
-  // Click: summarized → detail page + mark read, others → YouTube + mark read
   const handleCardClick = useCallback(
     async (id: string) => {
-      const item = itemsRef.current.find((i) => i.id === id);
+      const item =
+        itemsRef.current.find((i) => i.id === id) ?? pinnedItemsRef.current.find((i) => i.id === id);
       if (!item) return;
 
       if (!item.isRead) {
-        setItems((prev) =>
-          prev.map((i) => (i.id === id ? { ...i, isRead: true } : i)),
-        );
+        setItems((prev) => prev.map((i) => (i.id === id ? {...i, isRead: true} : i)));
+        setPinnedItems((prev) => prev.map((i) => (i.id === id ? {...i, isRead: true} : i)));
         fetch(`/api/youtube/${id}`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ isRead: true }),
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({isRead: true}),
         }).catch(() => {
-          setItems((prev) =>
-            prev.map((i) => (i.id === id ? { ...i, isRead: false } : i)),
-          );
+          setItems((prev) => prev.map((i) => (i.id === id ? {...i, isRead: false} : i)));
+          setPinnedItems((prev) => prev.map((i) => (i.id === id ? {...i, isRead: false} : i)));
         });
       }
 
@@ -337,13 +324,12 @@ export function YoutubeFeed() {
   );
 
   const handleToggleBookmark = useCallback(async (id: string) => {
-    const item = itemsRef.current.find((i) => i.id === id);
+    const item =
+      itemsRef.current.find((i) => i.id === id) ?? pinnedItemsRef.current.find((i) => i.id === id);
     if (!item) return;
 
     if (!item.isBookmarked) {
-      setItems((prev) =>
-        prev.map((i) => (i.id === id ? {...i, isBookmarked: true} : i)),
-      );
+      setItems((prev) => prev.map((i) => (i.id === id ? {...i, isBookmarked: true} : i)));
       try {
         const res = await fetch(`/api/youtube/${id}`, {
           method: 'PATCH',
@@ -352,15 +338,15 @@ export function YoutubeFeed() {
         });
         if (!res.ok) throw new Error();
       } catch {
-        setItems((prev) =>
-          prev.map((i) => (i.id === id ? {...i, isBookmarked: false} : i)),
-        );
+        setItems((prev) => prev.map((i) => (i.id === id ? {...i, isBookmarked: false} : i)));
       }
       return;
     }
 
-    // Unbookmarking also unpins (server mirrors this invariant)
-    const prevPinnedAt = item.pinnedAt;
+    // Unbookmark — also unpins (server mirrors). Snapshot both lists so a
+    // failed request restores the pinned entry at its original position.
+    const prevPinnedItems = pinnedItemsRef.current;
+    const prevItems = itemsRef.current;
     setPinnedItems((prev) => prev.filter((i) => i.id !== id));
     setItems((prev) =>
       prev.map((i) => (i.id === id ? {...i, isBookmarked: false, pinnedAt: null} : i)),
@@ -373,16 +359,14 @@ export function YoutubeFeed() {
       });
       if (!res.ok) throw new Error();
     } catch {
-      setItems((prev) =>
-        prev.map((i) => (i.id === id ? {...i, isBookmarked: true, pinnedAt: prevPinnedAt} : i)),
-      );
+      setPinnedItems(prevPinnedItems);
+      setItems(prevItems);
     }
   }, []);
 
   const handleMemoChange = useCallback(async (id: string, note: string | null) => {
     const item =
-      itemsRef.current.find((i) => i.id === id) ??
-      pinnedItemsRef.current.find((i) => i.id === id);
+      itemsRef.current.find((i) => i.id === id) ?? pinnedItemsRef.current.find((i) => i.id === id);
     const prevMemo = item?.note ?? null;
     const wasBookmarked = item?.isBookmarked ?? false;
 
@@ -409,15 +393,15 @@ export function YoutubeFeed() {
   }, []);
 
   const handleTogglePin = useCallback(async (id: string, nextPinned: boolean) => {
-    if (nextPinned && pinnedItemsRef.current.length >= MAX_PINNED &&
-        !pinnedItemsRef.current.some((p) => p.id === id)) {
+    if (
+      nextPinned &&
+      pinnedItemsRef.current.length >= MAX_PINNED &&
+      !pinnedItemsRef.current.some((p) => p.id === id)
+    ) {
       return;
     }
     const nowIso = new Date().toISOString();
 
-    // Precise rollback: snapshot previous state before optimistic mutation.
-    // Matches the pattern used by handleToggleBookmark / handleMemoChange so
-    // failure cannot leave items + pinnedItems in a partially-reconciled state.
     const prevItems = itemsRef.current;
     const prevPinnedItems = pinnedItemsRef.current;
 
@@ -425,17 +409,17 @@ export function YoutubeFeed() {
       const source = itemsRef.current.find((i) => i.id === id);
       if (source) {
         setItems((prev) => prev.filter((i) => i.id !== id));
-        setPinnedItems((prev) => [{ ...source, pinnedAt: nowIso, isBookmarked: true }, ...prev]);
+        setPinnedItems((prev) => [{...source, pinnedAt: nowIso, isBookmarked: true}, ...prev]);
       } else {
         setPinnedItems((prev) =>
-          prev.map((i) => i.id === id ? { ...i, pinnedAt: nowIso } : i)
+          prev.map((i) => (i.id === id ? {...i, pinnedAt: nowIso} : i)),
         );
       }
     } else {
       const source = pinnedItemsRef.current.find((i) => i.id === id);
       if (source) {
         setPinnedItems((prev) => prev.filter((i) => i.id !== id));
-        setItems((prev) => [{ ...source, pinnedAt: null }, ...prev]);
+        setItems((prev) => [{...source, pinnedAt: null}, ...prev]);
       }
     }
 
@@ -447,7 +431,6 @@ export function YoutubeFeed() {
       });
       if (!res.ok) throw new Error();
     } catch {
-      // Restore both lists atomically to the pre-mutation snapshot.
       setItems(prevItems);
       setPinnedItems(prevPinnedItems);
     }
@@ -456,23 +439,21 @@ export function YoutubeFeed() {
   const handleSummarize = async () => {
     if (selectedIds.size === 0) return;
     setSummarizing(true);
-    setSummarizeProgress({ total: selectedIds.size, results: [] });
+    setSummarizeProgress({total: selectedIds.size, results: []});
 
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
 
     setItems((prev) =>
-      prev.map((item) =>
-        selectedIds.has(item.id) ? { ...item, status: 'summarizing' } : item,
-      ),
+      prev.map((item) => (selectedIds.has(item.id) ? {...item, status: 'summarizing'} : item)),
     );
 
     try {
       const res = await fetch('/api/youtube/summarize', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ itemIds: Array.from(selectedIds) }),
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({itemIds: Array.from(selectedIds)}),
         signal: controller.signal,
       });
 
@@ -481,10 +462,10 @@ export function YoutubeFeed() {
         const decoder = new TextDecoder();
 
         while (true) {
-          const { done, value } = await reader.read();
+          const {done, value} = await reader.read();
           if (done) break;
 
-          const text = decoder.decode(value, { stream: true });
+          const text = decoder.decode(value, {stream: true});
           for (const line of text.split('\n')) {
             if (line.startsWith('data: ')) {
               try {
@@ -493,12 +474,9 @@ export function YoutubeFeed() {
                   const uiStatus = data.status === 'failed' ? 'collected' : data.status;
                   setItems((prev) =>
                     prev.map((item) =>
-                      item.videoId === data.videoId
-                        ? { ...item, status: uiStatus }
-                        : item,
+                      item.videoId === data.videoId ? {...item, status: uiStatus} : item,
                     ),
                   );
-                  // Update progress tracker
                   if (data.status === 'summarized' || data.status === 'failed') {
                     setSummarizeProgress((prev) =>
                       prev
@@ -518,7 +496,9 @@ export function YoutubeFeed() {
                     );
                   }
                 }
-              } catch { /* */ }
+              } catch {
+                /* */
+              }
             }
           }
         }
@@ -530,13 +510,17 @@ export function YoutubeFeed() {
     }
   };
 
-  const handleDeleteItem = useCallback(async (id: string) => {
-    const res = await fetch(`/api/youtube/${id}`, { method: 'DELETE' });
-    if (res.ok || res.status === 204) {
-      setItems((prev) => prev.filter((i) => i.id !== id));
-      deselectId(id);
-    }
-  }, [deselectId]);
+  const handleDeleteItem = useCallback(
+    async (id: string) => {
+      const res = await fetch(`/api/youtube/${id}`, {method: 'DELETE'});
+      if (res.ok || res.status === 204) {
+        setItems((prev) => prev.filter((i) => i.id !== id));
+        setPinnedItems((prev) => prev.filter((i) => i.id !== id));
+        deselectId(id);
+      }
+    },
+    [deselectId],
+  );
 
   const handleBulkDelete = async () => {
     if (selectedIds.size === 0) return;
@@ -549,6 +533,7 @@ export function YoutubeFeed() {
       });
       if (res.ok) {
         setItems((prev) => prev.filter((i) => !selectedIds.has(i.id)));
+        setPinnedItems((prev) => prev.filter((i) => !selectedIds.has(i.id)));
         exitSelectMode();
       }
     } finally {
@@ -556,9 +541,6 @@ export function YoutubeFeed() {
       setShowBulkDelete(false);
     }
   };
-
-  const [bulkUnreading, setBulkUnreading] = useState(false);
-  const [showBulkUnread, setShowBulkUnread] = useState(false);
 
   const handleBulkMarkUnread = async () => {
     if (selectedIds.size === 0) return;
@@ -582,19 +564,45 @@ export function YoutubeFeed() {
   const handleDeleteRequest = useCallback((id: string) => {
     setDeleteTarget(
       itemsRef.current.find((i) => i.id === id) ??
-      pinnedItemsRef.current.find((i) => i.id === id) ??
-      null
+        pinnedItemsRef.current.find((i) => i.id === id) ??
+        null,
     );
   }, []);
 
-  // Source tag map for card display
-  const sourceTagMap = useMemo(() => new Map(sources.map((s) => [s.id, s.tags ?? []])), [sources]);
-  const pinLocked = pinnedItems.length >= MAX_PINNED;
+  const getSourceTag = useCallback(
+    (sourceId: string | null): string | null => {
+      if (!sourceId) return null;
+      const tags = sourceTagMap.get(sourceId);
+      return tags && tags.length > 0 ? tags[0]! : null;
+    },
+    [sourceTagMap],
+  );
+
+  const isEmpty = items.length === 0 && pinnedItems.length === 0;
+
+  // Editorial empty-state copy
+  const emptyCopy = (() => {
+    if (isCreateTab) {
+      return {
+        eyebrow: 'Nothing here',
+        title: '수집된 영상이 없어요.',
+        hint: sources.length === 0 ? '우측 Sources 버튼으로 채널을 등록해보세요.' : '기간을 선택하고 Collect 를 눌러보세요.',
+      };
+    }
+    if (status === 'unread') return {eyebrow: 'Nothing here', title: '안읽은 요약이 없어요.', hint: 'Collect 탭에서 영상을 요약해보세요.'};
+    if (status === 'read') return {eyebrow: 'Nothing here', title: '읽은 요약이 없어요.', hint: null};
+    if (status === 'bookmarked') return {eyebrow: 'Nothing here', title: '북마크한 영상이 없어요.', hint: null};
+    return {eyebrow: 'Nothing here', title: '영상이 없어요.', hint: null};
+  })();
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto space-y-5 pb-24">
-      {/* ── Main tabs — underline editorial nav ── */}
-      <div role="tablist" aria-label="유튜브 모드" className="flex items-center gap-6 border-b border-border overflow-x-auto scrollbar-hide">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto space-y-6 pb-24">
+      {/* ── Main tabs (Feed / Collect) ── */}
+      <div
+        role="tablist"
+        aria-label="유튜브 모드"
+        className="flex items-center gap-6 border-b border-border overflow-x-auto scrollbar-hide"
+      >
         {MAIN_TABS.map(({value, label}) => {
           const isActive = tab === value;
           return (
@@ -619,86 +627,100 @@ export function YoutubeFeed() {
         })}
       </div>
 
-      {/* ── Feed tab: search (hairline) ── */}
-      {isFeedTab && (
-        <div className="relative">
-          <Search
-            className="absolute left-0 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground"
-            aria-hidden="true"
-          />
-          <input
-            type="text"
-            value={localSearch}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            placeholder="Search videos…"
-            maxLength={100}
-            aria-label="영상 검색"
-            className={cn(
-              'w-full h-10 pl-6 pr-7 bg-transparent',
-              'border-b border-border',
-              'text-base placeholder:text-muted-foreground',
-              'focus:outline-none focus:border-primary',
-              'transition-colors',
-            )}
-          />
-          {localSearch && (
-            <button
-              type="button"
-              onClick={handleSearchClear}
-              className="absolute right-0 top-1/2 -translate-y-1/2 p-0.5 rounded-full text-muted-foreground hover:text-primary transition-colors"
-              aria-label="검색어 지우기"
-            >
-              <X className="h-3.5 w-3.5" aria-hidden="true" />
-            </button>
-          )}
-        </div>
-      )}
 
-      {/* ── Feed tab: status filter (mono em-dash tabs) + select button ── */}
-      {isFeedTab && (
-        <div className="flex items-center justify-between gap-3">
-          <div role="tablist" aria-label="상태" className="flex items-center gap-5">
-            {STATUS_TABS.map(({value, label}) => {
-              const isActive = status === value;
-              return (
+      {/* ── Filter bar ── */}
+      <YoutubeFilterBar
+        tab={tab}
+        availableTags={availableTags}
+        activeTag={activeTag}
+        onTagChange={(t) => updateFilter({tag: t || null})}
+        status={isFeedTab ? status : undefined}
+        onStatusChange={isFeedTab ? handleStatusSwitch : undefined}
+        period={isCreateTab ? collectPeriod : undefined}
+        onPeriodChange={isCreateTab ? setCollectPeriod : undefined}
+        onStartCollect={isCreateTab ? handleStartCollect : undefined}
+        canCollect={sources.length > 0}
+        isCollecting={collectActive}
+        search={isFeedTab ? localSearch : undefined}
+        onSearchChange={isFeedTab ? handleSearchChange : undefined}
+        onSearchClear={isFeedTab ? handleSearchClear : undefined}
+        favoriteSources={favoriteSources.map((s) => ({id: s.id, channelName: s.channelName}))}
+        activeSourceId={activeSourceId}
+        onSourceIdChange={(id) => updateFilter({sourceId: id || null})}
+        feedStatusActions={
+          isFeedTab && (
+            <>
+              {!loading && items.length > 0 && (
                 <button
-                  key={value}
                   type="button"
-                  role="tab"
-                  aria-selected={isActive}
-                  onClick={() => handleStatusSwitch(value)}
+                  onClick={toggleSelectMode}
                   className={cn(
-                    'font-mono text-[11px] uppercase tracking-[0.1em] transition-colors cursor-pointer',
-                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm',
-                    isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
+                    'shrink-0 font-mono text-[11px] uppercase tracking-[0.08em] transition-colors cursor-pointer',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-sm px-1',
+                    selectMode ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
                   )}
                 >
-                  {isActive && (
-                    <span className="mr-1.5" aria-hidden="true">—</span>
-                  )}
-                  {label}
+                  {selectMode ? 'Cancel' : 'Select'}
                 </button>
-              );
-            })}
-          </div>
-          {!loading && items.length > 0 && (
-            <button
-              type="button"
-              onClick={toggleSelectMode}
-              className={cn(
-                'shrink-0 font-mono text-[11px] uppercase tracking-[0.08em] transition-colors cursor-pointer',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-sm',
-                selectMode ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
               )}
-            >
-              {selectMode ? 'Cancel' : 'Select'}
-            </button>
-          )}
-        </div>
+              <button
+                type="button"
+                onClick={() => setShowAddUrl(true)}
+                className="p-1.5 rounded-md border border-border text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                aria-label="YouTube URL 직접 추가"
+              >
+                <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+              <YoutubeSourceBar
+                sources={sources}
+                onAdd={handleAddSource}
+                onDelete={handleDeleteSource}
+                onUpdate={fetchSources}
+                compact
+              />
+            </>
+          )
+        }
+        collectRowActions={
+          isCreateTab && !collectActive && (
+            <>
+              {!loading && items.length > 0 && (
+                <button
+                  type="button"
+                  onClick={toggleSelectMode}
+                  className={cn(
+                    'shrink-0 font-mono text-[11px] uppercase tracking-[0.08em] transition-colors cursor-pointer',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-sm px-1',
+                    selectMode ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  {selectMode ? 'Cancel' : 'Select'}
+                </button>
+              )}
+              <YoutubeSourceBar
+                sources={sources}
+                onAdd={handleAddSource}
+                onDelete={handleDeleteSource}
+                onUpdate={fetchSources}
+                compact
+              />
+            </>
+          )
+        }
+      />
+
+      {/* ── Collect SSE in-flight ── */}
+      {isCreateTab && collectActive && (
+        <CollectProgress
+          sourceIds={sources.filter((s) => s.isActive).map((s) => s.id)}
+          period={collectPeriod}
+          onComplete={handleCollectComplete}
+          onClose={() => setCollectActive(false)}
+        />
       )}
 
-      {/* ── Feed tab: select mode bar (editorial hairline) ── */}
-      {isFeedTab && selectMode && (
+      {/* ── Select mode action bar (editorial hairline) ── */}
+      {selectMode && (
         <div className="flex items-center justify-between gap-3 pb-3 border-b border-border">
           <div className="flex items-baseline gap-4">
             <button
@@ -713,12 +735,35 @@ export function YoutubeFeed() {
               aria-live="polite"
               aria-atomic="true"
             >
-              <span className="text-primary" aria-hidden="true">—</span> {selectedIds.size} selected
+              <span className="text-primary" aria-hidden="true">—</span>{' '}
+              {selectedIds.size > 0
+                ? `${selectedIds.size} selected`
+                : isCreateTab
+                  ? '요약할 영상을 선택하세요'
+                  : '선택한 항목 없음'}
             </span>
           </div>
           {selectedIds.size > 0 && (
             <div className="flex items-center gap-2">
-              {status === 'read' && (
+              {isCreateTab && (
+                <Button
+                  size="sm"
+                  onClick={handleSummarize}
+                  disabled={summarizing || selectedIds.size > YOUTUBE_SUMMARIZE_BATCH_MAX}
+                >
+                  {summarizing ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-1.5" aria-hidden="true" />
+                      요약 중…
+                    </>
+                  ) : selectedIds.size > YOUTUBE_SUMMARIZE_BATCH_MAX ? (
+                    `최대 ${YOUTUBE_SUMMARIZE_BATCH_MAX}개`
+                  ) : (
+                    `${selectedIds.size}개 요약`
+                  )}
+                </Button>
+              )}
+              {isFeedTab && status === 'read' && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -726,7 +771,7 @@ export function YoutubeFeed() {
                   disabled={bulkUnreading}
                 >
                   <MailX className="h-4 w-4 mr-1.5" aria-hidden="true" />
-                  Mark unread
+                  {bulkUnreading ? '이동 중…' : '안읽음으로'}
                 </Button>
               )}
               <Button
@@ -735,216 +780,25 @@ export function YoutubeFeed() {
                 onClick={() => setShowBulkDelete(true)}
                 disabled={bulkDeleting}
               >
-                <Trash2 className="h-4 w-4 mr-1.5" aria-hidden="true" />
-                Delete
-              </Button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── 생성 탭: 소스 관리 + 수집 ── */}
-      {isCreateTab && (
-        <>
-          <YoutubeSourceBar
-            sources={sources}
-            onAdd={handleAddSource}
-            onDelete={handleDeleteSource}
-            onUpdate={fetchSources}
-          />
-
-          {!collectActive && (
-            <div className="flex items-center gap-5">
-              <div role="radiogroup" aria-label="수집 기간" className="flex items-center gap-4">
-                {PERIODS.map((p) => {
-                  const isActive = collectPeriod === p.value;
-                  return (
-                    <button
-                      key={p.value}
-                      type="button"
-                      role="radio"
-                      aria-checked={isActive}
-                      onClick={() => setCollectPeriod(p.value)}
-                      className={cn(
-                        'font-mono text-[11px] uppercase tracking-[0.1em] transition-colors cursor-pointer',
-                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-sm',
-                        isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
-                      )}
-                    >
-                      {isActive && <span className="mr-1.5" aria-hidden="true">—</span>}
-                      {p.label}
-                    </button>
-                  );
-                })}
-              </div>
-              <Button
-                size="sm"
-                onClick={handleStartCollect}
-                disabled={sources.length === 0}
-                className="gap-1.5"
-              >
-                <Download className="h-3.5 w-3.5" aria-hidden="true" />
-                Collect
-              </Button>
-              {!loading && items.length > 0 && (
-                <button
-                  type="button"
-                  onClick={toggleSelectMode}
-                  className={cn(
-                    'ml-auto shrink-0 font-mono text-[11px] uppercase tracking-[0.08em] transition-colors cursor-pointer',
-                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-sm',
-                    selectMode ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
-                  )}
-                >
-                  {selectMode ? 'Cancel' : 'Select'}
-                </button>
-              )}
-            </div>
-          )}
-
-          {collectActive && (
-            <CollectProgress
-              sourceIds={sources.filter((s) => s.isActive).map((s) => s.id)}
-              period={collectPeriod}
-              onComplete={handleCollectComplete}
-              onClose={() => setCollectActive(false)}
-            />
-          )}
-        </>
-      )}
-
-      {/* ── Favorites bar (editorial sm chips) ── */}
-      {favoriteSources.length > 0 && (
-        <div className="flex items-center gap-1.5 overflow-x-auto overflow-y-visible scrollbar-none pb-0.5">
-          {favoriteSources.map((source) => {
-            const active = activeSourceId === source.id;
-            return (
-              <button
-                key={source.id}
-                type="button"
-                onClick={() =>
-                  updateFilter({ sourceId: active ? null : source.id })
-                }
-                className={cn(
-                  'inline-flex items-center gap-1.5 shrink-0 rounded-sm px-2.5 py-1.5 text-xs',
-                  'transition-colors cursor-pointer border',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
-                  active
-                    ? 'bg-primary/10 text-primary border-primary/40'
-                    : 'bg-background text-muted-foreground border-border hover:text-foreground hover:border-muted-foreground',
-                )}
-              >
-                <Star className="h-3 w-3 fill-current" aria-hidden="true" />
-                <span className="max-w-[100px] truncate">{source.channelName}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {(allTags.length > 0 || isFeedTab) && (
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-5 overflow-x-auto overflow-y-visible scrollbar-none">
-            {TAG_OPTIONS.filter((t) => allTags.includes(t.value)).map((tagOpt) => {
-              const isActive = activeTag === tagOpt.value;
-              return (
-                <button
-                  key={tagOpt.value}
-                  type="button"
-                  onClick={() =>
-                    updateFilter({ tag: isActive ? null : tagOpt.value })
-                  }
-                  className={cn(
-                    'shrink-0 font-mono text-[11px] uppercase tracking-[0.1em] transition-colors cursor-pointer',
-                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-sm',
-                    isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
-                  )}
-                >
-                  {isActive && <span className="mr-1.5" aria-hidden="true">—</span>}
-                  {tagOpt.label}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* URL 직접 추가 — 우측 액센트 */}
-          {isFeedTab && (
-            <button
-              type="button"
-              onClick={() => setShowAddUrl(true)}
-              className={cn(
-                'shrink-0 inline-flex items-center justify-center',
-                'h-7 w-7 rounded-sm border border-border text-muted-foreground',
-                'hover:text-primary hover:border-primary transition-colors cursor-pointer',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
-              )}
-              aria-label="YouTube URL 직접 추가"
-            >
-              <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* ── Create tab: select mode bar ── */}
-      {isCreateTab && selectMode && (
-        <div className="space-y-3 pb-3 border-b border-border">
-          <div className="flex items-baseline justify-between gap-3">
-            <div className="flex items-baseline gap-4">
-              <button
-                type="button"
-                onClick={() => toggleSelectAll(items.map((i) => i.id))}
-                className="font-mono text-[11px] uppercase tracking-[0.1em] text-primary hover:text-primary/80 transition-colors cursor-pointer"
-              >
-                {selectedIds.size === items.length ? 'Clear all' : 'Select all'}
-              </button>
-              <span
-                className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground"
-                aria-live="polite"
-                aria-atomic="true"
-              >
-                <span className="text-primary" aria-hidden="true">—</span>{' '}
-                {selectedIds.size > 0 ? `${selectedIds.size} selected` : '요약할 영상을 선택하세요'}
-              </span>
-            </div>
-          </div>
-
-          {selectedIds.size > 0 && (
-            <div className="flex gap-2">
-              <Button
-                onClick={handleSummarize}
-                disabled={summarizing || selectedIds.size > YOUTUBE_SUMMARIZE_BATCH_MAX}
-                className="flex-1 gap-1.5"
-              >
-                {summarizing ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                    요약 중…
-                  </>
-                ) : selectedIds.size > YOUTUBE_SUMMARIZE_BATCH_MAX ? (
-                  `최대 ${YOUTUBE_SUMMARIZE_BATCH_MAX}개까지 요약 가능`
+                {bulkDeleting ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-1.5" aria-hidden="true" />
                 ) : (
-                  `선택한 ${selectedIds.size}개 요약하기`
+                  <Trash2 className="h-4 w-4 mr-1.5" aria-hidden="true" />
                 )}
-              </Button>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => setShowBulkDelete(true)}
-                disabled={bulkDeleting}
-                className="shrink-0"
-              >
-                <Trash2 className="h-4 w-4 mr-1.5" aria-hidden="true" />
-                Delete
+                {bulkDeleting ? '삭제 중…' : '삭제'}
               </Button>
             </div>
           )}
         </div>
       )}
 
-      {/* ── 요약 진행 상황 ── */}
+      {/* ── Summarize progress ── */}
       {summarizeProgress && (
-        <div className="rounded-lg border border-border bg-card p-4 space-y-3" role="status" aria-live="polite">
+        <div
+          className="rounded-lg border border-border bg-card p-4 space-y-3"
+          role="status"
+          aria-live="polite"
+        >
           <div className="flex items-center justify-between">
             <p className="text-sm font-medium">
               {summarizing
@@ -957,7 +811,7 @@ export function YoutubeFeed() {
                 onClick={() => {
                   setSummarizeProgress(null);
                   fetchedKeyRef.current = null;
-                  fetchItems({ reset: true });
+                  fetchItems({reset: true});
                 }}
                 className="text-xs text-muted-foreground hover:text-foreground cursor-pointer"
               >
@@ -966,22 +820,26 @@ export function YoutubeFeed() {
             )}
           </div>
 
-          {/* Progress bar */}
           <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
             <div
               className="h-full rounded-full bg-primary transition-all duration-300"
-              style={{ width: `${(summarizeProgress.results.length / summarizeProgress.total) * 100}%` }}
+              style={{
+                width: `${(summarizeProgress.results.length / summarizeProgress.total) * 100}%`,
+              }}
             />
           </div>
 
-          {/* Individual results */}
           <div className="space-y-1.5">
             {summarizeProgress.results.map((r) => (
               <div key={r.videoId} className="flex items-start gap-2 text-xs">
                 {r.status === 'summarized' ? (
-                  <span className="shrink-0 mt-0.5 h-4 w-4 rounded-full bg-emerald-500/20 text-emerald-600 flex items-center justify-center text-[10px]">✓</span>
+                  <span className="shrink-0 mt-0.5 h-4 w-4 rounded-full bg-emerald-500/20 text-emerald-600 flex items-center justify-center text-[10px]">
+                    ✓
+                  </span>
                 ) : (
-                  <span className="shrink-0 mt-0.5 h-4 w-4 rounded-full bg-destructive/20 text-destructive flex items-center justify-center text-[10px]">✕</span>
+                  <span className="shrink-0 mt-0.5 h-4 w-4 rounded-full bg-destructive/20 text-destructive flex items-center justify-center text-[10px]">
+                    ✕
+                  </span>
                 )}
                 <div className="min-w-0">
                   <p className="truncate text-foreground">{r.title}</p>
@@ -995,27 +853,21 @@ export function YoutubeFeed() {
         </div>
       )}
 
-      {/* ── Feed ── */}
+      {/* ── Feed body ── */}
       {loading ? (
-        <div className="flex justify-center py-8">
-          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" aria-hidden="true" />
-        </div>
-      ) : items.length === 0 && pinnedItems.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 py-16 text-muted-foreground">
-          <p className="text-sm">
-            {isFeedTab && status === 'unread' && '안읽은 요약이 없어요'}
-            {isFeedTab && status === 'read' && '읽은 요약이 없어요'}
-            {isFeedTab && status === 'bookmarked' && '북마크한 영상이 없어요'}
-            {isCreateTab && '수집된 영상이 없어요'}
+        <YoutubeFeedSkeleton tab={tab} />
+      ) : isEmpty ? (
+        <div className="flex flex-col items-center justify-center min-h-[40vh] text-center max-w-sm mx-auto">
+          <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-3">
+            <span className="text-primary" aria-hidden="true">—</span> {emptyCopy.eyebrow}
           </p>
-          <p className="text-xs">
-            {isFeedTab && status === 'unread' && '생성 탭에서 영상을 수집하고 요약해보세요'}
-            {isFeedTab && status === 'read' && '안읽음 탭에서 요약을 읽으면 여기에 표시돼요'}
-            {isFeedTab && status === 'bookmarked' && '마음에 드는 영상을 북마크해보세요'}
-            {isCreateTab && '채널을 추가하고 영상을 수집해보세요'}
-          </p>
+          <p className="font-display text-2xl leading-snug text-foreground">{emptyCopy.title}</p>
+          {emptyCopy.hint && (
+            <p className="mt-3 text-sm text-muted-foreground leading-relaxed">{emptyCopy.hint}</p>
+          )}
         </div>
       ) : isBookmarkStatus ? (
+        // Saved tab: pinned grid + masonry
         <>
           {pinnedItems.length > 0 && (
             <section className="mb-10">
@@ -1023,14 +875,15 @@ export function YoutubeFeed() {
                 eyebrow={`Pinned · ${pinnedItems.length}/${MAX_PINNED}`}
                 title="자주 돌아보는 것"
               />
-              <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 items-start gap-4">
+              <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 items-start gap-6">
                 {pinnedItems.map((item) => (
                   <YoutubeCard
                     key={item.id}
                     item={item}
                     selected={selectedIds.has(item.id)}
-                    onSelect={selectMode ? handleSelect : undefined}
-                    onClick={selectMode ? undefined : handleCardClick}
+                    selectMode={selectMode}
+                    onSelect={handleSelect}
+                    onClick={handleCardClick}
                     onDelete={handleDeleteRequest}
                     onToggleBookmark={handleToggleBookmark}
                     onMemoChange={handleMemoChange}
@@ -1038,26 +891,29 @@ export function YoutubeFeed() {
                     pinLocked={false}
                     savedVariant
                     showMemo
-                    sourceTags={item.sourceId ? sourceTagMap.get(item.sourceId) ?? EMPTY_TAGS : EMPTY_TAGS}
+                    sourceTag={getSourceTag(item.sourceId)}
                   />
                 ))}
               </div>
             </section>
           )}
-
           {items.length > 0 && (
             <section>
-              {pinnedItems.length > 0 && (
-                <SectionHeader eyebrow="All saved" title="전체" />
-              )}
-              <div className={`${pinnedItems.length > 0 ? 'mt-5' : ''} columns-1 sm:columns-2 lg:columns-3 gap-4`}>
+              {pinnedItems.length > 0 && <SectionHeader eyebrow="All saved" title="전체" />}
+              <div
+                className={cn(
+                  pinnedItems.length > 0 && 'mt-6',
+                  'columns-1 sm:columns-2 lg:columns-3 gap-6',
+                )}
+              >
                 {items.map((item) => (
-                  <div key={item.id} className="break-inside-avoid mb-4">
+                  <div key={item.id} className="break-inside-avoid mb-6">
                     <YoutubeCard
                       item={item}
                       selected={selectedIds.has(item.id)}
-                      onSelect={selectMode ? handleSelect : undefined}
-                      onClick={selectMode ? undefined : handleCardClick}
+                      selectMode={selectMode}
+                      onSelect={handleSelect}
+                      onClick={handleCardClick}
                       onDelete={handleDeleteRequest}
                       onToggleBookmark={handleToggleBookmark}
                       onMemoChange={handleMemoChange}
@@ -1065,7 +921,7 @@ export function YoutubeFeed() {
                       pinLocked={pinLocked}
                       savedVariant
                       showMemo
-                      sourceTags={item.sourceId ? sourceTagMap.get(item.sourceId) ?? EMPTY_TAGS : EMPTY_TAGS}
+                      sourceTag={getSourceTag(item.sourceId)}
                     />
                   </div>
                 ))}
@@ -1073,20 +929,57 @@ export function YoutubeFeed() {
             </section>
           )}
         </>
+      ) : isFeedTab ? (
+        // Feed tab Unread/Read: mobile grid + desktop hairline list
+        <>
+          <div className="lg:hidden grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-10">
+            {items.map((item) => (
+              <YoutubeCard
+                key={item.id}
+                item={item}
+                selected={selectedIds.has(item.id)}
+                selectMode={selectMode}
+                onSelect={handleSelect}
+                onClick={handleCardClick}
+                onDelete={handleDeleteRequest}
+                onToggleBookmark={handleToggleBookmark}
+                onMemoChange={handleMemoChange}
+                showMemo={showMemo}
+                sourceTag={getSourceTag(item.sourceId)}
+              />
+            ))}
+          </div>
+          <div className="hidden lg:block divide-y divide-border/60">
+            {items.map((item) => (
+              <YoutubeListRow
+                key={item.id}
+                item={item}
+                selected={selectedIds.has(item.id)}
+                selectMode={selectMode}
+                onSelect={handleSelect}
+                onClick={handleCardClick}
+                onDelete={handleDeleteRequest}
+                onToggleBookmark={handleToggleBookmark}
+                onMemoChange={handleMemoChange}
+                showMemo={showMemo}
+                sourceTag={getSourceTag(item.sourceId)}
+              />
+            ))}
+          </div>
+        </>
       ) : (
+        // Collect tab: compact list
         <div className="space-y-2">
           {items.map((item) => (
-            <YoutubeCard
+            <YoutubeCompactRow
               key={item.id}
               item={item}
               selected={selectedIds.has(item.id)}
-              onSelect={selectMode ? handleSelect : undefined}
-              onClick={selectMode ? undefined : handleCardClick}
+              selectMode={selectMode}
+              onSelect={handleSelect}
+              onClick={handleCardClick}
               onDelete={handleDeleteRequest}
-              onToggleBookmark={isFeedTab ? handleToggleBookmark : undefined}
-              onMemoChange={isFeedTab ? handleMemoChange : undefined}
-              showMemo={isFeedTab}
-              sourceTags={item.sourceId ? sourceTagMap.get(item.sourceId) ?? EMPTY_TAGS : EMPTY_TAGS}
+              sourceTag={getSourceTag(item.sourceId)}
             />
           ))}
         </div>
@@ -1101,7 +994,7 @@ export function YoutubeFeed() {
         </div>
       )}
 
-      {/* Single delete confirmation */}
+      {/* Single delete confirm */}
       <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -1127,7 +1020,7 @@ export function YoutubeFeed() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Bulk delete confirmation */}
+      {/* Bulk delete confirm */}
       <AlertDialog open={showBulkDelete} onOpenChange={setShowBulkDelete}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -1148,7 +1041,7 @@ export function YoutubeFeed() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Bulk mark unread confirmation */}
+      {/* Bulk mark unread confirm */}
       <AlertDialog open={showBulkUnread} onOpenChange={setShowBulkUnread}>
         <AlertDialogContent>
           <AlertDialogHeader>

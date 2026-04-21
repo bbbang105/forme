@@ -185,7 +185,7 @@ flowchart LR
 - **크롤링**: Cron/SSE → feedsmith 파싱 → SSRF 방어 → DB 적재
 - **인증**: `React.cache` 기반 `getAuthUser()` — 동일 요청 내 중복 인증 제거
 - **캘린더**: Optimistic updates — 로컬 상태 즉시 반영, 서버 백그라운드 동기화. 데스크톱 2컬럼 (`lg:flex-row` 캘린더 | 상세), 모바일 단일 컬럼. 이벤트 카테고리(아이콘+색상) 지원
-- **피드 UX**: 스와이프 액션 (`useSwipeAction` 훅, axis-lock + 타이머 정리), 키보드 네비 (j/k/o/b, DOM 직접 포커스링), 선택 모드 (일괄 삭제 100개 청크 + 읽음 탭 안읽음 되돌리기, bulk-action API, aria-live 카운트, itemsRef 패턴), 인라인 노트 (읽음+북마크 탭, `ITEM_NOTE_MAX_LENGTH=1000`, key prop 동기화), Saved 핀 고정 (최대 3개, 서버 검증 + 409, 마소너리 뷰)
+- **피드 UX**: 키보드 네비 (j/k/o/b, DOM 직접 포커스링), 선택 모드 (일괄 삭제 100개 청크 + 읽음 탭 안읽음 되돌리기, bulk-action API, aria-live 카운트, itemsRef 패턴), 인라인 노트 (읽음+북마크 탭, `ITEM_NOTE_MAX_LENGTH=1000`, key prop 동기화), Saved 핀 고정 (최대 3개, 서버 검증 + 409, 마소너리 뷰)
 - **유튜브 요약**: 수집과 요약 분리 — RSS로 무료 수집 (videoId 중복 스킵, YouTube Data API v3로 duration 조회 → Shorts/2분 미만 필터) → 선택적 Gemini 요약 (GEMINI_MODEL 환경변수, 영상 길이별 동적 프롬프트, 자막 최대 80K자, Innertube ANDROID client로 자막 추출 (POT 불필요, WEB client는 빈 응답) → description 폴백, summarySource 플래그). URL 직접 추가 (AddUrlDialog → SSE 원스텝 요약, 트랜잭션 delete+insert, cancel 시 orphan 정리). SSE 스트리밍 요약 (api/feed/crawl 패턴), 마크다운 렌더러 `next/dynamic` 지연 로딩, Saved 핀 고정 (최대 3개, 마소너리 뷰), optimistic updates + 에러 롤백, 자막 URL SSRF 방어, 읽음 탭 readAt DESC 정렬, 피드 선택 모드 (일괄 삭제/안읽음 되돌리기), 즐겨찾기 소스 DnD 순서변경
 - **크롤링 중복 방지**: 크로스소스 제목 dedup — 동일 유저의 기존 아이템 제목과 비교 후 중복 스킵 (feedSources join, 100개 청크 조회)
 - **에러 처리**: 모든 (main) 페이지 error.tsx (calendar, feed, memo, video) — `error` prop 로깅, 사용자에게 제네릭 메시지만 표출
