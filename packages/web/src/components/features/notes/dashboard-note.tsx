@@ -27,7 +27,7 @@ export async function DashboardNote() {
           최근 노트
         </CardTitle>
         <Link
-          href="/note"
+          href="/notes"
           className="text-xs text-primary hover:underline flex items-center gap-0.5"
         >
           전체 보기
