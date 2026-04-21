@@ -88,7 +88,7 @@ function Thumbnail({
 }
 
 // ─── Inline Memo (bookmark + read tabs) ─────────────────────────────────
-function InlineMemo({
+function InlineNote({
   itemId,
   initialMemo,
   onMemoChange,
@@ -540,7 +540,7 @@ export const FeedCard = memo(function FeedCard({
 
             {/* Inline note (bookmark / read tabs) */}
             {showMemo && !selectMode && onMemoChange && (
-              <InlineMemo
+              <InlineNote
                 key={item.note ?? ''}
                 itemId={item.id}
                 initialMemo={item.note}
@@ -666,7 +666,7 @@ export const FeedListRow = memo(function FeedListRow({
 
         {/* Inline note (bookmark / read tabs) */}
         {showMemo && !selectMode && onMemoChange && (
-          <InlineMemo
+          <InlineNote
             key={item.note ?? ''}
             itemId={item.id}
             initialMemo={item.note}

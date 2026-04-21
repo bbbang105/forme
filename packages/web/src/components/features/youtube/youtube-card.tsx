@@ -113,7 +113,7 @@ function YoutubeThumbnail({
   );
 }
 
-function InlineMemo({
+function InlineNote({
   itemId,
   initialMemo,
   onMemoChange,
@@ -359,7 +359,7 @@ export const YoutubeCard = memo(function YoutubeCard({
 
         {/* Inline note (bookmark tab) */}
         {showMemo && onMemoChange && (
-          <InlineMemo
+          <InlineNote
             key={item.note ?? ''}
             itemId={item.id}
             initialMemo={item.note}
