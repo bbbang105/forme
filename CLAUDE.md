@@ -180,6 +180,8 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/app/api/feed/bulk-delete/route.ts` | 피드 일괄 삭제 (POST, max 100개, UUID 전수 검증) |
 | `packages/web/src/app/api/feed/bulk-action/route.ts` | 피드 일괄 액션 (mark_unread/delete, max 100개, ownership join 검증) |
 | `packages/web/src/hooks/use-swipe-action.ts` | 터치 스와이프 제스처 훅 (axis-lock, damped swipe, ref 기반 콜백, 타이머 cleanup) |
+| `packages/web/src/hooks/use-bulk-selection.ts` | 공통 선택 모드 훅 (selectMode + Set<id>, toggle/deselect/toggleSelectAll(ids)/exitSelectMode, feed-list + youtube-feed 공유) |
+| `packages/web/src/lib/types/saved-item.ts` | `SavedItemBase` 공통 interface — FeedItemData / YoutubeItemData 가 extends (id/sourceId/title/description/thumbnailUrl/publishedAt/isRead/isBookmarked/note/pinnedAt 10필드) |
 | `packages/web/src/lib/format-time.ts` | 공유 시간 포맷 유틸 (formatTime, formatDuration) |
 | `packages/web/src/lib/constants.ts` | 앱 전역 상수 (페이지네이션, 제한값, SW 재시도 설정) |
 | `packages/web/src/components/ui/list-skeleton.tsx` | 공유 목록 스켈레톤 (role="status", aria-busy, count/showThumbnail props) |
