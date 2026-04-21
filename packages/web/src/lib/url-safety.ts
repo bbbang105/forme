@@ -13,9 +13,21 @@ export function isSafeUrl(raw: string): boolean {
   // Strip brackets from IPv6 hostname (URL parser wraps IPv6 in [])
   const host = u.hostname.toLowerCase().replace(/^\[|\]$/g, '');
 
-  // Normalize IPv4-mapped IPv6 (e.g. ::ffff:127.0.0.1 → 127.0.0.1)
-  const ipv4Mapped = host.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
-  const normalized = ipv4Mapped ? ipv4Mapped[1] : host;
+  // Normalize IPv4-mapped IPv6 to dotted IPv4.
+  //   Dotted form: ::ffff:127.0.0.1
+  //   Hex form:    ::ffff:7f00:1 (Node's URL parser normalizes to this)
+  let normalized = host;
+  const dottedMapped = host.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
+  if (dottedMapped) {
+    normalized = dottedMapped[1]!;
+  } else {
+    const hexMapped = host.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+    if (hexMapped) {
+      const high = parseInt(hexMapped[1]!, 16);
+      const low = parseInt(hexMapped[2]!, 16);
+      normalized = `${(high >> 8) & 0xff}.${high & 0xff}.${(low >> 8) & 0xff}.${low & 0xff}`;
+    }
+  }
 
   if (
     normalized === 'localhost' ||

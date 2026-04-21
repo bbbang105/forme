@@ -93,6 +93,10 @@ export const POST = withTracing('POST /api/feed/sources', async (request) => {
     return NextResponse.json({ error: 'url is required' }, { status: 400 });
   }
 
+  if (url.length > 2048) {
+    return NextResponse.json({ error: 'url is too long' }, { status: 400 });
+  }
+
   try {
     new URL(url);
   } catch {

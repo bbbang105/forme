@@ -21,6 +21,8 @@ function sqlTextArray(arr: string[]) {
 const MAX_SEARCH_LENGTH = 100;
 const DEFAULT_LIMIT = 12;
 const MAX_LIMIT = 50;
+const MAX_TAGS_FILTER = 10;
+const MAX_TAG_LENGTH = 30;
 
 // ── Types ──
 
@@ -140,6 +142,19 @@ export const GET = withTracing('GET /api/feed', async (request) => {
   const filterTags = tagsParam
     ? tagsParam.split(',').map((t) => t.trim()).filter(Boolean)
     : [];
+
+  if (filterTags.length > MAX_TAGS_FILTER) {
+    return NextResponse.json(
+      { error: `tags must have at most ${MAX_TAGS_FILTER} items` },
+      { status: 400 }
+    );
+  }
+  if (filterTags.some((t) => t.length > MAX_TAG_LENGTH)) {
+    return NextResponse.json(
+      { error: `Each tag must be ${MAX_TAG_LENGTH} characters or fewer` },
+      { status: 400 }
+    );
+  }
 
   const isBookmarked = status === 'bookmarked';
 

@@ -87,12 +87,16 @@ export const GET = withTracing('GET /api/youtube/items', async (request: Request
 
   // Tag filter — find sourceIds with matching tag, then filter items
   if (tag && typeof tag === 'string') {
+    const trimmedTag = tag.trim();
+    if (trimmedTag.length === 0 || trimmedTag.length > 30) {
+      return NextResponse.json({ error: 'Invalid tag' }, { status: 400 });
+    }
     const allSources = await db.select({ id: youtubeSources.id, tags: youtubeSources.tags })
       .from(youtubeSources)
       .where(eq(youtubeSources.userId, user.id));
 
     const filteredSourceIds = allSources
-      .filter((s) => s.tags?.includes(tag))
+      .filter((s) => s.tags?.includes(trimmedTag))
       .map((s) => s.id);
 
     if (filteredSourceIds.length > 0) {

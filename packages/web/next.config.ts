@@ -52,7 +52,7 @@ const nextConfig: NextConfig = {
               `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''}`,
               "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
               "font-src 'self' https://cdn.jsdelivr.net",
-              "img-src 'self' data: blob: https: http:",
+              "img-src 'self' data: blob: https:",
               `connect-src 'self' https://dbeegbhgezhnokosrhtk.supabase.co wss://dbeegbhgezhnokosrhtk.supabase.co${process.env.R2_PUBLIC_URL ? ' ' + process.env.R2_PUBLIC_URL : ''}`,
               `media-src 'self' blob:${process.env.R2_PUBLIC_URL ? ' ' + process.env.R2_PUBLIC_URL : ''}`,
               "worker-src 'self'",

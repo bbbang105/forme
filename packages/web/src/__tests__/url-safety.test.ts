@@ -71,15 +71,18 @@ describe('lib/url-safety — isSafeUrl', () => {
       expect(isSafeUrl('http://[::1]/')).toBe(false);
     });
 
-    it('rejects IPv4-mapped IPv6 loopback in dotted form', () => {
-      // URL parser keeps dotted form if passed as a hostname object directly;
-      // when wrapped in http:// the parser normalizes to hex. The url-safety
-      // code covers the dotted form explicitly.
-      // Here we assert the hex-normalized form is also not trivially passed
-      // (it becomes an IPv6 address, which is not loopback/::1/ULA so current
-      // impl will return true — documented gap).
-      // Loopback `::1` is caught:
-      expect(isSafeUrl('http://[::1]/')).toBe(false);
+    it('rejects IPv4-mapped IPv6 loopback in hex-normalized form (127.0.0.1 → ::ffff:7f00:1)', () => {
+      // URL parser normalizes ::ffff:127.0.0.1 to ::ffff:7f00:1 (hex form).
+      // url-safety now converts hex form back to dotted IPv4 for private check.
+      expect(isSafeUrl('http://[::ffff:7f00:1]/')).toBe(false);
+      expect(isSafeUrl('http://[::ffff:0a00:1]/')).toBe(false); // 10.0.0.1
+      expect(isSafeUrl('http://[::ffff:c0a8:1]/')).toBe(false); // 192.168.0.1
+      expect(isSafeUrl('http://[::ffff:a9fe:1]/')).toBe(false); // 169.254.0.1
+    });
+
+    it('accepts IPv4-mapped IPv6 public IP in hex form', () => {
+      // 8.8.8.8 → ::ffff:0808:0808
+      expect(isSafeUrl('http://[::ffff:0808:0808]/')).toBe(true);
     });
 
     it('rejects ULA fc00::/7 (fc00, fd00 prefixes)', () => {
