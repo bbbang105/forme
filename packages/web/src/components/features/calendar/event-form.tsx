@@ -535,7 +535,7 @@ function EventFormContent({
             />
           </div>
 
-          <DialogFooter className="gap-2 sticky bottom-0 bg-background pt-3 pb-1">
+          <DialogFooter className="gap-2 sticky bottom-0 bg-card pt-3 pb-1">
             {isEditing && (
               <Button
                 type="button"
