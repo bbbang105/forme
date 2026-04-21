@@ -24,6 +24,7 @@ import {YOUTUBE_VIDEO_ID_REGEX} from '@/lib/validators';
 import {AddUrlDialog} from './add-url-dialog';
 import {useInfiniteScroll} from '@/hooks/use-infinite-scroll';
 import {useFilterSync} from '@/hooks/use-filter-sync';
+import {useBulkSelection} from '@/hooks/use-bulk-selection';
 
 const EMPTY_TAGS: string[] = [];
 
@@ -72,7 +73,6 @@ export function YoutubeFeed() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [summarizing, setSummarizing] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [cursor, setCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
 
@@ -80,8 +80,16 @@ export function YoutubeFeed() {
   const [collectPeriod, setCollectPeriod] = useState<Period>('7d');
   const [collectActive, setCollectActive] = useState(false);
 
-  // Selection mode (create tab + feed tab)
-  const [selectMode, setSelectMode] = useState(false);
+  // Selection mode (create tab + feed tab) — shared bulk-selection hook
+  const {
+    selectMode,
+    selectedIds,
+    toggle: toggleSelectedId,
+    deselect: deselectId,
+    toggleSelectAll,
+    toggleSelectMode,
+    exitSelectMode,
+  } = useBulkSelection();
 
   // Summarize progress
   const [summarizeProgress, setSummarizeProgress] = useState<{
@@ -184,10 +192,9 @@ export function YoutubeFeed() {
     fetchedKeyRef.current = queryKey;
     setItems([]);
     setCursor(null);
-    setSelectedIds(new Set());
-    setSelectMode(false);
+    exitSelectMode();
     fetchItems({ reset: true });
-  }, [queryKey, fetchItems]);
+  }, [queryKey, fetchItems, exitSelectMode]);
 
   // Infinite scroll — shared hook reads latest fetchItems via ref internally.
   const {sentinelRef} = useInfiniteScroll({
@@ -294,13 +301,8 @@ export function YoutubeFeed() {
   useEffect(() => { pinnedItemsRef.current = pinnedItems; }, [pinnedItems]);
 
   const handleSelect = useCallback((id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
+    toggleSelectedId(id);
+  }, [toggleSelectedId]);
 
   // Click: summarized → detail page + mark read, others → YouTube + mark read
   const handleCardClick = useCallback(
@@ -522,8 +524,7 @@ export function YoutubeFeed() {
         }
       }
 
-      setSelectedIds(new Set());
-      setSelectMode(false);
+      exitSelectMode();
     } finally {
       setSummarizing(false);
     }
@@ -533,13 +534,9 @@ export function YoutubeFeed() {
     const res = await fetch(`/api/youtube/${id}`, { method: 'DELETE' });
     if (res.ok || res.status === 204) {
       setItems((prev) => prev.filter((i) => i.id !== id));
-      setSelectedIds((prev) => {
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
-      });
+      deselectId(id);
     }
-  }, []);
+  }, [deselectId]);
 
   const handleBulkDelete = async () => {
     if (selectedIds.size === 0) return;
@@ -552,8 +549,7 @@ export function YoutubeFeed() {
       });
       if (res.ok) {
         setItems((prev) => prev.filter((i) => !selectedIds.has(i.id)));
-        setSelectedIds(new Set());
-        setSelectMode(false);
+        exitSelectMode();
       }
     } finally {
       setBulkDeleting(false);
@@ -575,8 +571,7 @@ export function YoutubeFeed() {
       });
       if (res.ok) {
         setItems((prev) => prev.filter((i) => !selectedIds.has(i.id)));
-        setSelectedIds(new Set());
-        setSelectMode(false);
+        exitSelectMode();
       }
     } finally {
       setBulkUnreading(false);
@@ -689,12 +684,7 @@ export function YoutubeFeed() {
           {!loading && items.length > 0 && (
             <button
               type="button"
-              onClick={() => {
-                setSelectMode((prev) => {
-                  if (prev) setSelectedIds(new Set());
-                  return !prev;
-                });
-              }}
+              onClick={toggleSelectMode}
               className={cn(
                 'shrink-0 font-mono text-[11px] uppercase tracking-[0.08em] transition-colors cursor-pointer',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-sm',
@@ -713,10 +703,7 @@ export function YoutubeFeed() {
           <div className="flex items-baseline gap-4">
             <button
               type="button"
-              onClick={() => {
-                if (selectedIds.size === items.length) setSelectedIds(new Set());
-                else setSelectedIds(new Set(items.map((i) => i.id)));
-              }}
+              onClick={() => toggleSelectAll(items.map((i) => i.id))}
               className="font-mono text-[11px] uppercase tracking-[0.1em] text-primary hover:text-primary/80 transition-colors cursor-pointer"
             >
               {selectedIds.size === items.length ? 'Clear all' : 'Select all'}
@@ -802,12 +789,7 @@ export function YoutubeFeed() {
               {!loading && items.length > 0 && (
                 <button
                   type="button"
-                  onClick={() => {
-                    setSelectMode((prev) => {
-                      if (prev) setSelectedIds(new Set());
-                      return !prev;
-                    });
-                  }}
+                  onClick={toggleSelectMode}
                   className={cn(
                     'ml-auto shrink-0 font-mono text-[11px] uppercase tracking-[0.08em] transition-colors cursor-pointer',
                     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-sm',
@@ -911,10 +893,7 @@ export function YoutubeFeed() {
             <div className="flex items-baseline gap-4">
               <button
                 type="button"
-                onClick={() => {
-                  if (selectedIds.size === items.length) setSelectedIds(new Set());
-                  else setSelectedIds(new Set(items.map((i) => i.id)));
-                }}
+                onClick={() => toggleSelectAll(items.map((i) => i.id))}
                 className="font-mono text-[11px] uppercase tracking-[0.1em] text-primary hover:text-primary/80 transition-colors cursor-pointer"
               >
                 {selectedIds.size === items.length ? 'Clear all' : 'Select all'}
