@@ -4,6 +4,7 @@ import {feedItems, feedSources, db} from '@forme/shared';
 import {and, eq} from 'drizzle-orm';
 import {withTracing} from '@/lib/logger';
 import {isSafeUrl} from '@/lib/url-safety';
+import {safeFetch} from '@/lib/safe-fetch';
 
 const MANUAL_SOURCE_NAME = '직접 추가';
 const MANUAL_SOURCE_URL = 'manual://';
@@ -60,8 +61,8 @@ async function fetchOgMeta(url: string) {
   let thumbnailUrl: string | null = null;
 
   try {
-    const res = await fetch(url, {
-      signal: AbortSignal.timeout(10_000),
+    const res = await safeFetch(url, {
+      timeoutMs: 10_000,
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; forme-bot/1.0; +https://forme.app)',
         Accept: 'text/html,application/xhtml+xml',
@@ -222,8 +223,20 @@ export const POST = withTracing('POST /api/feed/add-url', async (request) => {
       return NextResponse.json({error: '이미 등록된 URL입니다'}, {status: 409});
     }
 
-    // 3. 썸네일 URL 검증
-    const thumbnailUrl = typeof body.thumbnailUrl === 'string' && isSafeUrl(body.thumbnailUrl) ? body.thumbnailUrl : null;
+    // 3. 썸네일 URL 검증 (https + SSRF + 길이 제한)
+    const thumbnailUrl = (() => {
+      const v = body.thumbnailUrl;
+      if (typeof v !== 'string' || v.length === 0 || v.length > 2000) return null;
+      let parsed: URL;
+      try {
+        parsed = new URL(v);
+      } catch {
+        return null;
+      }
+      if (parsed.protocol !== 'https:') return null;
+      if (!isSafeUrl(v)) return null;
+      return v;
+    })();
 
     // 4. feedItems 삽입 (삭제된 아이템이면 복원)
     let inserted;

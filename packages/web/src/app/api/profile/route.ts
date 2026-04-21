@@ -34,13 +34,29 @@ export const GET = withTracing('GET /api/profile', async () => {
 
     // 프로필 없으면 Discord identity에서 기본값으로 생성
     const identity = user.identities?.find((i) => i.provider === 'discord');
-    const discordId = identity?.id ?? '';
-    const discordUsername =
+    const discordId = (identity?.id ?? '').toString().slice(0, 255);
+    const rawUsername =
       (identity?.identity_data?.full_name as string) ??
       (identity?.identity_data?.name as string) ??
       user.email ??
       'user';
-    const avatarUrl = (identity?.identity_data?.avatar_url as string) ?? null;
+    const discordUsername =
+      typeof rawUsername === 'string' ? rawUsername.slice(0, 255) : 'user';
+
+    // Clamp + validate avatar URL: must be https, length < 500, well-formed.
+    const rawAvatar = identity?.identity_data?.avatar_url;
+    const avatarUrl = ((): string | null => {
+      if (typeof rawAvatar !== 'string' || rawAvatar.length === 0 || rawAvatar.length >= 500) {
+        return null;
+      }
+      try {
+        const parsed = new URL(rawAvatar);
+        if (parsed.protocol !== 'https:') return null;
+        return rawAvatar;
+      } catch {
+        return null;
+      }
+    })();
 
     const [created] = await db
       .insert(profiles)
@@ -48,7 +64,7 @@ export const GET = withTracing('GET /api/profile', async () => {
         userId: user.id,
         discordId,
         discordUsername,
-        displayName: discordUsername,
+        displayName: discordUsername.slice(0, 255),
         avatarUrl,
         interests: [],
       })

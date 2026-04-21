@@ -5,6 +5,7 @@ import {and, eq, inArray} from 'drizzle-orm';
 import {parseFeed} from 'feedsmith';
 import {feedItems as feedItemsTable, feedSources, db} from '@forme/shared';
 import {isSafeUrl} from './url-safety';
+import {safeFetch} from './safe-fetch';
 
 export interface CrawlSourceResult {
   sourceId: string;
@@ -115,20 +116,31 @@ function sanitizeTitle(title: string): string {
 
 /**
  * Fetch og:image meta tag from a URL (5s timeout) with SSRF protection
+ * on both the fetched page URL and the returned og:image URL.
  */
-async function extractOgImage(url: string): Promise<string | null> {
+export async function extractOgImage(url: string): Promise<string | null> {
   if (!isSafeUrl(url)) return null;
   try {
-    const response = await fetch(url, {
+    const response = await safeFetch(url, {
       headers: { 'User-Agent': 'FormeBot/1.0' },
-      signal: AbortSignal.timeout(5000),
+      timeoutMs: 5000,
     });
     if (!response.ok) return null;
     const html = await response.text();
     const match =
       html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
       html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
-    return match?.[1] ?? null;
+    const raw = match?.[1];
+    if (!raw) return null;
+    // Resolve relative URLs against the page URL, then SSRF-validate.
+    let resolved: string;
+    try {
+      resolved = new URL(raw, url).toString();
+    } catch {
+      return null;
+    }
+    if (!isSafeUrl(resolved)) return null;
+    return resolved;
   } catch {
     return null;
   }
@@ -161,9 +173,9 @@ export async function crawlSource(source: CrawlSource, options?: CrawlOptions): 
       };
     }
 
-    const response = await fetch(source.rssUrl, {
+    const response = await safeFetch(source.rssUrl, {
       headers: { 'User-Agent': 'FormeBot/1.0' },
-      signal: AbortSignal.timeout(10000),
+      timeoutMs: 10000,
     });
 
     if (!response.ok) {

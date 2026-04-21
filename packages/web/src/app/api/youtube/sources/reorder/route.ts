@@ -38,13 +38,20 @@ export const PUT = withTracing('PUT /api/youtube/sources/reorder', async (reques
     }
   }
 
-  await Promise.all(
-    body.items.map((item) =>
-      db.update(youtubeSources)
-        .set({favoriteOrder: item.favoriteOrder})
-        .where(and(eq(youtubeSources.id, item.id), eq(youtubeSources.userId, user.id))),
-    ),
-  );
+  try {
+    await db.transaction(async (tx) => {
+      await Promise.all(
+        body.items!.map((item) =>
+          tx.update(youtubeSources)
+            .set({favoriteOrder: item.favoriteOrder})
+            .where(and(eq(youtubeSources.id, item.id), eq(youtubeSources.userId, user.id))),
+        ),
+      );
+    });
+  } catch (err) {
+    console.error('[PUT /api/youtube/sources/reorder]', err);
+    return NextResponse.json({error: 'Internal server error'}, {status: 500});
+  }
 
   return NextResponse.json({ok: true});
 });
