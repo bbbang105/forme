@@ -14,7 +14,7 @@ const SORT_LABELS: Record<SortKey, string> = {
   title: 'Title',
 };
 
-interface Memo {
+interface Note {
   id: string;
   title: string | null;
   contentText: string;
@@ -25,12 +25,12 @@ interface Memo {
 }
 
 interface NoteListProps {
-  initialMemos: Memo[];
+  initialNotes: Note[];
   initialHasMore: boolean;
   initialNextOffset: number;
 }
 
-function sortMemos(list: Memo[], key: SortKey): Memo[] {
+function sortMemos(list: Note[], key: SortKey): Note[] {
   return [...list].sort((a, b) => {
     if (key === 'title') {
       return (a.title ?? '').localeCompare(b.title ?? '', 'ko');
@@ -39,13 +39,13 @@ function sortMemos(list: Memo[], key: SortKey): Memo[] {
   });
 }
 
-export function NoteList({ initialMemos, initialHasMore, initialNextOffset }: NoteListProps) {
+export function NoteList({ initialNotes, initialHasMore, initialNextOffset }: NoteListProps) {
   const router = useRouter();
-  const [notes, setMemos] = useState<Memo[]>(initialMemos);
+  const [notes, setNotesList] = useState<Note[]>(initialNotes);
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [nextOffset, setNextOffset] = useState(initialNextOffset);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<Memo[] | null>(null);
+  const [searchResults, setSearchResults] = useState<Note[] | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>('updatedAt');
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [activeTag, setActiveTag] = useState<string | null>(null);
@@ -55,7 +55,7 @@ export function NoteList({ initialMemos, initialHasMore, initialNextOffset }: No
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
   const sortRef = useRef<HTMLDivElement>(null);
 
-  // initialMemos 변경 시 state 동기화 — 검색/로드모어 중에는 덮어쓰지 않음
+  // initialNotes 변경 시 state 동기화 — 검색/로드모어 중에는 덮어쓰지 않음
   // 로컬 편집(검색/loadMore)이 활성화된 동안에는 서버 데이터로 덮어쓰지 않는다.
   // key-based reset: 부모가 key를 변경하면 컴포넌트가 재마운트되어 state가 초기화된다.
   const initializedRef = useRef(false);
@@ -66,11 +66,11 @@ export function NoteList({ initialMemos, initialHasMore, initialNextOffset }: No
     }
     // 검색 중이거나 추가 로드 중이면 서버 데이터로 덮어쓰지 않음
     if (searchQuery.trim() || isLoadingMore) return;
-    setMemos(initialMemos);
+    setNotesList(initialNotes);
     setHasMore(initialHasMore);
     setNextOffset(initialNextOffset);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialMemos, initialHasMore, initialNextOffset]);
+  }, [initialNotes, initialHasMore, initialNextOffset]);
 
   // Close sort menu on outside click
   useEffect(() => {
@@ -102,7 +102,7 @@ export function NoteList({ initialMemos, initialHasMore, initialNextOffset }: No
     searchTimerRef.current = setTimeout(async () => {
       try {
         const results = await searchNotes(searchQuery.trim());
-        if (!cancelled) setSearchResults(results as Memo[]);
+        if (!cancelled) setSearchResults(results as Note[]);
       } catch {
         if (!cancelled) setSearchResults(null);
       } finally {
@@ -121,7 +121,7 @@ export function NoteList({ initialMemos, initialHasMore, initialNextOffset }: No
     setIsLoadingMore(true);
     try {
       const result = await getNotesPage(nextOffset);
-      setMemos((prev) => [...prev, ...(result.notes as Memo[])]);
+      setNotesList((prev) => [...prev, ...(result.notes as Note[])]);
       setHasMore(result.hasMore);
       setNextOffset(result.nextOffset);
     } finally {
