@@ -7,6 +7,7 @@ import {UUID_REGEX} from '@/lib/validators';
 import {YOUTUBE_SUMMARIZE_BATCH_MAX} from '@/lib/constants';
 import {fetchTranscript} from '@/lib/youtube-transcript';
 import {summarizeVideo} from '@/lib/gemini';
+import {createSseStream} from '@/lib/sse';
 
 export const POST = withTracing('POST /api/youtube/summarize', async (request: Request) => {
   const supabase = await createClient();
@@ -42,32 +43,15 @@ export const POST = withTracing('POST /api/youtube/summarize', async (request: R
     return NextResponse.json({ error: 'No valid items' }, { status: 400 });
   }
 
-  const encoder = new TextEncoder();
-  let closed = false;
-  // Track the item currently being summarized so abort can restore its status.
+  // Track the item currently being summarized so cancel can restore its status.
   let currentItemId: string | null = null;
 
-  const stream = new ReadableStream({
-    async start(controller) {
-      const send = (event: string, data: unknown) => {
-        if (closed) return;
-        try {
-          controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
-        } catch {
-          closed = true;
-        }
-      };
-
-      const close = () => {
-        if (closed) return;
-        closed = true;
-        try { controller.close(); } catch { /* already closed */ }
-      };
-
+  return createSseStream(
+    async (send, close, signal) => {
       send('start', { total: items.length });
 
       for (let i = 0; i < items.length; i++) {
-        if (closed) break;
+        if (signal.aborted) break;
         const item = items[i]!;
         currentItemId = item.id;
         send('progress', { index: i, videoId: item.videoId, title: item.title, status: 'summarizing' });
@@ -121,33 +105,25 @@ export const POST = withTracing('POST /api/youtube/summarize', async (request: R
       send('done', { total: items.length });
       close();
     },
-    async cancel() {
-      // Client aborted — recover any in-flight item from `summarizing` so it
-      // reappears in the create tab instead of being stuck.
-      closed = true;
-      const stuckId = currentItemId;
-      currentItemId = null;
-      if (stuckId) {
-        try {
-          await db.update(youtubeItems)
-            .set({ status: 'collected', summarizedAt: null })
-            .where(and(
-              eq(youtubeItems.id, stuckId),
-              eq(youtubeItems.status, 'summarizing'),
-            ));
-        } catch (e) {
-          console.error('[youtube/summarize] cancel cleanup failed:', e);
+    {
+      onCancel: async () => {
+        // Client aborted — recover any in-flight item from `summarizing` so it
+        // reappears in the create tab instead of being stuck.
+        const stuckId = currentItemId;
+        currentItemId = null;
+        if (stuckId) {
+          try {
+            await db.update(youtubeItems)
+              .set({ status: 'collected', summarizedAt: null })
+              .where(and(
+                eq(youtubeItems.id, stuckId),
+                eq(youtubeItems.status, 'summarizing'),
+              ));
+          } catch (e) {
+            console.error('[youtube/summarize] cancel cleanup failed:', e);
+          }
         }
-      }
+      },
     },
-  });
-
-  return new Response(stream, {
-    headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
-      'X-Accel-Buffering': 'no',
-    },
-  });
+  );
 });

@@ -6,6 +6,7 @@ import {UUID_REGEX, YOUTUBE_VIDEO_ID_REGEX} from '@/lib/validators';
 import {isSafeUrl} from '@/lib/url-safety';
 import {parseFeed} from 'feedsmith';
 import {fetchVideoDurations} from '@/lib/youtube-api';
+import {createSseStream} from '@/lib/sse';
 
 interface CollectBody {
   sourceIds: string[];
@@ -15,10 +16,6 @@ interface CollectBody {
 function getPeriodDate(period: '3d' | '7d' | '30d'): Date {
   const days = period === '3d' ? 3 : period === '7d' ? 7 : 30;
   return new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-}
-
-function sseMessage(event: string, data: unknown): string {
-  return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 }
 
 export const POST = withTracing('POST /api/youtube/collect', async (request: Request) => {
@@ -65,13 +62,7 @@ export const POST = withTracing('POST /api/youtube/collect', async (request: Req
     .where(eq(youtubeItems.userId, user.id));
   const existingVideoIds = new Set(existingItems.map((i) => i.videoId));
 
-  const stream = new ReadableStream({
-    async start(controller) {
-      const encoder = new TextEncoder();
-      const write = (event: string, data: unknown) => {
-        controller.enqueue(encoder.encode(sseMessage(event, data)));
-      };
-
+  return createSseStream(async (write, close, signal) => {
       write('start', { totalSources: sources.length });
 
       let totalNewItems = 0;
@@ -79,6 +70,7 @@ export const POST = withTracing('POST /api/youtube/collect', async (request: Req
       let failCount = 0;
 
       for (let i = 0; i < sources.length; i++) {
+        if (signal.aborted) break;
         const source = sources[i];
         write('processing', { index: i, sourceName: source.channelName });
 
@@ -184,16 +176,6 @@ export const POST = withTracing('POST /api/youtube/collect', async (request: Req
         summary: { totalSources: sources.length, totalNewItems, successCount, failCount },
       });
 
-      controller.close();
-    },
-  });
-
-  return new Response(stream, {
-    headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
-      'X-Accel-Buffering': 'no',
-    },
+      close();
   });
 });
