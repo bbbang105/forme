@@ -21,6 +21,7 @@ vi.mock('@/lib/supabase/server', () => ({
 
 const { mockDb } = vi.hoisted(() => {
   let _resolveValue: unknown = [];
+  const _calls: Record<string, unknown[][]> = {};
 
   const handler: ProxyHandler<object> = {
     get(_target, prop) {
@@ -31,7 +32,17 @@ const { mockDb } = vi.hoisted(() => {
       if (prop === '_setResolve') {
         return (v: unknown) => { _resolveValue = v; };
       }
-      return vi.fn().mockImplementation(() => new Proxy({}, handler));
+      if (prop === '_getCalls') {
+        return (name: string) => _calls[name] ?? [];
+      }
+      if (prop === '_resetCalls') {
+        return () => { for (const k of Object.keys(_calls)) delete _calls[k]; };
+      }
+      const name = String(prop);
+      return vi.fn().mockImplementation((...args: unknown[]) => {
+        (_calls[name] ??= []).push(args);
+        return new Proxy({}, handler);
+      });
     },
   };
 
@@ -55,9 +66,18 @@ function setDbResolve(value: unknown) {
   (mockDb as Record<string, (v: unknown) => void>)._setResolve(value);
 }
 
+function getDbCalls(name: string): unknown[][] {
+  return (mockDb as Record<string, (n: string) => unknown[][]>)._getCalls(name);
+}
+
+function resetDbCalls() {
+  (mockDb as Record<string, () => void>)._resetCalls();
+}
+
 describe('Notes Actions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetDbCalls();
     setDbResolve([{ id: 'test-id', isPinned: false, title: '', contentText: '' }]);
   });
 
@@ -155,6 +175,123 @@ describe('Notes Actions', () => {
         },
       });
       expect(result).toBeDefined();
+    });
+
+    it('should sanitize javascript: link hrefs → empty string (regression)', async () => {
+      setMockUser('user-123');
+      setDbResolve([{ id: 'test-id' }]);
+      const { updateNote } = await import('@/lib/actions/notes');
+      await updateNote('550e8400-e29b-41d4-a716-446655440000', {
+        content: {
+          type: 'doc',
+          content: [{
+            type: 'paragraph',
+            content: [{
+              type: 'text',
+              text: 'x',
+              marks: [{ type: 'link', attrs: { href: 'javascript:alert(1)' } }],
+            }],
+          }],
+        },
+      });
+      const setCalls = getDbCalls('set');
+      const payload = setCalls[0]?.[0] as { content: Record<string, unknown> };
+      const serialized = JSON.stringify(payload.content);
+      expect(serialized).not.toContain('javascript:');
+      expect(serialized).toContain('"href":""');
+    });
+
+    it('should sanitize file:// image src → empty string (regression)', async () => {
+      setMockUser('user-123');
+      setDbResolve([{ id: 'test-id' }]);
+      const { updateNote } = await import('@/lib/actions/notes');
+      await updateNote('550e8400-e29b-41d4-a716-446655440000', {
+        content: {
+          type: 'doc',
+          content: [{
+            type: 'image',
+            attrs: { src: 'file:///etc/passwd' },
+          }],
+        },
+      });
+      const setCalls = getDbCalls('set');
+      const payload = setCalls[0]?.[0] as { content: Record<string, unknown> };
+      const serialized = JSON.stringify(payload.content);
+      expect(serialized).not.toContain('file://');
+      expect(serialized).toContain('"src":""');
+    });
+
+    it('should strip <script> tags from imageBlock caption (XSS defense)', async () => {
+      setMockUser('user-123');
+      setDbResolve([{ id: 'test-id' }]);
+      const { updateNote } = await import('@/lib/actions/notes');
+      await updateNote('550e8400-e29b-41d4-a716-446655440000', {
+        content: {
+          type: 'doc',
+          content: [{
+            type: 'imageBlock',
+            attrs: {
+              src: 'https://cdn.example.com/a.png',
+              caption: '<script>alert(1)</script>hello',
+            },
+          }],
+        },
+      });
+      const setCalls = getDbCalls('set');
+      const payload = setCalls[0]?.[0] as { content: Record<string, unknown> };
+      const serialized = JSON.stringify(payload.content);
+      expect(serialized).not.toContain('<script>');
+      expect(serialized).not.toContain('</script>');
+      // Textual content between stripped tags is preserved
+      expect(serialized).toContain('alert(1)hello');
+    });
+
+    it('should strip <img onerror> payload from imageBlock caption (XSS defense)', async () => {
+      setMockUser('user-123');
+      setDbResolve([{ id: 'test-id' }]);
+      const { updateNote } = await import('@/lib/actions/notes');
+      await updateNote('550e8400-e29b-41d4-a716-446655440000', {
+        content: {
+          type: 'doc',
+          content: [{
+            type: 'imageBlock',
+            attrs: {
+              src: 'https://cdn.example.com/a.png',
+              caption: 'pre<img src=x onerror="alert(1)">post',
+            },
+          }],
+        },
+      });
+      const setCalls = getDbCalls('set');
+      const payload = setCalls[0]?.[0] as { content: Record<string, unknown> };
+      const serialized = JSON.stringify(payload.content);
+      expect(serialized).not.toContain('<img');
+      expect(serialized).not.toContain('onerror');
+      expect(serialized).toContain('prepost');
+    });
+
+    it('should sanitize file:// src on imageBlock (regression)', async () => {
+      setMockUser('user-123');
+      setDbResolve([{ id: 'test-id' }]);
+      const { updateNote } = await import('@/lib/actions/notes');
+      await updateNote('550e8400-e29b-41d4-a716-446655440000', {
+        content: {
+          type: 'doc',
+          content: [{
+            type: 'imageBlock',
+            attrs: {
+              src: 'file:///etc/passwd',
+              caption: 'clean',
+            },
+          }],
+        },
+      });
+      const setCalls = getDbCalls('set');
+      const payload = setCalls[0]?.[0] as { content: Record<string, unknown> };
+      const serialized = JSON.stringify(payload.content);
+      expect(serialized).not.toContain('file://');
+      expect(serialized).toContain('"src":""');
+      expect(serialized).toContain('"caption":"clean"');
     });
 
     it('should succeed with valid data', async () => {

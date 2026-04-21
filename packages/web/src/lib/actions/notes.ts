@@ -30,6 +30,14 @@ function sanitizeTipTapContent(content: Record<string, unknown>): Record<string,
   return sanitizeNode(content) as Record<string, unknown>;
 }
 
+/** Strip all HTML tags from a string. Used for text-only fields like image captions
+ *  so that client renderers can safely insert the value into the DOM as textContent
+ *  without any ambiguity. Belt-and-suspenders: the renderer in image-block.tsx also
+ *  renders caption as React text children (no dangerouslySetInnerHTML). */
+function stripHtml(input: string): string {
+  return input.replace(/<[^>]*>/g, '');
+}
+
 function sanitizeNode(node: unknown): unknown {
   if (!node || typeof node !== 'object') return node;
   if (Array.isArray(node)) return node.map(sanitizeNode);
@@ -53,6 +61,31 @@ function sanitizeNode(node: unknown): unknown {
         obj.attrs = { ...attrs, src: '' };
       }
     }
+  }
+
+  // Sanitize imageBlock — validate src (same as image) and strip HTML from caption
+  if (obj.type === 'imageBlock' && obj.attrs && typeof obj.attrs === 'object') {
+    const attrs = obj.attrs as Record<string, unknown>;
+    const nextAttrs: Record<string, unknown> = { ...attrs };
+
+    if (typeof attrs.src === 'string') {
+      let srcAllowed = false;
+      try {
+        const url = new URL(attrs.src);
+        srcAllowed = ALLOWED_IMAGE_PROTOCOLS.includes(url.protocol);
+      } catch {
+        srcAllowed = false;
+      }
+      if (!srcAllowed) {
+        nextAttrs.src = '';
+      }
+    }
+
+    if (typeof attrs.caption === 'string') {
+      nextAttrs.caption = stripHtml(attrs.caption);
+    }
+
+    obj.attrs = nextAttrs;
   }
 
   for (const [key, value] of Object.entries(obj)) {

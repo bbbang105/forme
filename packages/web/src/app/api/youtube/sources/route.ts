@@ -36,6 +36,11 @@ export const POST = withTracing('POST /api/youtube/sources', async (request: Req
   if (!channelUrl || typeof channelUrl !== 'string') {
     return NextResponse.json({ error: 'channelUrl is required' }, { status: 400 });
   }
+  // Bound input size before running regex / decodeURIComponent to prevent
+  // memory blow-up and event-loop stalls on hostile payloads.
+  if (channelUrl.length > 500) {
+    return NextResponse.json({ error: 'channelUrl is too long' }, { status: 400 });
+  }
 
   let channelId: string | null = null;
 
@@ -47,7 +52,13 @@ export const POST = withTracing('POST /api/youtube/sources', async (request: Req
 
   // 2) youtube.com/@handle 형식 — 페이지에서 channelId 추출
   if (!channelId) {
-    const handleMatch = decodeURIComponent(channelUrl).match(/youtube\.com\/@([^\/\s?#]+)/);
+    let decoded: string;
+    try {
+      decoded = decodeURIComponent(channelUrl);
+    } catch {
+      return NextResponse.json({ error: 'Invalid channel URL' }, { status: 400 });
+    }
+    const handleMatch = decoded.match(/youtube\.com\/@([^\/\s?#]+)/);
     if (handleMatch && handleMatch[1]!.length <= 100) {
       try {
         const pageUrl = `https://www.youtube.com/@${encodeURIComponent(handleMatch[1]!)}`;
