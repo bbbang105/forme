@@ -172,7 +172,7 @@ export const POST = withTracing('POST /api/youtube/add-url', async (request: Req
           summarySource: transcript.source,
         });
       } catch (e) {
-        console.error('[video/add-url] Error:', e);
+        console.error('[youtube/add-url] Error:', e);
         send('error', {message: '요약에 실패했습니다'});
       }
 

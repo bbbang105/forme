@@ -97,7 +97,7 @@ export const POST = withTracing('POST /api/youtube/summarize', async (request: R
             summarySource: transcript.source,
           });
         } catch (e) {
-          console.error(`[video/summarize] Failed for ${item.videoId}:`, e);
+          console.error(`[youtube/summarize] Failed for ${item.videoId}:`, e);
           // 실패 시 collected로 복원 (새 영상 탭에서 다시 보이도록)
           await db.update(youtubeItems)
             .set({ status: 'collected' })

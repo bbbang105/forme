@@ -47,10 +47,16 @@ vi.mock('@forme/shared', () => ({
     id: 'id', userId: 'user_id', title: 'title',
     startDate: 'start_date', endDate: 'end_date',
     color: 'color', description: 'description',
+    excludedDates: 'excluded_dates', completedDates: 'completed_dates',
+    recurrenceEndDate: 'recurrence_end_date',
   },
   todos: {
     id: 'id', userId: 'user_id', date: 'date',
     content: 'content', isCompleted: 'is_completed', sortOrder: 'sort_order',
+  },
+  eventCategories: {
+    id: 'id', userId: 'user_id', name: 'name', color: 'color',
+    icon: 'icon', sortOrder: 'sort_order', createdAt: 'created_at',
   },
 }));
 
@@ -186,6 +192,210 @@ describe('Todo Actions', () => {
       setMockUser('user-123');
       const { deleteTodo } = await import('@/lib/actions/todos');
       await expect(deleteTodo('550e8400-e29b-41d4-a716-446655440001')).resolves.not.toThrow();
+    });
+  });
+});
+
+describe('Category Actions', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setDbResolve([{ id: 'test-id', name: 'Updated' }]);
+  });
+
+  describe('updateCategory', () => {
+    it('should throw if not authenticated', async () => {
+      setMockUser(null);
+      const { updateCategory } = await import('@/lib/actions/categories');
+      await expect(
+        updateCategory('550e8400-e29b-41d4-a716-446655440000', { name: 'Test' })
+      ).rejects.toThrow('Unauthorized');
+    });
+
+    it('should throw if id is not valid UUID', async () => {
+      setMockUser('user-123');
+      const { updateCategory } = await import('@/lib/actions/categories');
+      await expect(
+        updateCategory('bad-id', { name: 'Test' })
+      ).rejects.toThrow('잘못된 카테고리 ID입니다');
+    });
+
+    it('should succeed with valid UUID', async () => {
+      setMockUser('user-123');
+      setDbResolve([{ id: 'test-id', name: 'Updated' }]);
+      const { updateCategory } = await import('@/lib/actions/categories');
+      const result = await updateCategory(
+        '550e8400-e29b-41d4-a716-446655440000',
+        { name: 'Updated' }
+      );
+      expect(result).toBeDefined();
+    });
+  });
+
+  describe('deleteCategory', () => {
+    it('should throw if not authenticated', async () => {
+      setMockUser(null);
+      const { deleteCategory } = await import('@/lib/actions/categories');
+      await expect(
+        deleteCategory('550e8400-e29b-41d4-a716-446655440000')
+      ).rejects.toThrow('Unauthorized');
+    });
+
+    it('should throw if id is not valid UUID', async () => {
+      setMockUser('user-123');
+      const { deleteCategory } = await import('@/lib/actions/categories');
+      await expect(deleteCategory('not-a-uuid')).rejects.toThrow('잘못된 카테고리 ID입니다');
+    });
+
+    it('should succeed with valid UUID', async () => {
+      setMockUser('user-123');
+      const { deleteCategory } = await import('@/lib/actions/categories');
+      await expect(
+        deleteCategory('550e8400-e29b-41d4-a716-446655440000')
+      ).resolves.not.toThrow();
+    });
+  });
+});
+
+describe('Recurring Instance Actions', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setDbResolve([{
+      id: 'parent-id',
+      userId: 'user-123',
+      excludedDates: [],
+      completedDates: [],
+      startDate: '2026-01-01',
+      recurrenceEndDate: '2026-12-31',
+    }]);
+  });
+
+  describe('excludeRecurringDate', () => {
+    it('should throw if not authenticated', async () => {
+      setMockUser(null);
+      const { excludeRecurringDate } = await import('@/lib/actions/calendar');
+      await expect(
+        excludeRecurringDate('550e8400-e29b-41d4-a716-446655440000', '2026-04-10')
+      ).rejects.toThrow('Unauthorized');
+    });
+
+    it('should throw if eventId is not valid UUID', async () => {
+      setMockUser('user-123');
+      const { excludeRecurringDate } = await import('@/lib/actions/calendar');
+      await expect(
+        excludeRecurringDate('bad-id', '2026-04-10')
+      ).rejects.toThrow('잘못된 ID입니다');
+    });
+
+    it('should throw if date format is invalid', async () => {
+      setMockUser('user-123');
+      const { excludeRecurringDate } = await import('@/lib/actions/calendar');
+      await expect(
+        excludeRecurringDate('550e8400-e29b-41d4-a716-446655440000', '2026/04/10')
+      ).rejects.toThrow('날짜 형식이 올바르지 않습니다');
+    });
+
+    it('should succeed on valid input (new date added)', async () => {
+      setMockUser('user-123');
+      setDbResolve([{
+        id: 'parent-id',
+        userId: 'user-123',
+        excludedDates: ['2026-04-01'],
+      }]);
+      const { excludeRecurringDate } = await import('@/lib/actions/calendar');
+      await expect(
+        excludeRecurringDate('550e8400-e29b-41d4-a716-446655440000', '2026-04-10')
+      ).resolves.not.toThrow();
+    });
+
+    it('should be idempotent when date already excluded', async () => {
+      setMockUser('user-123');
+      setDbResolve([{
+        id: 'parent-id',
+        userId: 'user-123',
+        excludedDates: ['2026-04-10'],
+      }]);
+      const { excludeRecurringDate } = await import('@/lib/actions/calendar');
+      await expect(
+        excludeRecurringDate('550e8400-e29b-41d4-a716-446655440000', '2026-04-10')
+      ).resolves.not.toThrow();
+    });
+  });
+
+  describe('toggleRecurringInstance', () => {
+    it('should throw if not authenticated', async () => {
+      setMockUser(null);
+      const { toggleRecurringInstance } = await import('@/lib/actions/calendar');
+      await expect(
+        toggleRecurringInstance('550e8400-e29b-41d4-a716-446655440000', '2026-04-10')
+      ).rejects.toThrow('Unauthorized');
+    });
+
+    it('should throw if eventId is not valid UUID', async () => {
+      setMockUser('user-123');
+      const { toggleRecurringInstance } = await import('@/lib/actions/calendar');
+      await expect(
+        toggleRecurringInstance('bad-id', '2026-04-10')
+      ).rejects.toThrow('잘못된 ID입니다');
+    });
+
+    it('should throw if date format is invalid', async () => {
+      setMockUser('user-123');
+      const { toggleRecurringInstance } = await import('@/lib/actions/calendar');
+      await expect(
+        toggleRecurringInstance('550e8400-e29b-41d4-a716-446655440000', 'not-a-date')
+      ).rejects.toThrow('날짜 형식이 올바르지 않습니다');
+    });
+
+    it('should succeed on valid input', async () => {
+      setMockUser('user-123');
+      setDbResolve([{
+        id: 'parent-id',
+        userId: 'user-123',
+        completedDates: [],
+      }]);
+      const { toggleRecurringInstance } = await import('@/lib/actions/calendar');
+      await expect(
+        toggleRecurringInstance('550e8400-e29b-41d4-a716-446655440000', '2026-04-10')
+      ).resolves.not.toThrow();
+    });
+  });
+
+  describe('deleteRecurringAfter', () => {
+    it('should throw if not authenticated', async () => {
+      setMockUser(null);
+      const { deleteRecurringAfter } = await import('@/lib/actions/calendar');
+      await expect(
+        deleteRecurringAfter('550e8400-e29b-41d4-a716-446655440000', '2026-04-10')
+      ).rejects.toThrow('Unauthorized');
+    });
+
+    it('should throw if eventId is not valid UUID', async () => {
+      setMockUser('user-123');
+      const { deleteRecurringAfter } = await import('@/lib/actions/calendar');
+      await expect(
+        deleteRecurringAfter('bad-id', '2026-04-10')
+      ).rejects.toThrow('잘못된 ID입니다');
+    });
+
+    it('should throw if date format is invalid', async () => {
+      setMockUser('user-123');
+      const { deleteRecurringAfter } = await import('@/lib/actions/calendar');
+      await expect(
+        deleteRecurringAfter('550e8400-e29b-41d4-a716-446655440000', 'bad-date')
+      ).rejects.toThrow('날짜 형식이 올바르지 않습니다');
+    });
+
+    it('should succeed on valid input', async () => {
+      setMockUser('user-123');
+      setDbResolve([{
+        id: 'parent-id',
+        userId: 'user-123',
+        startDate: '2026-01-01',
+      }]);
+      const { deleteRecurringAfter } = await import('@/lib/actions/calendar');
+      await expect(
+        deleteRecurringAfter('550e8400-e29b-41d4-a716-446655440000', '2026-04-10')
+      ).resolves.not.toThrow();
     });
   });
 });
