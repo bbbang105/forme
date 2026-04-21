@@ -105,8 +105,8 @@ export async function updateTodo(
   }
 ) {
   return traceAction('updateTodo', async () => {
-    if (!UUID_REGEX.test(id)) throw new Error('잘못된 ID입니다');
     const user = await getAuthUser();
+    if (!UUID_REGEX.test(id)) throw new Error('잘못된 ID입니다');
 
     if (data.content !== undefined && !data.content.trim()) throw new Error('내용을 입력해주세요');
     if (data.content !== undefined && data.content.trim().length > 1000) throw new Error('내용은 1000자 이내여야 합니다');
@@ -173,8 +173,8 @@ export async function reorderTodos(items: { id: string; sortOrder: number }[]) {
 
 export async function deleteTodo(id: string) {
   return traceAction('deleteTodo', async () => {
-    if (!UUID_REGEX.test(id)) throw new Error('잘못된 ID입니다');
     const user = await getAuthUser();
+    if (!UUID_REGEX.test(id)) throw new Error('잘못된 ID입니다');
 
     await traceQuery('todos.delete', () =>
       db
@@ -195,8 +195,8 @@ export async function deleteTodo(id: string) {
 
 export async function toggleTodo(id: string) {
   return traceAction('toggleTodo', async () => {
-    if (!UUID_REGEX.test(id)) throw new Error('잘못된 ID입니다');
     const user = await getAuthUser();
+    if (!UUID_REGEX.test(id)) throw new Error('잘못된 ID입니다');
 
     const [row] = await traceQuery('todos.toggle', () =>
       db

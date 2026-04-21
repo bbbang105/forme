@@ -49,6 +49,12 @@ export const PATCH = withTracing('PATCH /api/youtube/[id]', async (request, ctx)
   if (note !== undefined && note !== null && typeof note !== 'string') {
     return NextResponse.json({error: 'note must be string or null'}, {status: 400});
   }
+  if (typeof note === 'string' && note.length > ITEM_NOTE_MAX_LENGTH) {
+    return NextResponse.json(
+      {error: `노트는 ${ITEM_NOTE_MAX_LENGTH}자 이내여야 합니다`},
+      {status: 400}
+    );
+  }
   if (pinned !== undefined && typeof pinned !== 'boolean') {
     return NextResponse.json({error: 'pinned must be boolean'}, {status: 400});
   }
@@ -78,7 +84,7 @@ export const PATCH = withTracing('PATCH /api/youtube/[id]', async (request, ctx)
     }
     if (isBookmarked !== undefined) updateValues.isBookmarked = isBookmarked;
     if (note !== undefined) {
-      updateValues.note = note ? note.slice(0, ITEM_NOTE_MAX_LENGTH) : null;
+      updateValues.note = note ? note : null;
       if (note) updateValues.isBookmarked = true;
     }
 
