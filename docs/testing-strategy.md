@@ -59,7 +59,7 @@ forme 프로젝트에서 회귀를 막고, 보안/데이터 무결성 침해를 
 
 **위치**: `src/__tests__/hooks/*.test.ts`
 **도구**: `@testing-library/react` `renderHook` + `act`
-**대상**: 공통 훅 (`use-auto-save`, `use-swipe-action`, `use-pull-to-refresh`, 추후 `useInfiniteScroll`, `useFilterSync` 등)
+**대상**: 공통 훅 (`use-auto-save`, `use-pull-to-refresh`, `useInfiniteScroll`, `useFilterSync` 등)
 
 **각 훅마다**:
 - 초기 상태 검증
