@@ -143,15 +143,15 @@ export function NoteEditor({ note }: NoteEditorProps) {
 
   return (
     <div className="fixed inset-0 z-50 bg-background flex flex-col pt-[env(safe-area-inset-top)]">
-      {/* Header */}
+      {/* Header — editorial hairline */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-background shrink-0">
         <button
           onClick={handleBack}
           aria-label="노트 목록으로 돌아가기"
-          className="flex items-center gap-1 text-sm text-primary -ml-1 p-1 min-w-[44px] min-h-[44px] focus-visible:ring-2 focus-visible:ring-ring rounded"
+          className="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground hover:text-foreground transition-colors -ml-1 p-1 min-w-[44px] min-h-[44px] focus-visible:ring-2 focus-visible:ring-ring rounded"
         >
-          <ArrowLeft className="h-5 w-5" />
-          <span className="hidden sm:inline">노트</span>
+          <ArrowLeft className="h-3.5 w-3.5" />
+          <span>notes</span>
         </button>
 
         <div className="flex items-center gap-1">
@@ -159,13 +159,23 @@ export function NoteEditor({ note }: NoteEditorProps) {
             <span
               role="status"
               aria-live="polite"
-              className={cn('text-xs mr-2 flex items-center gap-1', saveError ? 'text-destructive' : 'text-muted-foreground')}
+              className={cn(
+                'mr-2 flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.12em]',
+                saveError ? 'text-destructive' : 'text-muted-foreground',
+              )}
             >
-              {saving ? '저장 중...' : saveError ? (
-                <button onClick={save} className="flex items-center gap-1 hover:underline">
-                  <RotateCcw className="h-3 w-3" />저장 실패 · 재시도
+              {saving ? (
+                <span>saving…</span>
+              ) : saveError ? (
+                <button onClick={save} className="flex items-center gap-1 hover:text-foreground transition-colors">
+                  <RotateCcw className="h-3 w-3" />retry
                 </button>
-              ) : <><Check className="h-3 w-3 text-primary" />저장됨</>}
+              ) : (
+                <>
+                  <Check className="h-3 w-3 text-primary" />
+                  <span>saved</span>
+                </>
+              )}
             </span>
           )}
           <button
@@ -207,7 +217,7 @@ export function NoteEditor({ note }: NoteEditorProps) {
       <NoteToolbar editor={editor} />
 
       {/* Editor area */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 pb-[env(safe-area-inset-bottom)]">
+      <div className="flex-1 overflow-y-auto px-4 py-6 pb-[env(safe-area-inset-bottom)] max-w-3xl mx-auto w-full">
         <label htmlFor="note-title" className="sr-only">노트 제목</label>
         <input
           id="note-title"
@@ -216,7 +226,7 @@ export function NoteEditor({ note }: NoteEditorProps) {
           onChange={(e) => setTitle(e.target.value)}
           placeholder="제목"
           maxLength={200}
-          className="w-full text-2xl font-bold bg-transparent outline-none placeholder:text-muted-foreground/50 mb-3 focus-visible:ring-0"
+          className="w-full font-display text-4xl leading-[1.1] tracking-tight bg-transparent outline-none placeholder:text-muted-foreground/40 mb-3 focus-visible:ring-0"
         />
 
         {/* Tag input area */}

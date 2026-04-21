@@ -47,17 +47,20 @@ export function TagInput({ tags, onTagsChange }: TagInputProps) {
   }, [tags, onTagsChange]);
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5 mb-4 min-h-[28px]">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-6 min-h-[20px] font-mono text-[11px] uppercase tracking-[0.12em]">
+      {tags.length > 0 && (
+        <span className="text-muted-foreground" aria-hidden="true">— tags</span>
+      )}
       {tags.map((tag) => (
         <span
           key={tag}
-          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent text-xs text-accent-foreground"
+          className="inline-flex items-center gap-1 text-foreground/80 group"
         >
           {tag}
           <button
             type="button"
             onClick={() => removeTag(tag)}
-            className="text-muted-foreground hover:text-foreground transition-colors"
+            className="text-muted-foreground/60 hover:text-destructive transition-colors"
             aria-label={`태그 '${tag}' 제거`}
           >
             <X className="h-3 w-3" />
@@ -86,19 +89,19 @@ export function TagInput({ tags, onTagsChange }: TagInputProps) {
             if (e.relatedTarget) return;
             addTag();
           }}
-          placeholder="태그 입력..."
+          placeholder="tag…"
           maxLength={MAX_TAG_LENGTH}
-          className="text-xs bg-accent/60 rounded-full px-2.5 py-0.5 outline-none w-24 placeholder:text-muted-foreground/60"
+          className="font-mono text-[11px] uppercase tracking-[0.12em] bg-transparent border-b border-primary/60 outline-none w-24 placeholder:text-muted-foreground/50 placeholder:normal-case placeholder:tracking-normal"
         />
       ) : tags.length < MAX_TAGS ? (
         <button
           type="button"
           onClick={() => setShowTagInput(true)}
-          className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+          className="inline-flex items-center gap-1 text-muted-foreground hover:text-primary transition-colors"
           aria-label="태그 추가"
         >
           <Plus className="h-3 w-3" />
-          <span>태그</span>
+          <span>{tags.length === 0 ? '— add tag' : 'add'}</span>
         </button>
       ) : null}
     </div>
