@@ -228,8 +228,8 @@ export async function updateCalendarEvent(
   }
 ) {
   return traceAction('updateCalendarEvent', async () => {
-    if (!UUID_REGEX.test(id)) throw new Error('잘못된 ID입니다');
     const user = await getAuthUser();
+    if (!UUID_REGEX.test(id)) throw new Error('잘못된 ID입니다');
 
     if (data.title !== undefined && !data.title.trim()) throw new Error('제목을 입력해주세요');
     if (data.title !== undefined && data.title.trim().length > 200) throw new Error('제목은 200자 이내여야 합니다');
@@ -300,8 +300,8 @@ export async function updateCalendarEvent(
 
 export async function deleteCalendarEvent(id: string) {
   return traceAction('deleteCalendarEvent', async () => {
-    if (!UUID_REGEX.test(id)) throw new Error('잘못된 ID입니다');
     const user = await getAuthUser();
+    if (!UUID_REGEX.test(id)) throw new Error('잘못된 ID입니다');
 
     await traceQuery('calendar.events.delete', () =>
       db
@@ -322,8 +322,8 @@ export async function deleteCalendarEvent(id: string) {
 
 export async function toggleCalendarEvent(id: string) {
   return traceAction('toggleCalendarEvent', async () => {
-    if (!UUID_REGEX.test(id)) throw new Error('잘못된 ID입니다');
     const user = await getAuthUser();
+    if (!UUID_REGEX.test(id)) throw new Error('잘못된 ID입니다');
     const [toggled] = await traceQuery('toggle_calendar_event', () =>
       db.update(calendarEvents)
         .set({ isCompleted: sql`NOT ${calendarEvents.isCompleted}`, updatedAt: new Date() })
@@ -338,9 +338,9 @@ export async function toggleCalendarEvent(id: string) {
 
 export async function toggleRecurringInstance(eventId: string, dateStr: string) {
   return traceAction('toggleRecurringInstance', async () => {
+    const user = await getAuthUser();
     if (!UUID_REGEX.test(eventId)) throw new Error('잘못된 ID입니다');
     if (!DATE_REGEX.test(dateStr)) throw new Error('날짜 형식이 올바르지 않습니다');
-    const user = await getAuthUser();
 
     const [event] = await traceQuery('calendar.events.get_for_toggle_instance', () =>
       db.select().from(calendarEvents)
@@ -414,9 +414,9 @@ export async function updateRecurringInstance(
   }
 ) {
   return traceAction('updateRecurringInstance', async () => {
+    const user = await getAuthUser();
     if (!UUID_REGEX.test(parentId)) throw new Error('잘못된 ID입니다');
     if (!DATE_REGEX.test(instanceDate)) throw new Error('날짜 형식이 올바르지 않습니다');
-    const user = await getAuthUser();
 
     // 입력 검증 (DB 변경 전에 수행)
     if (!data.title.trim()) throw new Error('제목을 입력해주세요');
@@ -482,8 +482,8 @@ export async function updateRecurringInstance(
 
 export async function deleteRecurringAfter(eventId: string, dateStr: string) {
   return traceAction('deleteRecurringAfter', async () => {
-    if (!UUID_REGEX.test(eventId)) throw new Error('잘못된 ID입니다');
     const user = await getAuthUser();
+    if (!UUID_REGEX.test(eventId)) throw new Error('잘못된 ID입니다');
     if (!DATE_REGEX.test(dateStr)) throw new Error('날짜 형식이 올바르지 않습니다');
 
     const d = new Date(dateStr + 'T00:00:00');

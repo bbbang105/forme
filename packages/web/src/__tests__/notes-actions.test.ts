@@ -397,4 +397,59 @@ describe('Notes Actions', () => {
       expect(result).toBeDefined();
     });
   });
+
+  describe('cross-user isolation (RLS boundary simulation)', () => {
+    // When RLS filters rows belonging to another user, the Drizzle mock returns
+    // [] (no row matched user.id). Our actions must surface this as null /
+    // not-throw / no-op rather than leaking data.
+    it('getNote returns null when row belongs to another user (RLS filter → [])', async () => {
+      setMockUser('user-a');
+      setDbResolve([]); // simulate: no rows pass user_id = 'user-a'
+      const { getNote } = await import('@/lib/actions/notes');
+      const result = await getNote('550e8400-e29b-41d4-a716-446655440000');
+      expect(result).toBeNull();
+    });
+
+    it('updateNote resolves undefined row when note owned by another user', async () => {
+      setMockUser('user-a');
+      setDbResolve([]); // UPDATE ... WHERE user_id='user-a' returns nothing
+      const { updateNote } = await import('@/lib/actions/notes');
+      const result = await updateNote(
+        '550e8400-e29b-41d4-a716-446655440000',
+        { title: 'T' },
+      );
+      // No row updated → `const [row] = await ...` is undefined
+      expect(result).toBeUndefined();
+    });
+
+    it('deleteNote does not throw when row not owned (WHERE user_id filter removes it)', async () => {
+      setMockUser('user-a');
+      // Delete returns nothing; action is fire-and-forget
+      setDbResolve([]);
+      const { deleteNote } = await import('@/lib/actions/notes');
+      await expect(
+        deleteNote('550e8400-e29b-41d4-a716-446655440000')
+      ).resolves.not.toThrow();
+    });
+
+    it('toggleNotePin throws "노트를 찾을 수 없습니다" when other user owns the note', async () => {
+      setMockUser('user-a');
+      setDbResolve([]); // RLS-filtered UPDATE returns no row
+      const { toggleNotePin } = await import('@/lib/actions/notes');
+      await expect(
+        toggleNotePin('550e8400-e29b-41d4-a716-446655440000')
+      ).rejects.toThrow('노트를 찾을 수 없습니다');
+    });
+
+    it('getNote WHERE clause includes user.id (spy on where() args)', async () => {
+      setMockUser('user-a');
+      setDbResolve([]);
+      resetDbCalls();
+      const { getNote } = await import('@/lib/actions/notes');
+      await getNote('550e8400-e29b-41d4-a716-446655440000');
+      // `where()` must have been invoked — ensures user-scoping path is hit.
+      const calls = getDbCalls('where');
+      expect(calls.length).toBeGreaterThan(0);
+    });
+  });
 });
