@@ -95,7 +95,7 @@ pnpm db:push          # 스키마 직접 push (dev용)
 - 유튜브 선택 모드: 피드 탭 상태 칩 우측 "선택" 버튼, 생성 탭 수집 라인 우측 "선택" 버튼, 일괄 삭제 (bulk-action API), 읽음 탭에서 일괄 안읽음 되돌리기 (mark_unread)
 - 유튜브 즐겨찾기 소스: DnD 순서변경 (@dnd-kit/sortable, GripVertical 핸들, /api/youtube/sources/reorder 배치 업데이트)
 - 피드 필터 순서: 카테고리 세그먼트 → 상태 칩 (+ statusActions 슬롯) → 검색 → 즐겨찾기 소스 → 정렬, 헤더 제거 (선택/소스관리 버튼을 상태 칩 우측에 배치)
-- 테스트: Vitest + `vi.hoisted()` Proxy 기반 DB 목 패턴 (`packages/web/src/__tests__/`)
+- 테스트: Vitest + `vi.hoisted()` Proxy 기반 DB 목 패턴 (`packages/web/src/__tests__/`). **전략/규칙은 `docs/testing-strategy.md` 참조** — 신규 Server Action/API/훅/util 추가 시 필수 테스트 계층 + 커버리지 기준, CI 통합 (lint/typecheck/build/test 4 job 필수), 정적 분석 회귀 가드 (`route-consistency.test.ts`)
 
 ## 핵심 파일
 
@@ -239,6 +239,7 @@ RLS로 `auth.uid() = user_id` 강제. profiles 테이블로 멀티유저 확장 
 
 | 문서 | 내용 |
 |------|------|
+| `docs/testing-strategy.md` | 테스팅 전략 (계층, 필수 커버리지, 목 패턴, CI 통합) |
 | `docs/plans/26-03-03-forme-design.md` | 전체 설계 문서 |
 | `docs/26-03-03-schema-summary.md` | DB 스키마 요약 (테이블, FK, enum) |
 | `docs/26-03-03-patterns.md` | 인증/API/ORM 코드 패턴 |
