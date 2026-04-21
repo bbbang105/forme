@@ -369,6 +369,16 @@ describe('Recurring Instance Actions', () => {
       ).rejects.toThrow('Unauthorized');
     });
 
+    it('should throw Unauthorized (not UUID error) when unauthenticated with bad UUID — auth before validation', async () => {
+      setMockUser(null);
+      const { deleteRecurringAfter } = await import('@/lib/actions/calendar');
+      // Unauthorized must fire first, even though UUID is also invalid — this
+      // prevents leaking validation details to unauthenticated callers.
+      await expect(
+        deleteRecurringAfter('bad-id', '2026-04-10')
+      ).rejects.toThrow('Unauthorized');
+    });
+
     it('should throw if eventId is not valid UUID', async () => {
       setMockUser('user-123');
       const { deleteRecurringAfter } = await import('@/lib/actions/calendar');
@@ -396,6 +406,103 @@ describe('Recurring Instance Actions', () => {
       await expect(
         deleteRecurringAfter('550e8400-e29b-41d4-a716-446655440000', '2026-04-10')
       ).resolves.not.toThrow();
+    });
+  });
+
+  describe('auth ordering regression — recurring instance actions', () => {
+    // Regression: toggleRecurringInstance / updateRecurringInstance /
+    // deleteRecurringAfter must call getAuthUser before UUID validation so
+    // unauthenticated callers never receive "잘못된 ID입니다" (info leak).
+    it('toggleRecurringInstance: unauth + bad UUID → Unauthorized', async () => {
+      setMockUser(null);
+      const { toggleRecurringInstance } = await import('@/lib/actions/calendar');
+      await expect(
+        toggleRecurringInstance('bad', '2026-04-10')
+      ).rejects.toThrow('Unauthorized');
+    });
+
+    it('deleteRecurringAfter: unauth + bad date → Unauthorized', async () => {
+      setMockUser(null);
+      const { deleteRecurringAfter } = await import('@/lib/actions/calendar');
+      await expect(
+        deleteRecurringAfter('550e8400-e29b-41d4-a716-446655440000', 'not-a-date')
+      ).rejects.toThrow('Unauthorized');
+    });
+
+    it('updateCalendarEvent: unauth + bad UUID → Unauthorized', async () => {
+      setMockUser(null);
+      const { updateCalendarEvent } = await import('@/lib/actions/calendar');
+      await expect(
+        updateCalendarEvent('bad-id', { title: 'x' })
+      ).rejects.toThrow('Unauthorized');
+    });
+
+    it('deleteCalendarEvent: unauth + bad UUID → Unauthorized', async () => {
+      setMockUser(null);
+      const { deleteCalendarEvent } = await import('@/lib/actions/calendar');
+      await expect(deleteCalendarEvent('bad-id')).rejects.toThrow('Unauthorized');
+    });
+  });
+
+  describe('updateRecurringInstance', () => {
+    it('should throw if not authenticated', async () => {
+      setMockUser(null);
+      const { updateRecurringInstance } = await import('@/lib/actions/calendar');
+      await expect(
+        updateRecurringInstance(
+          '550e8400-e29b-41d4-a716-446655440000',
+          '2026-04-10',
+          { title: 'T', startDate: '2026-04-10', endDate: '2026-04-10' },
+        )
+      ).rejects.toThrow('Unauthorized');
+    });
+
+    it('should throw Unauthorized first when unauth + bad UUID', async () => {
+      setMockUser(null);
+      const { updateRecurringInstance } = await import('@/lib/actions/calendar');
+      await expect(
+        updateRecurringInstance(
+          'bad-id',
+          '2026-04-10',
+          { title: 'T', startDate: '2026-04-10', endDate: '2026-04-10' },
+        )
+      ).rejects.toThrow('Unauthorized');
+    });
+
+    it('should throw if parentId is not UUID', async () => {
+      setMockUser('user-123');
+      const { updateRecurringInstance } = await import('@/lib/actions/calendar');
+      await expect(
+        updateRecurringInstance(
+          'bad-id',
+          '2026-04-10',
+          { title: 'T', startDate: '2026-04-10', endDate: '2026-04-10' },
+        )
+      ).rejects.toThrow('잘못된 ID입니다');
+    });
+
+    it('should throw if instanceDate has wrong format', async () => {
+      setMockUser('user-123');
+      const { updateRecurringInstance } = await import('@/lib/actions/calendar');
+      await expect(
+        updateRecurringInstance(
+          '550e8400-e29b-41d4-a716-446655440000',
+          'not-a-date',
+          { title: 'T', startDate: '2026-04-10', endDate: '2026-04-10' },
+        )
+      ).rejects.toThrow('날짜 형식이 올바르지 않습니다');
+    });
+
+    it('should throw when title is empty', async () => {
+      setMockUser('user-123');
+      const { updateRecurringInstance } = await import('@/lib/actions/calendar');
+      await expect(
+        updateRecurringInstance(
+          '550e8400-e29b-41d4-a716-446655440000',
+          '2026-04-10',
+          { title: '   ', startDate: '2026-04-10', endDate: '2026-04-10' },
+        )
+      ).rejects.toThrow('제목을 입력해주세요');
     });
   });
 });
