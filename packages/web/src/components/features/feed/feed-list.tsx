@@ -7,6 +7,7 @@ import {Skeleton} from '@/components/ui/skeleton';
 import {Button} from '@/components/ui/button';
 import {useFilterSync} from '@/hooks/use-filter-sync';
 import {useInfiniteScroll} from '@/hooks/use-infinite-scroll';
+import {useBulkSelection} from '@/hooks/use-bulk-selection';
 import {
     AlertDialog,
     AlertDialogCancel,
@@ -93,9 +94,16 @@ export function FeedList() {
   const [manualSourceId, setManualSourceId] = useState<string | null>(null);
   const [addUrlOpen, setAddUrlOpen] = useState(false);
 
-  // Selection & delete state
-  const [selectMode, setSelectMode] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // Selection (shared bulk-selection hook)
+  const {
+    selectMode,
+    selectedIds,
+    toggle: toggleSelect,
+    toggleSelectAll,
+    toggleSelectMode,
+    exitSelectMode,
+  } = useBulkSelection();
+  // Delete & bulk-action UI state
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkUnreadOpen, setBulkUnreadOpen] = useState(false);
@@ -116,9 +124,8 @@ export function FeedList() {
 
   // Exit select mode on filter change
   useEffect(() => {
-    setSelectMode(false);
-    setSelectedIds(new Set());
-  }, [category, status, search, tagsParam, sort, sourceId]);
+    exitSelectMode();
+  }, [category, status, search, tagsParam, sort, sourceId, exitSelectMode]);
 
   // URL sync helper — delegates to shared `useFilterSync` but preserves the
   // feed-specific collapsing rules: drop `status=unread` (the default) and
@@ -375,11 +382,10 @@ export function FeedList() {
     }
 
     if (failed) fetchItems(null, false);
-    setSelectedIds(new Set());
-    setSelectMode(false);
+    exitSelectMode();
     setBulkDeleteOpen(false);
     setDeleting(false);
-  }, [selectedIds, fetchItems]);
+  }, [selectedIds, fetchItems, exitSelectMode]);
 
   const handleBulkMarkUnread = useCallback(async () => {
     if (selectedIds.size === 0) return;
@@ -400,35 +406,10 @@ export function FeedList() {
     }
 
     if (failed) fetchItems(null, false);
-    setSelectedIds(new Set());
-    setSelectMode(false);
+    exitSelectMode();
     setBulkUnreadOpen(false);
     setBulkUnreading(false);
-  }, [selectedIds, fetchItems]);
-
-  // ── Selection helpers ──
-
-  const toggleSelect = useCallback((id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
-
-  const toggleSelectAll = useCallback(() => {
-    setSelectedIds((prev) => {
-      const all = itemsRef.current;
-      if (prev.size === all.length) return new Set();
-      return new Set(all.map((i) => i.id));
-    });
-  }, []);
-
-  const exitSelectMode = useCallback(() => {
-    setSelectMode(false);
-    setSelectedIds(new Set());
-  }, []);
+  }, [selectedIds, fetchItems, exitSelectMode]);
 
   // ── Keyboard navigation (DOM-based focus to avoid re-renders) ──
 
@@ -552,7 +533,7 @@ export function FeedList() {
           <div className="flex items-baseline gap-4">
             <button
               type="button"
-              onClick={toggleSelectAll}
+              onClick={() => toggleSelectAll(items.map((i) => i.id))}
               className="font-mono text-[11px] uppercase tracking-[0.1em] text-primary hover:text-primary/80 transition-colors cursor-pointer"
             >
               {selectedIds.size === items.length ? 'Clear all' : 'Select all'}
@@ -620,7 +601,7 @@ export function FeedList() {
             {!selectMode ? (
               <button
                 type="button"
-                onClick={() => setSelectMode(true)}
+                onClick={toggleSelectMode}
                 disabled={loading || items.length === 0}
                 className="p-1.5 rounded-md border border-border text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors disabled:opacity-50 disabled:pointer-events-none"
                 aria-label="선택 모드"
