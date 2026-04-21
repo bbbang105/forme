@@ -3,14 +3,15 @@ import {createClient} from '@/lib/supabase/server';
 import {feedSources, db} from '@forme/shared';
 import {asc, desc, eq} from 'drizzle-orm';
 import {isSafeUrl} from '@/lib/url-safety';
+import {safeFetch} from '@/lib/safe-fetch';
 import {withTracing} from '@/lib/logger';
 
 async function detectRssUrl(url: string): Promise<string | null> {
   if (!isSafeUrl(url)) return null;
   try {
-    const response = await fetch(url, {
+    const response = await safeFetch(url, {
       headers: { 'User-Agent': 'FormeBot/1.0' },
-      signal: AbortSignal.timeout(5000),
+      timeoutMs: 5000,
     });
     if (!response.ok) return null;
     const html = await response.text();

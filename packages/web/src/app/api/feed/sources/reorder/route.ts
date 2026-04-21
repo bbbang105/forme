@@ -68,19 +68,21 @@ export const PUT = withTracing('PUT /api/feed/sources/reorder', async (request) 
   const items = body.items;
 
   try {
-    await Promise.all(
-      items.map((item) =>
-        db
-          .update(feedSources)
-          .set({ favoriteOrder: item.favoriteOrder })
-          .where(
-            and(
-              eq(feedSources.id, item.id),
-              eq(feedSources.userId, user.id)
+    await db.transaction(async (tx) => {
+      await Promise.all(
+        items.map((item) =>
+          tx
+            .update(feedSources)
+            .set({ favoriteOrder: item.favoriteOrder })
+            .where(
+              and(
+                eq(feedSources.id, item.id),
+                eq(feedSources.userId, user.id)
+              )
             )
-          )
-      )
-    );
+        )
+      );
+    });
 
     return NextResponse.json({ ok: true });
   } catch (err) {

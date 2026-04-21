@@ -2,6 +2,29 @@ import {timingSafeEqual} from 'node:crypto';
 import {UUID_REGEX} from '@/lib/validators';
 import {db, profiles} from '@forme/shared';
 
+/** Minimum recommended CRON_SECRET length (in characters). */
+export const MIN_CRON_SECRET_LENGTH = 32;
+
+/** One-shot warning so we don't spam logs on every request. */
+let _weakSecretWarned = false;
+function warnIfWeakSecret(secret: string | undefined): void {
+  if (_weakSecretWarned) return;
+  if (!secret) return;
+  if (secret.length < MIN_CRON_SECRET_LENGTH) {
+    _weakSecretWarned = true;
+    // Log once at runtime. Short secrets weaken brute-force resistance but
+    // shouldn't break serving — hence warn, not throw.
+    console.warn(
+      `[cron-auth] CRON_SECRET is shorter than ${MIN_CRON_SECRET_LENGTH} chars; please rotate to a 32+ char random value.`,
+    );
+  }
+}
+
+/** Internal helper for tests: reset the warn-once flag. Not exported from index. */
+export function _resetWeakSecretWarning(): void {
+  _weakSecretWarned = false;
+}
+
 /** Timing-safe string comparison — constant time regardless of length mismatch */
 export function safeCompare(a: string, b: string): boolean {
   const bufA = Buffer.from(a);
@@ -23,6 +46,7 @@ export function verifyCronSecret(request: Request):
   | { ok: false; status: number; error: string } {
   const authHeader = request.headers.get('authorization');
   const secret = process.env.CRON_SECRET?.trim();
+  warnIfWeakSecret(secret);
   if (!secret || !authHeader || !safeCompare(authHeader, `Bearer ${secret}`)) {
     return { ok: false, status: 401, error: 'Unauthorized' };
   }
@@ -38,6 +62,7 @@ export function verifyCronAuth(request: Request):
   | { ok: false; status: number; error: string } {
   const authHeader = request.headers.get('authorization');
   const secret = process.env.CRON_SECRET?.trim();
+  warnIfWeakSecret(secret);
   if (!secret || !authHeader || !safeCompare(authHeader, `Bearer ${secret}`)) {
     return { ok: false, status: 401, error: 'Unauthorized' };
   }

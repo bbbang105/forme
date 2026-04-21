@@ -1,4 +1,5 @@
 import {isSafeUrl} from '@/lib/url-safety';
+import {safeFetch} from '@/lib/safe-fetch';
 import {YOUTUBE_VIDEO_ID_REGEX} from '@/lib/validators';
 
 const MAX_TRANSCRIPT_CHARS = 80_000;
@@ -55,14 +56,14 @@ async function fetchCaptionText(videoId: string): Promise<string> {
   if (!YOUTUBE_VIDEO_ID_REGEX.test(videoId)) throw new Error('Invalid video ID');
 
   // Innertube ANDROID client로 player 정보 가져오기
-  const playerRes = await fetch(INNERTUBE_URL, {
+  const playerRes = await safeFetch(INNERTUBE_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'User-Agent': ANDROID_UA,
     },
     body: JSON.stringify({ videoId, context: ANDROID_CONTEXT }),
-    signal: AbortSignal.timeout(10_000),
+    timeoutMs: 10_000,
   });
   if (!playerRes.ok) throw new Error(`Innertube player API failed: ${playerRes.status}`);
   const playerData: InnertubePlayerResponse = await playerRes.json();
@@ -85,8 +86,8 @@ async function fetchCaptionText(videoId: string): Promise<string> {
   if (!isSafeUrl(track.baseUrl)) throw new Error('Unsafe caption URL');
 
   // 자막 XML fetch
-  const captionRes = await fetch(track.baseUrl, {
-    signal: AbortSignal.timeout(10_000),
+  const captionRes = await safeFetch(track.baseUrl, {
+    timeoutMs: 10_000,
   });
   if (!captionRes.ok) throw new Error(`Caption fetch failed: ${captionRes.status}`);
   const xml = await captionRes.text();
