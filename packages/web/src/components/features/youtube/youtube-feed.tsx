@@ -2,7 +2,7 @@
 
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useRouter, useSearchParams} from 'next/navigation';
-import {BookmarkIcon, Download, Loader2, Mail, MailOpen, MailX, Plus, Search, Star, Trash2, Wand2, X} from 'lucide-react';
+import {Download, Loader2, MailX, Plus, Search, Star, Trash2, X} from 'lucide-react';
 import {cn} from '@/lib/utils';
 import {Button} from '@/components/ui/button';
 import {
@@ -29,20 +29,20 @@ type Status = 'unread' | 'read' | 'bookmarked';
 type Period = '3d' | '7d' | '30d';
 
 const MAIN_TABS: { value: Tab; label: string }[] = [
-  { value: 'feed', label: '피드' },
-  { value: 'create', label: '생성' },
+  { value: 'feed', label: 'Feed' },
+  { value: 'create', label: 'Collect' },
 ];
 
-const STATUS_CHIPS: { value: Status; label: string; icon: typeof Mail }[] = [
-  { value: 'unread', label: '안읽음', icon: Mail },
-  { value: 'read', label: '읽음', icon: MailOpen },
-  { value: 'bookmarked', label: '북마크', icon: BookmarkIcon },
+const STATUS_TABS: { value: Status; label: string }[] = [
+  { value: 'unread', label: 'Unread' },
+  { value: 'read', label: 'Read' },
+  { value: 'bookmarked', label: 'Saved' },
 ];
 
 const PERIODS: { value: Period; label: string }[] = [
-  { value: '3d', label: '3일' },
-  { value: '7d', label: '7일' },
-  { value: '30d', label: '30일' },
+  { value: '3d', label: '3D' },
+  { value: '7d', label: '7D' },
+  { value: '30d', label: '30D' },
 ];
 
 const TAG_OPTIONS = [
@@ -592,45 +592,52 @@ export function YoutubeFeed() {
   const pinLocked = pinnedItems.length >= MAX_PINNED;
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-4 max-w-7xl mx-auto space-y-4 pb-24">
-      {/* ── 1단: 메인 탭 (세그먼트 컨트롤) ── */}
-      <div className="flex rounded-xl bg-muted/50 p-1 gap-0.5">
-        {MAIN_TABS.map(({ value, label }) => (
-          <button
-            key={value}
-            type="button"
-            onClick={() => handleTabSwitch(value)}
-            className={cn(
-              'flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2.5 text-sm font-semibold',
-              'transition-all cursor-pointer',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
-              tab === value
-                ? 'bg-background text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground',
-            )}
-          >
-            {value === 'feed' && <Mail className="h-4 w-4" aria-hidden="true" />}
-            {value === 'create' && <Wand2 className="h-4 w-4" aria-hidden="true" />}
-            {label}
-          </button>
-        ))}
+    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto space-y-5 pb-24">
+      {/* ── Main tabs — underline editorial nav ── */}
+      <div role="tablist" aria-label="유튜브 모드" className="flex items-center gap-6 border-b border-border overflow-x-auto scrollbar-hide">
+        {MAIN_TABS.map(({value, label}) => {
+          const isActive = tab === value;
+          return (
+            <button
+              key={value}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              onClick={() => handleTabSwitch(value)}
+              className={cn(
+                'py-3 font-mono text-[11px] uppercase tracking-[0.12em] whitespace-nowrap',
+                '-mb-px border-b-2 transition-colors cursor-pointer',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                isActive
+                  ? 'border-primary text-foreground font-semibold'
+                  : 'border-transparent text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {label}
+            </button>
+          );
+        })}
       </div>
 
-      {/* ── 피드 탭: 검색 ── */}
+      {/* ── Feed tab: search (hairline) ── */}
       {isFeedTab && (
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+          <Search
+            className="absolute left-0 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground"
+            aria-hidden="true"
+          />
           <input
             type="text"
             value={localSearch}
             onChange={(e) => handleSearchChange(e.target.value)}
-            placeholder="제목이나 요약으로 검색..."
+            placeholder="Search videos…"
             maxLength={100}
             aria-label="영상 검색"
             className={cn(
-              'w-full h-10 pl-9 pr-9 rounded-lg border border-border bg-background',
+              'w-full h-10 pl-6 pr-7 bg-transparent',
+              'border-b border-border',
               'text-base placeholder:text-muted-foreground',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1',
+              'focus:outline-none focus:border-primary',
               'transition-colors',
             )}
           />
@@ -638,37 +645,38 @@ export function YoutubeFeed() {
             <button
               type="button"
               onClick={handleSearchClear}
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-muted transition-colors"
+              className="absolute right-0 top-1/2 -translate-y-1/2 p-0.5 rounded-full text-muted-foreground hover:text-primary transition-colors"
               aria-label="검색어 지우기"
             >
-              <X className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+              <X className="h-3.5 w-3.5" aria-hidden="true" />
             </button>
           )}
         </div>
       )}
 
-      {/* ── 2단: 피드 탭 — 상태 필터 칩 + 선택 버튼 ── */}
+      {/* ── Feed tab: status filter (mono em-dash tabs) + select button ── */}
       {isFeedTab && (
-        <div className="relative flex items-center">
-          <div className="flex items-center gap-1.5 pr-12">
-            {STATUS_CHIPS.map((chip) => {
-              const Icon = chip.icon;
+        <div className="flex items-center justify-between gap-3">
+          <div role="tablist" aria-label="상태" className="flex items-center gap-5">
+            {STATUS_TABS.map(({value, label}) => {
+              const isActive = status === value;
               return (
                 <button
-                  key={chip.value}
+                  key={value}
                   type="button"
-                  onClick={() => handleStatusSwitch(chip.value)}
+                  role="tab"
+                  aria-selected={isActive}
+                  onClick={() => handleStatusSwitch(value)}
                   className={cn(
-                    'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium',
-                    'transition-colors cursor-pointer',
-                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
-                    status === chip.value
-                      ? 'bg-primary text-primary-foreground'
-                      : 'border border-border text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                    'font-mono text-[11px] uppercase tracking-[0.1em] transition-colors cursor-pointer',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm',
+                    isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
                   )}
                 >
-                  <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-                  {chip.label}
+                  {isActive && (
+                    <span className="mr-1.5" aria-hidden="true">—</span>
+                  )}
+                  {label}
                 </button>
               );
             })}
@@ -683,62 +691,60 @@ export function YoutubeFeed() {
                 });
               }}
               className={cn(
-                'absolute right-0 inline-flex shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium',
-                'transition-colors cursor-pointer',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
-                selectMode
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-muted-foreground hover:text-foreground',
+                'shrink-0 font-mono text-[11px] uppercase tracking-[0.08em] transition-colors cursor-pointer',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-sm',
+                selectMode ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
               )}
             >
-              {selectMode ? '취소' : '선택'}
+              {selectMode ? 'Cancel' : 'Select'}
             </button>
           )}
         </div>
       )}
 
-      {/* ── 피드 탭: 선택 모드 바 ── */}
+      {/* ── Feed tab: select mode bar (editorial hairline) ── */}
       {isFeedTab && selectMode && (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-muted-foreground">
-              {selectedIds.size > 0 ? `${selectedIds.size}개 선택됨` : '영상을 선택하세요'}
-            </p>
+        <div className="flex items-center justify-between gap-3 pb-3 border-b border-border">
+          <div className="flex items-baseline gap-4">
             <button
               type="button"
               onClick={() => {
                 if (selectedIds.size === items.length) setSelectedIds(new Set());
                 else setSelectedIds(new Set(items.map((i) => i.id)));
               }}
-              className="text-xs text-primary hover:underline cursor-pointer"
+              className="font-mono text-[11px] uppercase tracking-[0.1em] text-primary hover:text-primary/80 transition-colors cursor-pointer"
             >
-              {selectedIds.size === items.length ? '선택 해제' : '전체 선택'}
+              {selectedIds.size === items.length ? 'Clear all' : 'Select all'}
             </button>
+            <span
+              className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground"
+              aria-live="polite"
+              aria-atomic="true"
+            >
+              <span className="text-primary" aria-hidden="true">—</span> {selectedIds.size} selected
+            </span>
           </div>
-
           {selectedIds.size > 0 && (
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
               {status === 'read' && (
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setShowBulkUnread(true)}
                   disabled={bulkUnreading}
-                  className="flex-1 gap-1.5 h-auto py-2.5"
                 >
-                  <MailX className="h-3.5 w-3.5" aria-hidden="true" />
-                  안읽음으로
+                  <MailX className="h-4 w-4 mr-1.5" aria-hidden="true" />
+                  Mark unread
                 </Button>
               )}
               <Button
-                variant="outline"
+                variant="destructive"
                 size="sm"
                 onClick={() => setShowBulkDelete(true)}
                 disabled={bulkDeleting}
-                className="flex-1 gap-1.5 h-auto py-2.5 text-destructive hover:text-destructive"
               >
-                <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                삭제
+                <Trash2 className="h-4 w-4 mr-1.5" aria-hidden="true" />
+                Delete
               </Button>
             </div>
           )}
@@ -756,25 +762,28 @@ export function YoutubeFeed() {
           />
 
           {!collectActive && (
-            <div className="flex items-center gap-2">
-              <div role="radiogroup" aria-label="수집 기간" className="flex rounded-lg border border-border p-0.5">
-                {PERIODS.map((p) => (
-                  <button
-                    key={p.value}
-                    type="button"
-                    role="radio"
-                    aria-checked={collectPeriod === p.value}
-                    onClick={() => setCollectPeriod(p.value)}
-                    className={cn(
-                      'rounded-md px-3 py-1 text-xs font-medium transition-colors cursor-pointer',
-                      collectPeriod === p.value
-                        ? 'bg-primary text-primary-foreground'
-                        : 'text-muted-foreground hover:text-foreground',
-                    )}
-                  >
-                    {p.label}
-                  </button>
-                ))}
+            <div className="flex items-center gap-5">
+              <div role="radiogroup" aria-label="수집 기간" className="flex items-center gap-4">
+                {PERIODS.map((p) => {
+                  const isActive = collectPeriod === p.value;
+                  return (
+                    <button
+                      key={p.value}
+                      type="button"
+                      role="radio"
+                      aria-checked={isActive}
+                      onClick={() => setCollectPeriod(p.value)}
+                      className={cn(
+                        'font-mono text-[11px] uppercase tracking-[0.1em] transition-colors cursor-pointer',
+                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-sm',
+                        isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
+                      )}
+                    >
+                      {isActive && <span className="mr-1.5" aria-hidden="true">—</span>}
+                      {p.label}
+                    </button>
+                  );
+                })}
               </div>
               <Button
                 size="sm"
@@ -783,7 +792,7 @@ export function YoutubeFeed() {
                 className="gap-1.5"
               >
                 <Download className="h-3.5 w-3.5" aria-hidden="true" />
-                수집
+                Collect
               </Button>
               {!loading && items.length > 0 && (
                 <button
@@ -795,15 +804,12 @@ export function YoutubeFeed() {
                     });
                   }}
                   className={cn(
-                    'ml-auto inline-flex shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium',
-                    'transition-colors cursor-pointer',
-                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
-                    selectMode
-                      ? 'bg-primary/10 text-primary'
-                      : 'text-muted-foreground hover:text-foreground',
+                    'ml-auto shrink-0 font-mono text-[11px] uppercase tracking-[0.08em] transition-colors cursor-pointer',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-sm',
+                    selectMode ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
                   )}
                 >
-                  {selectMode ? '취소' : '선택'}
+                  {selectMode ? 'Cancel' : 'Select'}
                 </button>
               )}
             </div>
@@ -820,65 +826,69 @@ export function YoutubeFeed() {
         </>
       )}
 
-      {/* ── 공통: 즐겨찾기 소스 칩 + 태그 칩 ── */}
+      {/* ── Favorites bar (editorial sm chips) ── */}
       {favoriteSources.length > 0 && (
-        <div className="flex items-center gap-1.5 overflow-x-auto overflow-y-visible scrollbar-none">
-          {favoriteSources.map((source) => (
-            <button
-              key={source.id}
-              type="button"
-              onClick={() =>
-                updateFilter({ sourceId: activeSourceId === source.id ? null : source.id })
-              }
-              className={cn(
-                'inline-flex items-center gap-1 shrink-0 rounded-full px-3 py-1.5 text-xs font-medium',
-                'transition-colors cursor-pointer border',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
-                activeSourceId === source.id
-                  ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30'
-                  : 'bg-background text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground',
-              )}
-            >
-              <Star className="h-3 w-3 text-amber-500" fill="currentColor" aria-hidden="true" />
-              <span className="max-w-[100px] truncate">{source.channelName}</span>
-            </button>
-          ))}
+        <div className="flex items-center gap-1.5 overflow-x-auto overflow-y-visible scrollbar-none pb-0.5">
+          {favoriteSources.map((source) => {
+            const active = activeSourceId === source.id;
+            return (
+              <button
+                key={source.id}
+                type="button"
+                onClick={() =>
+                  updateFilter({ sourceId: active ? null : source.id })
+                }
+                className={cn(
+                  'inline-flex items-center gap-1.5 shrink-0 rounded-sm px-2.5 py-1.5 text-xs',
+                  'transition-colors cursor-pointer border',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
+                  active
+                    ? 'bg-primary/10 text-primary border-primary/40'
+                    : 'bg-background text-muted-foreground border-border hover:text-foreground hover:border-muted-foreground',
+                )}
+              >
+                <Star className="h-3 w-3 fill-current" aria-hidden="true" />
+                <span className="max-w-[100px] truncate">{source.channelName}</span>
+              </button>
+            );
+          })}
         </div>
       )}
 
-      {(allTags.length > 0 || isFeedTab || (isCreateTab && !loading && items.length > 0)) && (
-        <div className="relative flex items-center">
-          <div className="flex items-center gap-1.5 overflow-x-auto overflow-y-visible scrollbar-none pr-10">
-            {TAG_OPTIONS.filter((t) => allTags.includes(t.value)).map((tagOpt) => (
-              <button
-                key={tagOpt.value}
-                type="button"
-                onClick={() =>
-                  updateFilter({ tag: activeTag === tagOpt.value ? null : tagOpt.value })
-                }
-                className={cn(
-                  'inline-flex shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium',
-                  'transition-colors cursor-pointer',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
-                  activeTag === tagOpt.value
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted/60 text-muted-foreground hover:text-foreground ring-1 ring-border/50',
-                )}
-              >
-                {tagOpt.label}
-              </button>
-            ))}
+      {(allTags.length > 0 || isFeedTab) && (
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-5 overflow-x-auto overflow-y-visible scrollbar-none">
+            {TAG_OPTIONS.filter((t) => allTags.includes(t.value)).map((tagOpt) => {
+              const isActive = activeTag === tagOpt.value;
+              return (
+                <button
+                  key={tagOpt.value}
+                  type="button"
+                  onClick={() =>
+                    updateFilter({ tag: isActive ? null : tagOpt.value })
+                  }
+                  className={cn(
+                    'shrink-0 font-mono text-[11px] uppercase tracking-[0.1em] transition-colors cursor-pointer',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-sm',
+                    isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  {isActive && <span className="mr-1.5" aria-hidden="true">—</span>}
+                  {tagOpt.label}
+                </button>
+              );
+            })}
           </div>
 
-          {/* URL 직접 추가 버튼 — 항상 우측 고정 */}
+          {/* URL 직접 추가 — 우측 액센트 */}
           {isFeedTab && (
             <button
               type="button"
               onClick={() => setShowAddUrl(true)}
               className={cn(
-                'absolute right-0 inline-flex items-center justify-center',
-                'h-7 w-7 rounded-full bg-primary text-primary-foreground',
-                'shadow-sm hover:bg-primary/90 transition-colors cursor-pointer',
+                'shrink-0 inline-flex items-center justify-center',
+                'h-7 w-7 rounded-sm border border-border text-muted-foreground',
+                'hover:text-primary hover:border-primary transition-colors cursor-pointer',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
               )}
               aria-label="YouTube URL 직접 추가"
@@ -889,58 +899,59 @@ export function YoutubeFeed() {
         </div>
       )}
 
-      {/* ── 생성 탭: 선택 모드 바 ── */}
+      {/* ── Create tab: select mode bar ── */}
       {isCreateTab && selectMode && (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-muted-foreground">
-              {selectedIds.size > 0 ? `${selectedIds.size}개 선택됨` : '요약할 영상을 선택하세요'}
-            </p>
-            <button
-              type="button"
-              onClick={() => {
-                if (selectedIds.size === items.length) setSelectedIds(new Set());
-                else setSelectedIds(new Set(items.map((i) => i.id)));
-              }}
-              className="text-xs text-primary hover:underline cursor-pointer"
-            >
-              {selectedIds.size === items.length ? '선택 해제' : '전체 선택'}
-            </button>
+        <div className="space-y-3 pb-3 border-b border-border">
+          <div className="flex items-baseline justify-between gap-3">
+            <div className="flex items-baseline gap-4">
+              <button
+                type="button"
+                onClick={() => {
+                  if (selectedIds.size === items.length) setSelectedIds(new Set());
+                  else setSelectedIds(new Set(items.map((i) => i.id)));
+                }}
+                className="font-mono text-[11px] uppercase tracking-[0.1em] text-primary hover:text-primary/80 transition-colors cursor-pointer"
+              >
+                {selectedIds.size === items.length ? 'Clear all' : 'Select all'}
+              </button>
+              <span
+                className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground"
+                aria-live="polite"
+                aria-atomic="true"
+              >
+                <span className="text-primary" aria-hidden="true">—</span>{' '}
+                {selectedIds.size > 0 ? `${selectedIds.size} selected` : '요약할 영상을 선택하세요'}
+              </span>
+            </div>
           </div>
 
           {selectedIds.size > 0 && (
             <div className="flex gap-2">
-              <button
-                type="button"
+              <Button
                 onClick={handleSummarize}
                 disabled={summarizing || selectedIds.size > YOUTUBE_SUMMARIZE_BATCH_MAX}
-                className={cn(
-                  'flex-1 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground',
-                  'transition-colors hover:bg-primary/90',
-                  'focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
-                  'disabled:opacity-50 disabled:cursor-not-allowed',
-                )}
+                className="flex-1 gap-1.5"
               >
                 {summarizing ? (
-                  <span className="inline-flex items-center gap-2 justify-center">
+                  <>
                     <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                     요약 중…
-                  </span>
+                  </>
                 ) : selectedIds.size > YOUTUBE_SUMMARIZE_BATCH_MAX ? (
                   `최대 ${YOUTUBE_SUMMARIZE_BATCH_MAX}개까지 요약 가능`
                 ) : (
                   `선택한 ${selectedIds.size}개 요약하기`
                 )}
-              </button>
+              </Button>
               <Button
-                variant="outline"
+                variant="destructive"
                 size="sm"
                 onClick={() => setShowBulkDelete(true)}
                 disabled={bulkDeleting}
-                className="gap-1 shrink-0 h-auto text-destructive hover:text-destructive"
+                className="shrink-0"
               >
-                <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                삭제
+                <Trash2 className="h-4 w-4 mr-1.5" aria-hidden="true" />
+                Delete
               </Button>
             </div>
           )}
