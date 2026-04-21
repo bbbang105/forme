@@ -155,12 +155,12 @@ export function NoteList({ initialNotes, initialHasMore, initialNextOffset }: No
   const handleNewMemo = useCallback(() => {
     startTransition(async () => {
       const note = await createNote();
-      router.push(`/note/${note.id}`);
+      router.push(`/notes/${note.id}`);
     });
   }, [router]);
 
   return (
-    <div className="flex flex-col h-full max-w-3xl mx-auto w-full">
+    <div className="flex flex-col h-full max-w-7xl mx-auto w-full">
       {/* Masthead */}
       <div className="px-4 sm:px-5 pt-8 pb-5 space-y-4">
         <div className="flex items-baseline justify-between gap-3 pb-3 border-b border-border">

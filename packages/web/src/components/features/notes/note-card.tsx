@@ -67,7 +67,7 @@ export const NoteCard = memo(function NoteCard({note, highlight = ''}: NoteCardP
 
   return (
     <Link
-      href={`/note/${note.id}`}
+      href={`/notes/${note.id}`}
       className={cn(
         'group block px-4 sm:px-5 py-4 border-b border-border/60 last:border-b-0',
         'hover:bg-accent/30 transition-colors',

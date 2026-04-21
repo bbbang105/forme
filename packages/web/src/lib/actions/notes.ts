@@ -339,8 +339,8 @@ export async function getNotesPage(offset = 0, limit = DEFAULT_PAGE_SIZE) {
   }, { offset, limit });
 }
 
-export async function getRecentMemos(limit = 3) {
-  return traceAction('getRecentMemos', async () => {
+export async function getRecentNotes(limit = 3) {
+  return traceAction('getRecentNotes', async () => {
     const user = await getAuthUser();
 
     const safeLimit = Math.min(Math.max(1, limit), 20);

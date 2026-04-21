@@ -210,7 +210,7 @@ export function YoutubeFeed() {
         else params.delete(key);
       }
       fetchedKeyRef.current = null;
-      router.push(`/video?${params.toString()}`);
+      router.push(`/youtube?${params.toString()}`);
     },
     [searchParams, router],
   );
@@ -330,7 +330,7 @@ export function YoutubeFeed() {
       }
 
       if (item.status === 'summarized') {
-        router.push(`/video/${id}`);
+        router.push(`/youtube/${id}`);
       } else {
         window.open(`https://www.youtube.com/watch?v=${item.videoId}`, '_blank', 'noopener');
       }
@@ -1039,7 +1039,7 @@ export function YoutubeFeed() {
                 eyebrow={`Pinned · ${pinnedItems.length}/${MAX_PINNED}`}
                 title="자주 돌아보는 것"
               />
-              <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 items-start gap-4">
                 {pinnedItems.map((item) => (
                   <YoutubeCard
                     key={item.id}

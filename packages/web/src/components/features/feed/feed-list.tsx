@@ -528,7 +528,7 @@ export function FeedList() {
   // ── Empty state: no sources ──
   if (!loading && !hasSources) {
     return (
-      <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-7xl mx-auto">
+      <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto">
         <div className="flex items-center justify-end mb-8">
           <SourceManager onCrawlComplete={handleCrawlComplete} onFavoritesChange={handleFavoritesChange} />
         </div>
@@ -552,7 +552,7 @@ export function FeedList() {
   const isEmpty = items.length === 0 && pinnedItems.length === 0;
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-8 max-w-7xl mx-auto">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto">
       {/* Select mode action bar — editorial hairline style */}
       {selectMode && (
         <div className="flex items-center justify-between gap-3 mb-6 pb-3 border-b border-border">
@@ -689,7 +689,7 @@ export function FeedList() {
                 eyebrow={`Pinned · ${pinnedItems.length}/${MAX_PINNED}`}
                 title="자주 돌아보는 것"
               />
-              <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 items-start gap-6">
                 {pinnedItems.map((item) => (
                   <FeedCard
                     key={item.id}
