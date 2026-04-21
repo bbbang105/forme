@@ -7,6 +7,7 @@ import {YOUTUBE_VIDEO_ID_REGEX} from '@/lib/validators';
 import {fetchTranscript} from '@/lib/youtube-transcript';
 import {summarizeVideo} from '@/lib/gemini';
 import {isSafeUrl} from '@/lib/url-safety';
+import {createSseStream} from '@/lib/sse';
 
 const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
 
@@ -89,26 +90,10 @@ export const POST = withTracing('POST /api/youtube/add-url', async (request: Req
     return NextResponse.json({error: '유효한 YouTube URL이 아닙니다'}, {status: 400});
   }
 
-  const encoder = new TextEncoder();
-  let closed = false;
   let insertedItemId: string | null = null;
 
-  const stream = new ReadableStream({
-    async start(controller) {
-      const send = (event: string, data: unknown) => {
-        if (closed) return;
-        try {
-          controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
-        } catch {
-          closed = true;
-        }
-      };
-      const close = () => {
-        if (closed) return;
-        closed = true;
-        try { controller.close(); } catch { /* already closed */ }
-      };
-
+  return createSseStream(
+    async (send, close) => {
       try {
         // Step 1: 메타데이터 수집
         send('progress', {step: 'meta', message: '영상 정보 가져오는 중...'});
@@ -179,29 +164,19 @@ export const POST = withTracing('POST /api/youtube/add-url', async (request: Req
         console.error('[youtube/add-url] Error:', e);
         send('error', {message: '요약에 실패했습니다'});
       }
-
-      close();
     },
-    async cancel() {
-      closed = true;
-      // Clean up orphaned DB row if still in 'summarizing' status
-      if (insertedItemId) {
-        try {
-          await db.delete(youtubeItems)
-            .where(and(eq(youtubeItems.id, insertedItemId), eq(youtubeItems.status, 'summarizing')));
-        } catch {
-          // best-effort cleanup
+    {
+      onCancel: async () => {
+        // Clean up orphaned DB row if still in 'summarizing' status
+        if (insertedItemId) {
+          try {
+            await db.delete(youtubeItems)
+              .where(and(eq(youtubeItems.id, insertedItemId), eq(youtubeItems.status, 'summarizing')));
+          } catch {
+            // best-effort cleanup
+          }
         }
-      }
+      },
     },
-  });
-
-  return new Response(stream, {
-    headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
-      'X-Accel-Buffering': 'no',
-    },
-  });
+  );
 });

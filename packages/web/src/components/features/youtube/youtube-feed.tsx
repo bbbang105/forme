@@ -22,6 +22,8 @@ import {YoutubeCard, type YoutubeItemData} from './youtube-card';
 import {YOUTUBE_SUMMARIZE_BATCH_MAX} from '@/lib/constants';
 import {YOUTUBE_VIDEO_ID_REGEX} from '@/lib/validators';
 import {AddUrlDialog} from './add-url-dialog';
+import {useInfiniteScroll} from '@/hooks/use-infinite-scroll';
+import {useFilterSync} from '@/hooks/use-filter-sync';
 
 const EMPTY_TAGS: string[] = [];
 
@@ -57,6 +59,7 @@ const TAG_OPTIONS = [
 export function YoutubeFeed() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const {updateFilter: updateFilterBase} = useFilterSync({basePath: '/youtube'});
   const tab = (searchParams.get('tab') as Tab) || 'feed';
   const status = (searchParams.get('status') as Status) || 'unread';
   const activeSourceId = searchParams.get('sourceId') || '';
@@ -96,7 +99,6 @@ export function YoutubeFeed() {
   const MAX_PINNED = 3;
   const [showAddUrl, setShowAddUrl] = useState(false);
 
-  const sentinelRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const fetchedKeyRef = useRef<string | null>(null);
 
@@ -187,33 +189,24 @@ export function YoutubeFeed() {
     fetchItems({ reset: true });
   }, [queryKey, fetchItems]);
 
-  // Infinite scroll
-  useEffect(() => {
-    if (!sentinelRef.current || !hasMore) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry?.isIntersecting && !loadingMore && !loading && cursor) {
-          fetchItems({ reset: false, nextCursor: cursor });
-        }
-      },
-      { rootMargin: '200px' },
-    );
-    observer.observe(sentinelRef.current);
-    return () => observer.disconnect();
-  }, [hasMore, loading, loadingMore, cursor, fetchItems]);
+  // Infinite scroll — shared hook reads latest fetchItems via ref internally.
+  const {sentinelRef} = useInfiniteScroll({
+    hasMore,
+    loading: loadingMore || loading,
+    onLoadMore: () => {
+      if (cursor) fetchItems({ reset: false, nextCursor: cursor });
+    },
+    rootMargin: '200px',
+  });
 
-  // URL update helper
+  // URL update helper — uses the shared filter sync hook, then invalidates
+  // the refetch tracker so the next `useEffect(queryKey)` run refetches.
   const updateFilter = useCallback(
     (updates: Record<string, string | null>) => {
-      const params = new URLSearchParams(searchParams.toString());
-      for (const [key, value] of Object.entries(updates)) {
-        if (value !== null && value !== undefined) params.set(key, value);
-        else params.delete(key);
-      }
       fetchedKeyRef.current = null;
-      router.push(`/youtube?${params.toString()}`);
+      updateFilterBase(updates);
     },
-    [searchParams, router],
+    [updateFilterBase],
   );
 
   // Stable ref for updateFilter (avoid stale closure in debounce timer)

@@ -1,10 +1,12 @@
 'use client';
 
 import {useCallback, useEffect, useRef, useState, useMemo} from 'react';
-import {useRouter, useSearchParams} from 'next/navigation';
+import {useSearchParams} from 'next/navigation';
 import {CheckSquare, Loader2, MailX, Newspaper, Plus, Trash2, X} from 'lucide-react';
 import {Skeleton} from '@/components/ui/skeleton';
 import {Button} from '@/components/ui/button';
+import {useFilterSync} from '@/hooks/use-filter-sync';
+import {useInfiniteScroll} from '@/hooks/use-infinite-scroll';
 import {
     AlertDialog,
     AlertDialogCancel,
@@ -60,8 +62,11 @@ function buildFeedParams(opts: {
 }
 
 export function FeedList() {
-  const router = useRouter();
   const searchParams = useSearchParams();
+  const {updateFilter: updateFilterBase} = useFilterSync({
+    basePath: '/feed',
+    preserveScroll: true,
+  });
 
   // Filter state from URL
   const category = searchParams.get('category') ?? '';
@@ -101,8 +106,7 @@ export function FeedList() {
   const showMemo = status === 'bookmarked' || status === 'read';
   const pinLocked = pinnedItems.length >= MAX_PINNED;
 
-  // Refs for infinite scroll
-  const sentinelRef = useRef<HTMLDivElement>(null);
+  // Refs for keeping handler state fresh in keyboard nav etc.
   const cursorRef = useRef(cursor);
   const hasMoreRef = useRef(hasMore);
   const loadingMoreRef = useRef(false);
@@ -116,7 +120,9 @@ export function FeedList() {
     setSelectedIds(new Set());
   }, [category, status, search, tagsParam, sort, sourceId]);
 
-  // URL sync helper
+  // URL sync helper — delegates to shared `useFilterSync` but preserves the
+  // feed-specific collapsing rules: drop `status=unread` (the default) and
+  // drop `sort=latest` (the default) so canonical URLs stay short.
   const updateFilters = useCallback(
     (updates: {
       category?: string;
@@ -126,27 +132,19 @@ export function FeedList() {
       sort?: SortMode;
       sourceId?: string;
     }) => {
-      const newCategory = updates.category ?? category;
-      const newStatus = updates.status ?? status;
-      const newSearch = updates.search ?? search;
-      const newTags = updates.tags ?? selectedTags;
-      const newSort = updates.sort ?? sort;
-      const newSourceId = updates.sourceId ?? sourceId;
-
-      const params = buildFeedParams({
-        category: newCategory,
-        status: newStatus,
-        search: newSearch,
-        tagsParam: newTags.join(','),
-        sort: newSort,
-        sourceId: newSourceId,
-      });
-      if (newStatus === 'unread') params.delete('status');
-
-      const qs = params.toString();
-      router.push(`/feed${qs ? `?${qs}` : ''}`, { scroll: false });
+      const patch: Record<string, string | null> = {};
+      if (updates.category !== undefined) patch.category = updates.category || null;
+      if (updates.status !== undefined)
+        patch.status = updates.status === 'unread' ? null : updates.status;
+      if (updates.search !== undefined) patch.search = updates.search || null;
+      if (updates.tags !== undefined)
+        patch.tags = updates.tags.length > 0 ? updates.tags.join(',') : null;
+      if (updates.sort !== undefined)
+        patch.sort = updates.sort === 'latest' ? null : updates.sort;
+      if (updates.sourceId !== undefined) patch.sourceId = updates.sourceId || null;
+      updateFilterBase(patch);
     },
-    [router, category, status, search, selectedTags, sort, sourceId]
+    [updateFilterBase],
   );
 
   // Fetch items
@@ -201,28 +199,23 @@ export function FeedList() {
     fetchItems(null, false);
   }, [category, status, search, tagsParam, sort, sourceId, fetchItems]);
 
-  // Infinite scroll
-  useEffect(() => {
-    const sentinel = sentinelRef.current;
-    if (!sentinel || loading) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting && hasMoreRef.current && !loadingMoreRef.current) {
-          loadingMoreRef.current = true;
-          setLoadingMore(true);
-          fetchItems(cursorRef.current, true).finally(() => {
-            loadingMoreRef.current = false;
-            setLoadingMore(false);
-          });
-        }
-      },
-      { rootMargin: '400px' }
-    );
-
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [fetchItems, loading]);
+  // Infinite scroll — shared hook centralises the observer lifecycle.
+  // We retain `loadingMoreRef` to guard against double-fires within a single
+  // fetch round (e.g. observer fires again before our setState flushes).
+  const {sentinelRef} = useInfiniteScroll({
+    hasMore,
+    loading: loading || loadingMore,
+    onLoadMore: () => {
+      if (loadingMoreRef.current) return;
+      loadingMoreRef.current = true;
+      setLoadingMore(true);
+      fetchItems(cursorRef.current, true).finally(() => {
+        loadingMoreRef.current = false;
+        setLoadingMore(false);
+      });
+    },
+    rootMargin: '400px',
+  });
 
   // ── Optimistic handlers ──
 
