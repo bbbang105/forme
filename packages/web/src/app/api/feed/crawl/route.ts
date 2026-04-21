@@ -20,12 +20,21 @@ export const POST = withTracing('POST /api/feed/crawl', async (request: Request)
   }
 
   // Parse optional since date from request body
+  // Accept only dates within the last year and not in the future.
   let since: Date | undefined;
   try {
     const body = await request.json();
     if (body.since) {
       const parsed = new Date(body.since);
-      if (!isNaN(parsed.getTime())) since = parsed;
+      const now = Date.now();
+      const oneYearAgo = now - 365 * 24 * 60 * 60 * 1000;
+      if (
+        !isNaN(parsed.getTime()) &&
+        parsed.getTime() >= oneYearAgo &&
+        parsed.getTime() <= now
+      ) {
+        since = parsed;
+      }
     }
   } catch {
     // No body or invalid JSON — continue without since filter

@@ -119,10 +119,9 @@ export const GET = withTracing('GET /api/cron/feed', async (request) => {
     }
   }
 
-  return NextResponse.json({
-    ok: true,
-    userCount: userIds.length,
-    totalNewItems: globalTotalNew,
-    durationMs: Date.now() - startedAt,
-  });
+  // Internal metrics are logged via withTracing — response body stays minimal
+  // so it doesn't leak user counts / timing to anyone who guesses the secret.
+  const durationMs = Date.now() - startedAt;
+  console.info('[cron/feed] done', { userCount: userIds.length, totalNewItems: globalTotalNew, durationMs });
+  return NextResponse.json({ ok: true, processed: globalTotalNew });
 });

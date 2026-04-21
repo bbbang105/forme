@@ -80,6 +80,10 @@ export const POST = withTracing('POST /api/youtube/add-url', async (request: Req
     return NextResponse.json({error: 'URL이 필요합니다'}, {status: 400});
   }
 
+  if (url.length > 2048) {
+    return NextResponse.json({error: 'URL이 너무 깁니다'}, {status: 400});
+  }
+
   const videoId = extractVideoId(url.trim());
   if (!videoId) {
     return NextResponse.json({error: '유효한 YouTube URL이 아닙니다'}, {status: 400});

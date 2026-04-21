@@ -241,8 +241,9 @@ export async function updateNote(
         .returning()
     );
 
-    // Content-only update — only the note list needs refreshing, not the dashboard widget
+    // Title or preview may change — dashboard widget shows these, so revalidate both.
     revalidatePath('/notes');
+    revalidatePath('/dashboard');
     return row;
   }, { id });
 }
