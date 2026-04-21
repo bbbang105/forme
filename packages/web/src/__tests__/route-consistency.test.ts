@@ -74,4 +74,27 @@ describe('route consistency — regression guard', () => {
         .join('\n')}`,
     ).toBe(0);
   });
+
+  it('no deprecated /api/note/ (singular) API references', () => {
+    // Match /api/note/ path but NOT /api/notes/. Catches fetch / withTracing labels / comment strings.
+    const pattern = /(['"`]\/api\/note\/|\bPOST \/api\/note\/|\bGET \/api\/note\/|\bPATCH \/api\/note\/|\bDELETE \/api\/note\/)/;
+    const offenders = scan(pattern);
+    expect(
+      offenders.length,
+      `Found ${offenders.length} deprecated /api/note/ (singular) references:\n${offenders
+        .map((o) => `  ${o.file}:${o.line}  ${o.snippet}`)
+        .join('\n')}`,
+    ).toBe(0);
+  });
+
+  it('no deprecated /api/video/ or /api/memo/ API references', () => {
+    const pattern = /(['"`]\/api\/(video|memo)\/|\b(POST|GET|PATCH|DELETE) \/api\/(video|memo)\/)/;
+    const offenders = scan(pattern);
+    expect(
+      offenders.length,
+      `Found ${offenders.length} deprecated /api/video/ or /api/memo/ references:\n${offenders
+        .map((o) => `  ${o.file}:${o.line}  ${o.snippet}`)
+        .join('\n')}`,
+    ).toBe(0);
+  });
 });
