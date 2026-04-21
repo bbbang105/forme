@@ -247,8 +247,8 @@ export async function updateNote(
   }, { id });
 }
 
-export async function getMemoTags() {
-  return traceAction('getMemoTags', async () => {
+export async function getNoteTags() {
+  return traceAction('getNoteTags', async () => {
     const user = await getAuthUser();
     const rows = await traceQuery('notes.tags', () =>
       db
@@ -282,8 +282,8 @@ export async function deleteNote(id: string) {
   }, { id });
 }
 
-export async function toggleMemoPin(id: string) {
-  return traceAction('toggleMemoPin', async () => {
+export async function toggleNotePin(id: string) {
+  return traceAction('toggleNotePin', async () => {
     const user = await getAuthUser();
     validateUUID(id);
 

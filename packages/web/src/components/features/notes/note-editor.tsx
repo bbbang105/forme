@@ -4,7 +4,7 @@ import {useCallback, useEffect, useRef, useState} from 'react';
 import {useRouter} from 'next/navigation';
 import {EditorContent, useEditor} from '@tiptap/react';
 import {ArrowLeft, Check, Pin, RotateCcw, Trash2} from 'lucide-react';
-import {deleteNote, toggleMemoPin, updateNote} from '@/lib/actions/notes';
+import {deleteNote, toggleNotePin, updateNote} from '@/lib/actions/notes';
 import {NoteToolbar} from './note-toolbar';
 import {TagInput} from './tag-input';
 import {cn} from '@/lib/utils';
@@ -137,7 +137,7 @@ export function NoteEditor({ note }: NoteEditorProps) {
   }, [note.id, router]);
 
   const handleTogglePin = useCallback(async () => {
-    const result = await toggleMemoPin(note.id);
+    const result = await toggleNotePin(note.id);
     if (result) setIsPinned(result.isPinned);
   }, [note.id]);
 

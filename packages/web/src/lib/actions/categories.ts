@@ -68,6 +68,7 @@ export async function createCategory(data: { name: string; color: string; icon: 
 export async function updateCategory(id: string, data: { name?: string; color?: string; icon?: string; sortOrder?: number }) {
   return traceAction('updateCategory', async () => {
     const user = await getAuthUser();
+    if (!UUID_REGEX.test(id)) throw new Error('잘못된 카테고리 ID입니다');
 
     const updates: Record<string, unknown> = {};
     if (data.name !== undefined) {
@@ -104,6 +105,7 @@ export async function updateCategory(id: string, data: { name?: string; color?: 
 export async function deleteCategory(id: string) {
   return traceAction('deleteCategory', async () => {
     const user = await getAuthUser();
+    if (!UUID_REGEX.test(id)) throw new Error('잘못된 카테고리 ID입니다');
     await traceQuery('delete_category', () =>
       db.delete(eventCategories)
         .where(and(eq(eventCategories.id, id), eq(eventCategories.userId, user.id)))

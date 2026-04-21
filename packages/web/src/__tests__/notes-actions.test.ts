@@ -335,20 +335,26 @@ describe('Notes Actions', () => {
     });
   });
 
-  describe('toggleMemoPin', () => {
+  describe('toggleNotePin', () => {
     it('should throw if not authenticated', async () => {
       setMockUser(null);
-      const { toggleMemoPin } = await import('@/lib/actions/notes');
+      const { toggleNotePin } = await import('@/lib/actions/notes');
       await expect(
-        toggleMemoPin('550e8400-e29b-41d4-a716-446655440000')
+        toggleNotePin('550e8400-e29b-41d4-a716-446655440000')
       ).rejects.toThrow('Unauthorized');
+    });
+
+    it('should throw if id is not valid UUID', async () => {
+      setMockUser('user-123');
+      const { toggleNotePin } = await import('@/lib/actions/notes');
+      await expect(toggleNotePin('bad-id')).rejects.toThrow('잘못된 ID입니다');
     });
 
     it('should toggle pin when authenticated', async () => {
       setMockUser('user-123');
       setDbResolve([{ id: 'test-id', isPinned: true }]);
-      const { toggleMemoPin } = await import('@/lib/actions/notes');
-      const result = await toggleMemoPin('550e8400-e29b-41d4-a716-446655440000');
+      const { toggleNotePin } = await import('@/lib/actions/notes');
+      const result = await toggleNotePin('550e8400-e29b-41d4-a716-446655440000');
       expect(result).toBeDefined();
     });
   });

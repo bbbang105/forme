@@ -1,25 +1,29 @@
 import Link from 'next/link';
-import {and, desc, eq} from 'drizzle-orm';
-import {db, youtubeItems} from '@forme/shared';
-import {getAuthUser} from '@/lib/auth';
+import {getRecentYoutubeItems} from '@/lib/actions/youtube';
 import {PlayCircle} from 'lucide-react';
 import {SectionHeader} from '@/components/ui/section-header';
 
 const LIMIT = 5;
 
 export async function DashboardYoutube() {
-  const user = await getAuthUser();
-  const items = await db
-    .select({
-      id: youtubeItems.id,
-      title: youtubeItems.title,
-      channelName: youtubeItems.channelName,
-      thumbnailUrl: youtubeItems.thumbnailUrl,
-    })
-    .from(youtubeItems)
-    .where(and(eq(youtubeItems.userId, user.id), eq(youtubeItems.status, 'summarized')))
-    .orderBy(desc(youtubeItems.summarizedAt))
-    .limit(LIMIT);
+  let items;
+  try {
+    items = await getRecentYoutubeItems(LIMIT);
+  } catch {
+    return (
+      <section aria-labelledby="dashboard-video-heading" className="space-y-4">
+        <SectionHeader
+          eyebrow="YouTube"
+          title="최근 요약"
+          actionHref="/youtube"
+          actionLabel="View all"
+        />
+        <p className="text-sm text-muted-foreground border-t border-border/60 py-8 text-center">
+          최근 요약을 불러올 수 없습니다.
+        </p>
+      </section>
+    );
+  }
 
   if (items.length === 0) {
     return (

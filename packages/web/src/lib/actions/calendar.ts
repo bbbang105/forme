@@ -342,8 +342,10 @@ export async function toggleRecurringInstance(eventId: string, dateStr: string) 
     if (!DATE_REGEX.test(dateStr)) throw new Error('날짜 형식이 올바르지 않습니다');
     const user = await getAuthUser();
 
-    const [event] = await db.select().from(calendarEvents)
-      .where(and(eq(calendarEvents.id, eventId), eq(calendarEvents.userId, user.id)));
+    const [event] = await traceQuery('calendar.events.get_for_toggle_instance', () =>
+      db.select().from(calendarEvents)
+        .where(and(eq(calendarEvents.id, eventId), eq(calendarEvents.userId, user.id)))
+    );
     if (!event) throw new Error('일정을 찾을 수 없습니다');
 
     const existing = event.completedDates ?? [];
@@ -369,14 +371,15 @@ export async function excludeRecurringDate(eventId: string, dateStr: string) {
     const user = await getAuthUser();
     if (!DATE_REGEX.test(dateStr)) throw new Error('날짜 형식이 올바르지 않습니다');
 
-    const [event] = await db.select().from(calendarEvents)
-      .where(and(eq(calendarEvents.id, eventId), eq(calendarEvents.userId, user.id)));
+    const [event] = await traceQuery('calendar.events.get_for_exclude', () =>
+      db.select().from(calendarEvents)
+        .where(and(eq(calendarEvents.id, eventId), eq(calendarEvents.userId, user.id)))
+    );
     if (!event) throw new Error('일정을 찾을 수 없습니다');
 
-    const excluded = event.excludedDates ?? [];
-    if (!excluded.includes(dateStr)) {
-      excluded.push(dateStr);
-    }
+    // Build a new array instead of mutating the ORM-returned reference
+    const existing = event.excludedDates ?? [];
+    const excluded = existing.includes(dateStr) ? existing : [...existing, dateStr];
 
     await traceQuery('calendar.events.excludeDate', () =>
       db.update(calendarEvents)
@@ -487,8 +490,10 @@ export async function deleteRecurringAfter(eventId: string, dateStr: string) {
     d.setDate(d.getDate() - 1);
     const newEndDate = d.toISOString().split('T')[0];
 
-    const [event] = await db.select().from(calendarEvents)
-      .where(and(eq(calendarEvents.id, eventId), eq(calendarEvents.userId, user.id)));
+    const [event] = await traceQuery('calendar.events.get_for_delete_after', () =>
+      db.select().from(calendarEvents)
+        .where(and(eq(calendarEvents.id, eventId), eq(calendarEvents.userId, user.id)))
+    );
     if (!event) throw new Error('일정을 찾을 수 없습니다');
 
     if (newEndDate < event.startDate) {
