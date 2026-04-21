@@ -1,22 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
-  <rect width="192" height="192" rx="32" fill="#18181b"/>
-  <defs>
-    <pattern id="scanlines" width="4" height="4" patternUnits="userSpaceOnUse">
-      <rect width="4" height="2" fill="#0ea5e9" opacity="0.03"/>
-    </pattern>
-  </defs>
-  <rect width="192" height="192" rx="32" fill="url(#scanlines)"/>
-  <!-- { f } retro style — tighter spacing -->
-  <g fill="none" stroke="#0ea5e9" stroke-width="11" stroke-linecap="square" stroke-linejoin="miter">
-    <!-- { left brace -->
-    <polyline points="56,48 44,48 44,86 33,96 44,106 44,144 56,144"/>
-    <!-- f stem -->
-    <line x1="96" y1="63" x2="96" y2="144"/>
-    <!-- f crossbar -->
-    <line x1="81" y1="99" x2="113" y2="99"/>
-    <!-- f top hook -->
-    <polyline points="96,63 96,55 109,48"/>
-    <!-- } right brace -->
-    <polyline points="136,48 148,48 148,86 159,96 148,106 148,144 136,144"/>
-  </g>
+  <title>forme</title>
+  <rect width="192" height="192" rx="36" fill="#F7F2E8"/>
+  <text x="42" y="150" font-family="Instrument Serif, Georgia, 'Times New Roman', serif" font-style="italic" font-weight="400" font-size="156" letter-spacing="-0.02em" fill="#1F1A15">f<tspan fill="#D96B3B">.</tspan></text>
 </svg>

@@ -1,17 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
-  <rect width="192" height="192" fill="#18181b"/>
-  <defs>
-    <pattern id="scanlines" width="4" height="4" patternUnits="userSpaceOnUse">
-      <rect width="4" height="2" fill="#0ea5e9" opacity="0.03"/>
-    </pattern>
-  </defs>
-  <rect width="192" height="192" fill="url(#scanlines)"/>
-  <!-- { f } retro — inward for maskable safe zone (20% padding) -->
-  <g fill="none" stroke="#0ea5e9" stroke-width="9" stroke-linecap="square" stroke-linejoin="miter">
-    <polyline points="62,58 52,58 52,88 43,96 52,104 52,134 62,134"/>
-    <line x1="96" y1="70" x2="96" y2="134"/>
-    <line x1="83" y1="99" x2="111" y2="99"/>
-    <polyline points="96,70 96,63 107,58"/>
-    <polyline points="130,58 140,58 140,88 149,96 140,104 140,134 130,134"/>
-  </g>
+  <title>forme</title>
+  <rect width="192" height="192" fill="#F7F2E8"/>
+  <text x="58" y="134" font-family="Instrument Serif, Georgia, 'Times New Roman', serif" font-style="italic" font-weight="400" font-size="116" letter-spacing="-0.02em" fill="#1F1A15">f<tspan fill="#D96B3B">.</tspan></text>
 </svg>
