@@ -160,7 +160,7 @@ export function NoteList({ initialNotes, initialHasMore, initialNextOffset }: No
   }, [router]);
 
   return (
-    <div className="flex flex-col h-full max-w-3xl mx-auto w-full">
+    <div className="flex flex-col h-full max-w-7xl mx-auto w-full">
       {/* Masthead */}
       <div className="px-4 sm:px-5 pt-8 pb-5 space-y-4">
         <div className="flex items-baseline justify-between gap-3 pb-3 border-b border-border">

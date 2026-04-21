@@ -1,7 +1,7 @@
 export function YoutubeFeedSkeleton() {
   return (
     <div
-      className="space-y-4 px-4 sm:px-6 lg:px-8 py-4 max-w-7xl mx-auto"
+      className="space-y-4 px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto"
       role="status"
       aria-label="유튜브 피드 불러오는 중"
       aria-busy={true}
