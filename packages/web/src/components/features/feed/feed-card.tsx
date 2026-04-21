@@ -8,6 +8,7 @@ import {ITEM_NOTE_MAX_LENGTH} from '@/lib/constants';
 import {formatRelativeDate, getArticleGradient, getCategoryStyle} from '@/lib/feed-utils';
 import {Checkbox} from '@/components/ui/checkbox';
 import {useSwipeAction} from '@/hooks/use-swipe-action';
+import type {SavedItemBase} from '@/lib/types/saved-item';
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -15,23 +16,14 @@ function isNew(collectedAt: string): boolean {
   return Date.now() - new Date(collectedAt).getTime() < ONE_DAY_MS;
 }
 
-export interface FeedItemData {
-  id: string;
+export interface FeedItemData extends SavedItemBase {
+  /** Feed items always belong to a source (RSS feed or "직접 추가" system source). */
   sourceId: string;
-  title: string;
   url: string;
-  description: string | null;
-  thumbnailUrl: string | null;
-  publishedAt: string | null;
   category: string;
   tags: string[] | null;
-  isRead: boolean;
-  isBookmarked: boolean;
   collectedAt: string;
   sourceName: string | null;
-  note: string | null;
-  /** ISO string if the bookmark is pinned to the top of the Saved view, otherwise null. */
-  pinnedAt: string | null;
 }
 
 interface FeedCardProps {

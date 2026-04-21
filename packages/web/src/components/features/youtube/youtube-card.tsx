@@ -6,26 +6,16 @@ import {Bookmark, BookmarkCheck, FileText, MessageSquare, Pin, PinOff, Trash2} f
 import {cn} from '@/lib/utils';
 import {ITEM_NOTE_MAX_LENGTH} from '@/lib/constants';
 import {formatRelativeDate, getArticleGradient} from '@/lib/feed-utils';
+import type {SavedItemBase} from '@/lib/types/saved-item';
 
-export interface YoutubeItemData {
-  id: string;
+export interface YoutubeItemData extends SavedItemBase {
   videoId: string;
-  sourceId: string | null;
-  title: string;
-  description: string | null;
-  thumbnailUrl: string | null;
-  channelName: string;
-  publishedAt: string | null;
   status: string;
+  channelName: string;
   oneLiner: string | null;
   summarySource: string | null;
   keywords: string[] | null;
-  isRead: boolean;
-  isBookmarked: boolean;
   duration: number | null;
-  note: string | null;
-  /** ISO string if pinned to top of Saved view, otherwise null. */
-  pinnedAt: string | null;
 }
 
 interface YoutubeCardProps {
