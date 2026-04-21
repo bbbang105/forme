@@ -46,14 +46,6 @@ interface YoutubeCardProps {
   sourceTags?: string[];
 }
 
-const TAG_COLORS: Record<string, string> = {
-  economy: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-  dev: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
-  ai: 'bg-violet-500/10 text-violet-600 dark:text-violet-400',
-  uxui: 'bg-pink-500/10 text-pink-600 dark:text-pink-400',
-  'start-up': 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
-};
-
 const TAG_LABELS: Record<string, string> = {
   economy: 'ECONOMY',
   dev: 'DEV',
@@ -171,11 +163,11 @@ function InlineNote({
           e.stopPropagation();
           setEditing(true);
         }}
-        className="w-full text-left mt-1.5 px-2.5 py-1.5 rounded-md bg-muted/50 border border-border/40 text-xs text-muted-foreground hover:border-border transition-colors"
+        className="w-full text-left mt-1.5 px-2.5 py-1.5 rounded-sm bg-background/60 border-l-2 border-border text-xs text-muted-foreground hover:border-primary/60 transition-colors"
       >
         <div className="flex items-start gap-1.5">
           <MessageSquare className="h-3 w-3 mt-0.5 shrink-0 text-muted-foreground/60" aria-hidden="true" />
-          <span className="whitespace-pre-wrap">{initialMemo}</span>
+          <span className="whitespace-pre-wrap italic">{initialMemo}</span>
         </div>
       </button>
     );
@@ -208,27 +200,27 @@ function InlineNote({
         rows={2}
         placeholder="노트를 입력하세요…"
         aria-label="노트 입력"
-        className="w-full text-base sm:text-sm px-2.5 py-1.5 rounded-md bg-muted/50 border border-primary/30 text-foreground placeholder:text-muted-foreground/50 resize-none focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
+        className="w-full text-base sm:text-sm px-2.5 py-1.5 rounded-sm bg-background/60 border-l-2 border-primary/60 text-foreground italic placeholder:text-muted-foreground/50 placeholder:not-italic resize-none focus:outline-none"
       />
       <div className="flex items-center justify-between mt-1">
-        <span className="text-[10px] text-muted-foreground/50">{value.length}/{ITEM_NOTE_MAX_LENGTH}</span>
-        <div className="flex gap-1">
+        <span className="font-mono text-[10px] text-muted-foreground/50 tracking-[0.08em]">{value.length}/{ITEM_NOTE_MAX_LENGTH}</span>
+        <div className="flex gap-3">
           <button
             type="button"
             onClick={() => {
               setValue(initialMemo ?? '');
               setEditing(false);
             }}
-            className="text-[10px] text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded"
+            className="font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground hover:text-foreground transition-colors"
           >
-            취소
+            cancel
           </button>
           <button
             type="button"
             onClick={save}
-            className="text-[10px] text-primary font-medium hover:text-primary/80 px-1.5 py-0.5 rounded"
+            className="font-mono text-[10px] uppercase tracking-[0.1em] text-primary hover:text-primary/80 transition-colors"
           >
-            저장
+            save
           </button>
         </div>
       </div>
@@ -291,34 +283,31 @@ export const YoutubeCard = memo(function YoutubeCard({
           </p>
         )}
 
-        <div className="mt-1.5 flex items-center gap-1">
-          {/* Source tag (1개만) */}
+        <div className="mt-1.5 flex items-center gap-2">
+          {/* Source tag (1개만) — mono em-dash */}
           {sourceTags.slice(0, 1).map((tag) => (
             <span
               key={tag}
-              className={cn(
-                'inline-flex shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold',
-                TAG_COLORS[tag] ?? 'bg-muted text-muted-foreground',
-              )}
+              className="shrink-0 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground"
             >
               {TAG_LABELS[tag] ?? tag.toUpperCase()}
             </span>
           ))}
 
           {isSummarized && item.summarySource === 'description' && (
-            <span className="inline-block shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">
-              설명 기반
+            <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+              — desc
             </span>
           )}
           {isSummarizing && (
-            <span className="inline-flex shrink-0 items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-              <span className="h-1.5 w-1.5 rounded-full bg-primary motion-safe:animate-pulse" />
-              요약 중...
+            <span className="inline-flex shrink-0 items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-primary">
+              <span className="h-1 w-1 rounded-full bg-primary motion-safe:animate-pulse" />
+              summarizing
             </span>
           )}
           {/* 키워드: 텍스트로 · 구분 표시 */}
           {isSummarized && item.keywords && item.keywords.length > 0 && (
-            <span className="truncate text-[10px] text-muted-foreground/70">
+            <span className="truncate text-[11px] text-muted-foreground/70 italic">
               {item.keywords.slice(0, 3).join(' · ')}
             </span>
           )}

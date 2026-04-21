@@ -32,18 +32,47 @@ export default async function YoutubeDetailPage({
 
   return (
     <div className="mx-auto max-w-2xl px-4 pb-24 pt-4">
-      {/* Back link */}
+      {/* Back link — mono */}
       <Link
         href="/youtube"
-        className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        className="mb-6 inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground hover:text-foreground transition-colors"
       >
-        <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-        돌아가기
+        <ArrowLeft className="h-3 w-3" aria-hidden="true" />
+        back
       </Link>
+
+      {/* Metadata eyebrow (channel + date + source marker) */}
+      <p className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+        <span>{item.channelName}</span>
+        {dateLabel && (
+          <>
+            <span aria-hidden="true">—</span>
+            <span>{dateLabel}</span>
+          </>
+        )}
+        {item.summarySource === 'description' && (
+          <>
+            <span aria-hidden="true">—</span>
+            <span>desc-based</span>
+          </>
+        )}
+      </p>
+
+      {/* Title — editorial serif italic */}
+      <h1 className="font-display text-3xl leading-[1.15] tracking-tight text-balance">
+        {item.title}
+      </h1>
+
+      {/* One-liner summary — pull quote */}
+      {item.oneLiner && (
+        <blockquote className="mt-4 border-l-2 border-primary pl-4 font-display text-lg leading-snug text-foreground/80">
+          {item.oneLiner}
+        </blockquote>
+      )}
 
       {/* Thumbnail */}
       {item.thumbnailUrl && (
-        <div className="relative mb-4 aspect-video w-full overflow-hidden rounded-xl bg-muted">
+        <div className="relative mt-6 aspect-video w-full overflow-hidden rounded-sm border border-border bg-muted">
           <Image
             src={item.thumbnailUrl}
             alt=""
@@ -56,44 +85,19 @@ export default async function YoutubeDetailPage({
         </div>
       )}
 
-      {/* Title */}
-      <h1 className="text-xl font-bold leading-tight">{item.title}</h1>
-
-      {/* Metadata */}
-      <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-        <span>{item.channelName}</span>
-        {dateLabel && (
-          <>
-            <span className="text-border">·</span>
-            <span>{dateLabel}</span>
-          </>
-        )}
-        {item.summarySource === 'description' && (
-          <span className="inline-block rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">
-            설명 기반
-          </span>
-        )}
-      </p>
-
-      {/* Keywords */}
+      {/* Keywords — editorial chip row */}
       {item.keywords && item.keywords.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-1.5">
+        <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-1.5 pb-4 border-b border-border">
+          <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">— keywords</span>
           {item.keywords.map((kw) => (
             <span
               key={kw}
-              className="rounded-md bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
+              className="font-mono text-[11px] uppercase tracking-[0.1em] text-foreground/80"
             >
               {kw}
             </span>
           ))}
         </div>
-      )}
-
-      {/* One-liner summary */}
-      {item.oneLiner && (
-        <blockquote className="mt-4 border-l-2 border-primary/50 pl-3 text-sm text-muted-foreground italic">
-          {item.oneLiner}
-        </blockquote>
       )}
 
       {/* Markdown summary */}
@@ -102,15 +106,19 @@ export default async function YoutubeDetailPage({
       </div>
 
       {/* YouTube original link */}
-      <div className="mt-8">
-        <Button asChild variant="outline" className="w-full gap-2">
+      <div className="mt-10 pt-6 border-t border-border">
+        <Button
+          asChild
+          variant="outline"
+          className="w-full gap-2 font-mono text-[11px] uppercase tracking-[0.12em] h-11"
+        >
           <a
             href={`https://www.youtube.com/watch?v=${item.videoId}`}
             target="_blank"
             rel="noopener noreferrer"
           >
-            <ExternalLink className="h-4 w-4" aria-hidden="true" />
-            YouTube에서 보기
+            <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+            watch on youtube
           </a>
         </Button>
       </div>
