@@ -119,7 +119,7 @@ function ImageBlockView({node, updateAttributes, deleteNode, selected}: ReactNod
           />
         )}
 
-        {/* Caption */}
+        {/* Caption — rendered as text only (no dangerouslySetInnerHTML) to prevent XSS via crafted attrs */}
         <figcaption
           className="image-block-caption"
           contentEditable
@@ -128,8 +128,9 @@ function ImageBlockView({node, updateAttributes, deleteNode, selected}: ReactNod
           onBlur={(e) => {
             updateAttributes({caption: e.currentTarget.textContent || ''});
           }}
-          dangerouslySetInnerHTML={{__html: caption || ''}}
-        />
+        >
+          {caption || ''}
+        </figcaption>
       </figure>
     </NodeViewWrapper>
   );

@@ -97,4 +97,18 @@ describe('route consistency — regression guard', () => {
         .join('\n')}`,
     ).toBe(0);
   });
+
+  it('no deprecated /api/youtube/items/<id> mutating references (list path /api/youtube/items? is OK)', () => {
+    // Match /api/youtube/items/ followed by a UUID fragment, param template, or withTracing label.
+    // The list endpoint is accessed as /api/youtube/items?... (querystring) — keep that allowed.
+    const pattern =
+      /(['"`]\/api\/youtube\/items\/(?!route)[^'"`?\s]+|\b(POST|GET|PATCH|DELETE) \/api\/youtube\/items\/\[id\])/;
+    const offenders = scan(pattern);
+    expect(
+      offenders.length,
+      `Found ${offenders.length} deprecated /api/youtube/items/<id> references (use /api/youtube/<id> instead):\n${offenders
+        .map((o) => `  ${o.file}:${o.line}  ${o.snippet}`)
+        .join('\n')}`,
+    ).toBe(0);
+  });
 });
