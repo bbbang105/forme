@@ -1,12 +1,12 @@
 import Link from 'next/link';
-import {getRecentMemos} from '@/lib/actions/notes';
+import {getRecentNotes} from '@/lib/actions/notes';
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
 import {ArrowRight, StickyNote} from 'lucide-react';
 
 export async function DashboardNote() {
-  let recentMemos;
+  let recentNotes;
   try {
-    recentMemos = await getRecentMemos(3);
+    recentNotes = await getRecentNotes(3);
   } catch {
     return (
       <Card>
@@ -17,7 +17,7 @@ export async function DashboardNote() {
     );
   }
 
-  if (recentMemos.length === 0) return null;
+  if (recentNotes.length === 0) return null;
 
   return (
     <Card>
@@ -35,10 +35,10 @@ export async function DashboardNote() {
         </Link>
       </CardHeader>
       <CardContent className="p-4 pt-0 space-y-2">
-        {recentMemos.map((note) => (
+        {recentNotes.map((note) => (
           <Link
             key={note.id}
-            href={`/note/${note.id}`}
+            href={`/notes/${note.id}`}
             className="block p-2 -mx-2 rounded-lg hover:bg-accent/50 transition-colors"
           >
             <p className="text-sm font-medium truncate">

@@ -155,7 +155,7 @@ export function NoteList({ initialNotes, initialHasMore, initialNextOffset }: No
   const handleNewMemo = useCallback(() => {
     startTransition(async () => {
       const note = await createNote();
-      router.push(`/note/${note.id}`);
+      router.push(`/notes/${note.id}`);
     });
   }, [router]);
 

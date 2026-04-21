@@ -210,7 +210,7 @@ export function YoutubeFeed() {
         else params.delete(key);
       }
       fetchedKeyRef.current = null;
-      router.push(`/video?${params.toString()}`);
+      router.push(`/youtube?${params.toString()}`);
     },
     [searchParams, router],
   );
@@ -330,7 +330,7 @@ export function YoutubeFeed() {
       }
 
       if (item.status === 'summarized') {
-        router.push(`/video/${id}`);
+        router.push(`/youtube/${id}`);
       } else {
         window.open(`https://www.youtube.com/watch?v=${item.videoId}`, '_blank', 'noopener');
       }
