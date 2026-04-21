@@ -105,25 +105,25 @@ function LinkInput({ initialUrl, onSubmit, onCancel }: LinkInputProps) {
           if (e.key === 'Enter') handleSubmit();
           if (e.key === 'Escape') onCancel();
         }}
-        placeholder="URL을 입력하세요..."
-        className="flex-1 text-sm bg-transparent outline-none placeholder:text-muted-foreground"
+        placeholder="https://…"
+        className="flex-1 text-sm bg-transparent outline-none placeholder:text-muted-foreground/60"
         autoFocus
       />
       <button
         type="button"
         onClick={handleSubmit}
-        className="text-xs font-medium text-primary px-2 py-1 min-h-[44px] flex items-center focus-visible:ring-2 focus-visible:ring-ring rounded"
+        className="font-mono text-[11px] uppercase tracking-[0.12em] text-primary hover:text-primary/80 transition-colors px-2 py-1 min-h-[44px] flex items-center focus-visible:ring-2 focus-visible:ring-ring rounded"
         aria-label="링크 확인"
       >
-        확인
+        apply
       </button>
       <button
         type="button"
         onClick={onCancel}
-        className="text-xs text-muted-foreground px-2 py-1 min-h-[44px] flex items-center focus-visible:ring-2 focus-visible:ring-ring rounded"
+        className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground hover:text-foreground transition-colors px-2 py-1 min-h-[44px] flex items-center focus-visible:ring-2 focus-visible:ring-ring rounded"
         aria-label="링크 취소"
       >
-        취소
+        cancel
       </button>
     </div>
   );
@@ -357,11 +357,11 @@ function ToolbarButton({
     <button
       type="button"
       className={cn(
-        'p-2 rounded-md transition-colors shrink-0',
+        'p-2 rounded-sm transition-colors shrink-0',
         'focus-visible:ring-2 focus-visible:ring-ring',
         active
-          ? 'bg-accent text-accent-foreground'
-          : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+          ? 'text-primary bg-primary/5'
+          : 'text-muted-foreground hover:text-foreground hover:bg-accent/60',
         disabled && 'opacity-30 pointer-events-none'
       )}
       disabled={disabled}
@@ -373,5 +373,5 @@ function ToolbarButton({
 }
 
 function ToolbarDivider() {
-  return <div className="w-px h-5 bg-border mx-0.5 shrink-0" aria-hidden="true" />;
+  return <div className="w-px h-4 bg-border mx-1 shrink-0" aria-hidden="true" />;
 }
