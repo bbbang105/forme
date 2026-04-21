@@ -55,7 +55,7 @@ function setDbResolve(value: unknown) {
   (mockDb as Record<string, (v: unknown) => void>)._setResolve(value);
 }
 
-describe('Memo Actions', () => {
+describe('Notes Actions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     setDbResolve([{ id: 'test-id', isPinned: false, title: '', contentText: '' }]);
@@ -239,18 +239,18 @@ describe('Memo Actions', () => {
     });
   });
 
-  describe('getRecentMemos', () => {
+  describe('getRecentNotes', () => {
     it('should throw if not authenticated', async () => {
       setMockUser(null);
-      const { getRecentMemos } = await import('@/lib/actions/notes');
-      await expect(getRecentMemos()).rejects.toThrow('Unauthorized');
+      const { getRecentNotes } = await import('@/lib/actions/notes');
+      await expect(getRecentNotes()).rejects.toThrow('Unauthorized');
     });
 
     it('should clamp limit to max 20', async () => {
       setMockUser('user-123');
       setDbResolve([]);
-      const { getRecentMemos } = await import('@/lib/actions/notes');
-      const result = await getRecentMemos(100);
+      const { getRecentNotes } = await import('@/lib/actions/notes');
+      const result = await getRecentNotes(100);
       expect(result).toBeDefined();
     });
   });

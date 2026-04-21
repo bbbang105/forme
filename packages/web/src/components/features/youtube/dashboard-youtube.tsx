@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import {desc, eq, and} from 'drizzle-orm';
+import {and, desc, eq} from 'drizzle-orm';
 import {db, youtubeItems} from '@forme/shared';
 import {getAuthUser} from '@/lib/auth';
 import {PlayCircle} from 'lucide-react';
@@ -49,7 +49,7 @@ export async function DashboardYoutube() {
         {items.map((item) => (
           <li key={item.id}>
             <Link
-              href={`/video/${item.id}`}
+              href={`/youtube/${item.id}`}
               className="group flex gap-3 py-3 border-b border-border/60 last:border-b-0 transition-colors"
             >
               {item.thumbnailUrl ? (
