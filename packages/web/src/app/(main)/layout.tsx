@@ -46,11 +46,7 @@ export default async function MainLayout({
   return (
     <div className="min-h-screen bg-background">
       <Header avatarUrl={avatarUrl} />
-      <LayoutShell>
-        <main className="pt-[calc(3.5rem+env(safe-area-inset-top))] pb-[calc(4rem+env(safe-area-inset-bottom))]">
-          {children}
-        </main>
-      </LayoutShell>
+      <LayoutShell>{children}</LayoutShell>
       <TabBar />
       <ScrollToTop />
     </div>

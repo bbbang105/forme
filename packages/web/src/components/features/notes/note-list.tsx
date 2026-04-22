@@ -160,7 +160,7 @@ export function NoteList({ initialNotes, initialHasMore, initialNextOffset }: No
   }, [router]);
 
   return (
-    <div className="flex flex-col h-full max-w-7xl mx-auto w-full">
+    <div className="max-w-[1400px] mx-auto w-full">
       {/* Masthead */}
       <div className="px-4 sm:px-5 pt-8 pb-5 space-y-4">
         <div className="flex items-baseline justify-between gap-3 pb-3 border-b border-border">
@@ -261,8 +261,9 @@ export function NoteList({ initialNotes, initialHasMore, initialNextOffset }: No
         )}
       </div>
 
-      {/* Memo list */}
-      <div className="flex-1 overflow-y-auto">
+      {/* Memo list — body scroll 위임 (중첩 overflow 제거). sticky 요소가 생기면
+          상위 스크롤 컨테이너가 body임을 고려할 것. */}
+      <div>
         {notes.length === 0 ? (
           <div className="flex flex-col items-center justify-center min-h-[40vh] text-center px-4 max-w-sm mx-auto">
             <StickyNote className="h-6 w-6 text-primary mb-5" aria-hidden="true" />

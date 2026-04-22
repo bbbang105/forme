@@ -24,7 +24,9 @@ export function Header({ avatarUrl }: HeaderProps) {
         'pt-[env(safe-area-inset-top)]'
       )}
     >
-      <div className="flex items-center justify-between h-14 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+      {/* Full-width chrome so the forme wordmark sits on the same x-axis as the
+          collapsed Sidebar icons (w-16 → icon center ≈ 32px matches `lg:px-8`). */}
+      <div className="flex items-center justify-between h-14 px-4 sm:px-6 lg:px-8">
         <Link
           href="/dashboard"
           aria-label="대시보드로 이동"

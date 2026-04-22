@@ -4,7 +4,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 function FeedListSkeleton() {
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto space-y-4">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-[1400px] mx-auto space-y-4">
       <div className="flex items-center justify-between">
         <div className="space-y-1">
           <Skeleton className="h-6 w-24" />

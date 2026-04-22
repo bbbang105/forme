@@ -61,6 +61,8 @@ pnpm db:push          # 스키마 직접 push (dev용)
 - 투두: DnD 드래그 순서변경 (@dnd-kit, GripVertical 핸들, 모바일 항상 표시), 밀린 투두 칩 (date < 오늘 && 미완료 → amber 칩 + "오늘로" 이동), 완료 애니메이션 (check-bounce), 빈 상태 격려 문구
 - Cron 인증: `lib/cron-auth.ts` — `verifyCronSecret()` (timingSafeEqual, 길이 무관 constant-time 비교) + `getAllUserIds()` (profiles 테이블, 100명 cap, 5분 TTL 캐시) 멀티유저 패턴, 모든 cron 라우트에서 사용. 레거시 `verifyCronAuth()` (단일유저) 호환 유지
 - 푸시 알림 Cron: 데일리 요약 (08:00 KST, 일정+투두 카운트), 일정 리마인더 (5분 간격, 현재~1시간 이내 윈도우, 자정 경계 대응, biweekly 격주 검증, reminderSent 즉시 업데이트, 유저별 병렬 처리)
+- 네비게이션 레이아웃: PC(`lg:`) = 좌측 고정 사이드바 (`w-52` 펼침 / `w-16` 접힘, `forme-sidebar-collapsed` localStorage, <1280 자동 접힘) + Header full-width / 모바일 = 하단 TabBar (`lg:hidden`). LayoutShell이 `<main>` 래퍼 + `lg:ml-52/16` 동적 오프셋 관리.
+- 피처 페이지 컨테이너 폭: `max-w-[1400px]` 통일 (feed/youtube/calendar/notes 전체, 대시보드와 동일 기준)
 - 모바일 PWA: viewport `maximumScale: 1, userScalable: false`, 모든 input/textarea/select `text-base`(16px) 이상 (iOS 자동 줌 방지), 크롬 스타일 pull-to-refresh (`overscroll-behavior-y: contain` + DOM 직접 조작 + 컨텐츠 translateY + 인라인 SVG 인디케이터 + `window.location.reload()`)
 - Safari PWA 대응: Dialog `flex flex-col` + `inset-y-0 my-auto` 센터링 (grid+translate 금지), `body[data-scroll-locked]`에서 `overscroll-behavior-y: auto` 해제, pull-to-refresh에서 다이얼로그 열림 감지 스킵
 - 피드 Soft Delete: `deletedAt` 타임스탬프 기반 (NULL = 활성), 모든 SELECT에 `isNull(feedItems.deletedAt)` 필터 필수, 삭제 아이템은 DB에 유지되어 크롤 시 재수집 방지 (title dedup + unique constraint), `add-url`에서 삭제된 URL 재등록 시 UPDATE로 복원
@@ -68,7 +70,7 @@ pnpm db:push          # 스키마 직접 push (dev용)
 - 피드 삭제: 단건 삭제 (AlertDialog 확인) + 일괄 삭제 (체크박스 선택, 100개 청크), ownership은 feedSources join으로 검증
 - 피드 선택 모드: 읽음 탭에서 일괄 안읽음 되돌리기 (bulk-action API, mark_unread) + 일괄 삭제, aria-live 선택 카운트, itemsRef 패턴
 - 피드 URL 수동 등록: POST /api/feed/add-url (preview 모드 + 저장 모드), "직접 추가" 시스템 소스 자동 생성 (manual://), OG 메타 파싱 (50KB streaming), AddUrlDialog 2단계 플로우 (가져오기→미리보기 편집→등록), INTEREST_OPTIONS 태그 클릭 토글 (최대 5개), 카테고리 선택 (AI/DEV/UXUI/ECONOMY), 즐겨찾기 바에 "직접 추가" 필터 칩
-- 피드/유튜브 inline 노트: `InlineNote` 컴포넌트 (읽음+북마크 탭, `ITEM_NOTE_MAX_LENGTH=1000`, key prop으로 외부 상태 동기화), PATCH API 서버측 노트→자동 북마크 (명시적 isBookmarked 지정 시 덮어쓰지 않음)
+- 피드/유튜브 inline 노트: `InlineNote` 공용 컴포넌트 (`components/features/saved/inline-note.tsx`, auto-grow textarea, 읽음+북마크 탭, `ITEM_NOTE_MAX_LENGTH=1000`, key prop으로 외부 상태 동기화, feed-card + youtube-card 공유), PATCH API 서버측 노트→자동 북마크 (명시적 isBookmarked 지정 시 덮어쓰지 않음)
 - Saved 핀 고정: `feed_items.pinned_at` / `youtube_items.pinned_at` 타임스탬프, 유저당 최대 3개 (서버측 count 검증 후 409), Saved 탭 상단 3-col pinned grid + 하단 CSS columns 마소너리. PATCH `{pinned: boolean}` 지원, 북마크 해제 시 자동 unpin
 - 피드 UX: 키보드 네비 (j/k/o/b, ref 기반 리스너 — 아이템 변경 시 재등록 불필요)
 - 노트 캐싱: 에디터 뒤로가기 시 `router.refresh()` + NoteList initialNotes props 동기화
@@ -104,13 +106,14 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | 파일 | 설명 |
 |------|------|
 | `packages/web/src/proxy.ts` | Next.js 16 proxy (인증 리다이렉트, `/api/cron/` 우회 허용) |
-| `packages/web/src/app/(main)/layout.tsx` | 인증 레이아웃 (async 서버 컴포넌트, 아바타 서버사이드 fetch, LayoutShell + 탭바) |
+| `packages/web/src/app/(main)/layout.tsx` | 인증 레이아웃 (async 서버 컴포넌트, 아바타 서버사이드 fetch, LayoutShell + Sidebar + TabBar) |
 | `packages/web/src/app/(auth)/login/page.tsx` | Discord 로그인 |
 | `packages/web/src/app/auth/callback/route.ts` | OAuth 콜백 (open redirect 방어) |
 | `packages/web/src/lib/supabase/middleware.ts` | 세션 갱신 유틸 |
 | `packages/web/src/lib/supabase/server.ts` | 서버 Supabase 클라이언트 |
-| `packages/web/src/components/layout/tab-bar.tsx` | 하단 탭바 (4탭: 피드/유튜브/캘린더/노트) |
-| `packages/web/src/components/layout/header.tsx` | 헤더 (forme 로고 + 다크모드 토글 + 서버 전달 avatarUrl prop) |
+| `packages/web/src/components/layout/sidebar.tsx` | 데스크톱 좌측 사이드바 (`lg:` 이상, `w-52` 펼침/`w-16` 접힘, `forme-sidebar-collapsed` localStorage, <1280 자동 접힘, em-dash eyebrow + mono uppercase 라벨) |
+| `packages/web/src/components/layout/tab-bar.tsx` | 모바일 하단 탭바 (4탭: 피드/유튜브/캘린더/노트, `lg:hidden`) |
+| `packages/web/src/components/layout/header.tsx` | 헤더 full-width (forme 로고 + 다크모드 토글 + avatarUrl prop, `max-w-7xl` 제거 — 로고가 사이드바 아이콘과 수직 정렬) |
 | `packages/web/src/components/ui/logo.tsx` | `LogoMark` (f. 이탤릭 세리프 32px 아이콘) + `Wordmark` (forme. 풀 워드마크) — Instrument Serif italic + ember `.` 악센트 |
 | `packages/shared/src/schema/calendar-events.ts` | 캘린더 이벤트 스키마 (반복: recurrenceType/Days/EndDate, excludedDates, reminderSent) |
 | `packages/shared/src/schema/todos.ts` | 투두 스키마 |
@@ -122,7 +125,7 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/lib/auth.ts` | 인증 유틸 (React.cache 기반 getAuthUser) |
 | `packages/web/src/lib/logger.ts` | 구조화 로거 (withTracing, traceAction, traceQuery) |
 | `packages/web/src/lib/r2.ts` | Cloudflare R2 업로드/삭제 유틸 (Cache-Control 포함) |
-| `packages/web/src/components/layout/layout-shell.tsx` | 클라이언트 레이아웃 셸 (PullToRefresh) |
+| `packages/web/src/components/layout/layout-shell.tsx` | 클라이언트 레이아웃 셸 (PullToRefresh, `<main>` 래퍼, `lg:ml-52/16` 동적 오프셋 관리, hydration flash 방어) |
 | `packages/web/src/components/layout/pull-to-refresh.tsx` | 크롬 스타일 Pull-to-Refresh (컨텐츠 translateY + 인라인 SVG 인디케이터) |
 | `packages/web/src/hooks/use-pull-to-refresh.ts` | Pull-to-Refresh 훅 (DOM 직접 조작, 스크롤 컨테이너 감지, window.location.reload, 다이얼로그 열림 감지 스킵) |
 | `packages/web/src/lib/push.ts` | 푸시 알림 발송 (sendPushToUser) |
@@ -201,7 +204,8 @@ pnpm db:push          # 스키마 직접 push (dev용)
 | `packages/web/src/app/api/youtube/sources/reorder/route.ts` | 즐겨찾기 소스 순서 배치 업데이트 (favoriteOrder) |
 | `packages/web/src/app/api/youtube/items/route.ts` | 영상 피드 목록 (tab=feed/create, status=unread/read/bookmarked, 읽음 탭 readAt DESC 정렬, 검색 escapeIlike, 커서 페이지네이션) |
 | `packages/web/src/components/features/youtube/youtube-feed.tsx` | 유튜브 피드 메인 (Feed/Collect 메인탭, 잡지 그리드 모바일 + 헤어라인 리스트 데스크탑, Saved pinned+마소너리, Collect 컴팩트 리스트, 무한스크롤, 선택 모드, URL 추가, itemsRef/updateFilterRef 패턴) |
-| `packages/web/src/components/features/youtube/youtube-card.tsx` | 영상 카드 3종 (`YoutubeCard` 잡지 그리드 — Feed 탭 모바일 + Saved, `YoutubeListRow` 헤어라인 리스트 — Feed 탭 데스크탑, `YoutubeCompactRow` 컴팩트 행 — Collect 탭). 공유 primitives (Thumbnail + duration badge, MetaRow em-dash mono, ActionButtons, InlineNote). savedVariant 핀 ember border + pinned 라벨 |
+| `packages/web/src/components/features/youtube/youtube-card.tsx` | 영상 카드 3종 (`YoutubeCard` 잡지 그리드 — Feed 탭 모바일 + Saved, `YoutubeListRow` 헤어라인 리스트 — Feed 탭 데스크탑, `YoutubeCompactRow` 컴팩트 행 — Collect 탭). 공유 primitives (Thumbnail + duration badge, MetaRow em-dash mono, ActionButtons, InlineNote from `features/saved/`). savedVariant 핀 ember border + pinned 라벨 |
+| `packages/web/src/components/features/saved/inline-note.tsx` | 피드/유튜브 공용 인라인 노트 컴포넌트 (auto-grow textarea, `ITEM_NOTE_MAX_LENGTH=1000`, feed-card + youtube-card 중복 제거) |
 | `packages/web/src/components/features/youtube/youtube-filter-bar.tsx` | 필터바 (태그 세그먼트 + Feed: 상태칩 + feedStatusActions + 검색 / Collect: 기간칩 + Collect 버튼 + collectRowActions / 즐겨찾기 채널 칩) |
 | `packages/web/src/components/features/youtube/youtube-feed-skeleton.tsx` | 탭 인식 스켈레톤 (Feed: 모바일 잡지 + 데스크탑 헤어라인 / Collect: 컴팩트 행) |
 | `packages/web/src/components/features/youtube/youtube-source-bar.tsx` | 채널 소스 관리 다이얼로그 (추가/삭제/즐겨찾기/태그, 즐겨찾기 DnD 순서변경, compact 트리거 모드로 Feed/Collect 양쪽 액션 슬롯에 배치) |

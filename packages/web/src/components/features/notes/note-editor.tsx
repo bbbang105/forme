@@ -216,8 +216,10 @@ export function NoteEditor({ note }: NoteEditorProps) {
       {/* Toolbar */}
       <NoteToolbar editor={editor} />
 
-      {/* Editor area */}
-      <div className="flex-1 overflow-y-auto px-4 py-6 pb-[env(safe-area-inset-bottom)] max-w-3xl mx-auto w-full">
+      {/* Editor area
+          Bottom padding must clear the fixed TabBar (h-16 + safe area) so the
+          last line of the document is not trapped behind it on mobile. */}
+      <div className="flex-1 overflow-y-auto px-4 pt-6 pb-[calc(5rem+env(safe-area-inset-bottom))] max-w-3xl mx-auto w-full">
         <label htmlFor="note-title" className="sr-only">노트 제목</label>
         <input
           id="note-title"

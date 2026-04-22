@@ -502,7 +502,7 @@ export function FeedList() {
   // ── Empty state: no sources ──
   if (!loading && !hasSources) {
     return (
-      <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto">
+      <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-[1400px] mx-auto">
         <div className="flex items-center justify-end mb-8">
           <SourceManager onCrawlComplete={handleCrawlComplete} onFavoritesChange={handleFavoritesChange} />
         </div>
@@ -526,7 +526,7 @@ export function FeedList() {
   const isEmpty = items.length === 0 && pinnedItems.length === 0;
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-[1400px] mx-auto">
       {/* Select mode action bar — editorial hairline style */}
       {selectMode && (
         <div className="flex items-center justify-between gap-3 mb-6 pb-3 border-b border-border">
