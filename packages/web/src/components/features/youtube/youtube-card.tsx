@@ -1,13 +1,13 @@
 'use client';
 
-import {memo, useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {memo, useCallback, useMemo, useState} from 'react';
 import Image from 'next/image';
-import {Bookmark, BookmarkCheck, FileText, MessageSquare, Pin, PinOff, Trash2} from 'lucide-react';
+import {Bookmark, BookmarkCheck, FileText, Pin, PinOff, Trash2} from 'lucide-react';
 import {cn} from '@/lib/utils';
-import {ITEM_NOTE_MAX_LENGTH} from '@/lib/constants';
 import {formatDuration} from '@/lib/format-time';
 import {formatRelativeDate, getArticleGradient, getCategoryStyle} from '@/lib/feed-utils';
 import {Checkbox} from '@/components/ui/checkbox';
+import {InlineNote} from '@/components/features/saved/inline-note';
 import type {SavedItemBase} from '@/lib/types/saved-item';
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
@@ -223,129 +223,6 @@ function ActionButtons({
           <Trash2 className={iconSize} aria-hidden="true" />
         </button>
       )}
-    </div>
-  );
-}
-
-// ─── Inline Note (bookmark + read tabs) ─────────────────────────────────
-function InlineNote({
-  itemId,
-  initialMemo,
-  onMemoChange,
-}: {
-  itemId: string;
-  initialMemo: string | null;
-  onMemoChange: (id: string, note: string | null) => void;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [value, setValue] = useState(initialMemo ?? '');
-  const inputRef = useRef<HTMLTextAreaElement>(null);
-  const savingRef = useRef(false);
-
-  useEffect(() => {
-    if (editing && inputRef.current) inputRef.current.focus();
-  }, [editing]);
-
-  const save = useCallback(() => {
-    if (savingRef.current) return;
-    const trimmed = value.trim();
-    const newMemo = trimmed || null;
-    if (newMemo !== (initialMemo ?? null)) {
-      savingRef.current = true;
-      onMemoChange(itemId, newMemo);
-      queueMicrotask(() => {
-        savingRef.current = false;
-      });
-    }
-    setEditing(false);
-  }, [value, initialMemo, itemId, onMemoChange]);
-
-  if (!editing && !initialMemo) {
-    return (
-      <button
-        type="button"
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          setEditing(true);
-        }}
-        className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground/60 hover:text-primary transition-colors mt-2"
-      >
-        <MessageSquare className="h-3 w-3" aria-hidden="true" />
-        <span>Add note</span>
-      </button>
-    );
-  }
-
-  if (!editing) {
-    return (
-      <button
-        type="button"
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          setEditing(true);
-        }}
-        className="w-full text-left mt-2 pl-3 py-1 border-l-2 border-primary/40 text-xs text-muted-foreground hover:border-primary transition-colors"
-      >
-        <span className="whitespace-pre-wrap">{initialMemo}</span>
-      </button>
-    );
-  }
-
-  return (
-    <div
-      className="mt-2 pl-3 border-l-2 border-primary"
-      onClick={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-      }}
-    >
-      <textarea
-        ref={inputRef}
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onBlur={save}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            save();
-          }
-          if (e.key === 'Escape') {
-            setValue(initialMemo ?? '');
-            setEditing(false);
-          }
-        }}
-        maxLength={ITEM_NOTE_MAX_LENGTH}
-        rows={2}
-        placeholder="노트를 입력하세요…"
-        aria-label="노트 입력"
-        className="w-full text-base sm:text-sm bg-transparent text-foreground placeholder:text-muted-foreground/50 resize-none focus:outline-none"
-      />
-      <div className="flex items-center justify-between mt-1">
-        <span className="font-mono text-[10px] text-muted-foreground/50">
-          {value.length}/{ITEM_NOTE_MAX_LENGTH}
-        </span>
-        <div className="flex gap-3">
-          <button
-            type="button"
-            onClick={() => {
-              setValue(initialMemo ?? '');
-              setEditing(false);
-            }}
-            className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground hover:text-foreground"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={save}
-            className="font-mono text-[10px] uppercase tracking-[0.08em] text-primary hover:text-primary/80"
-          >
-            Save
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

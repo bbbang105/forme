@@ -596,7 +596,7 @@ export function YoutubeFeed() {
   })();
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto space-y-6 pb-24">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-[1400px] mx-auto space-y-6 pb-24">
       {/* ── Main tabs (Feed / Collect) ── */}
       <div
         role="tablist"
